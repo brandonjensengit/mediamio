@@ -222,4 +222,113 @@ class JellyfinAPIClient: ObservableObject {
     func getCurrentUser(userId: String) async throws -> User {
         try await get(endpoint: "/Users/\(userId)")
     }
+
+    // MARK: - Content Methods
+
+    /// Get user's libraries/views (Movies, TV Shows, etc.)
+    func getLibraries(userId: String) async throws -> LibrariesResponse {
+        let endpoint = Constants.API.Endpoints.userViews(userId: userId)
+        return try await get(endpoint: endpoint)
+    }
+
+    /// Get continue watching items
+    func getContinueWatching(userId: String, limit: Int = 12) async throws -> ItemsResponse {
+        let endpoint = Constants.API.Endpoints.resumeItems(userId: userId)
+        let queryItems = [
+            URLQueryItem(name: "Limit", value: String(limit)),
+            URLQueryItem(name: "Fields", value: "PrimaryImageAspectRatio,BasicSyncInfo"),
+            URLQueryItem(name: "ImageTypeLimit", value: "1"),
+            URLQueryItem(name: "EnableImageTypes", value: "Primary,Backdrop,Thumb"),
+            URLQueryItem(name: "EnableTotalRecordCount", value: "false"),
+            URLQueryItem(name: "MediaTypes", value: "Video")
+        ]
+        return try await get(endpoint: endpoint, queryItems: queryItems)
+    }
+
+    /// Get recently added items
+    func getRecentlyAdded(userId: String, limit: Int = 16, parentId: String? = nil) async throws -> [MediaItem] {
+        let endpoint = Constants.API.Endpoints.latestItems(userId: userId)
+        var queryItems = [
+            URLQueryItem(name: "Limit", value: String(limit)),
+            URLQueryItem(name: "Fields", value: "PrimaryImageAspectRatio,Path"),
+            URLQueryItem(name: "ImageTypeLimit", value: "1"),
+            URLQueryItem(name: "EnableImageTypes", value: "Primary,Backdrop,Thumb")
+        ]
+
+        if let parentId = parentId {
+            queryItems.append(URLQueryItem(name: "ParentId", value: parentId))
+        }
+
+        return try await get(endpoint: endpoint, queryItems: queryItems)
+    }
+
+    /// Get items from a library with filters
+    func getLibraryItems(
+        userId: String,
+        parentId: String? = nil,
+        includeItemTypes: [String]? = nil,
+        limit: Int = 50,
+        startIndex: Int = 0,
+        sortBy: String? = "SortName",
+        sortOrder: String? = "Ascending"
+    ) async throws -> ItemsResponse {
+        let endpoint = Constants.API.Endpoints.userItems(userId: userId)
+
+        var queryItems = [
+            URLQueryItem(name: "Fields", value: "PrimaryImageAspectRatio,Path,Overview"),
+            URLQueryItem(name: "ImageTypeLimit", value: "1"),
+            URLQueryItem(name: "EnableImageTypes", value: "Primary,Backdrop,Thumb"),
+            URLQueryItem(name: "StartIndex", value: String(startIndex)),
+            URLQueryItem(name: "Limit", value: String(limit)),
+            URLQueryItem(name: "Recursive", value: "true")
+        ]
+
+        if let parentId = parentId {
+            queryItems.append(URLQueryItem(name: "ParentId", value: parentId))
+        }
+
+        if let types = includeItemTypes {
+            queryItems.append(URLQueryItem(name: "IncludeItemTypes", value: types.joined(separator: ",")))
+        }
+
+        if let sortBy = sortBy {
+            queryItems.append(URLQueryItem(name: "SortBy", value: sortBy))
+        }
+
+        if let sortOrder = sortOrder {
+            queryItems.append(URLQueryItem(name: "SortOrder", value: sortOrder))
+        }
+
+        return try await get(endpoint: endpoint, queryItems: queryItems)
+    }
+
+    /// Get detailed information about a specific item
+    func getItemDetails(userId: String, itemId: String) async throws -> MediaItem {
+        let endpoint = Constants.API.Endpoints.userItemDetails(userId: userId, itemId: itemId)
+        let queryItems = [
+            URLQueryItem(name: "Fields", value: "Path,Genres,Studios,People,Overview,ProviderIds")
+        ]
+        return try await get(endpoint: endpoint, queryItems: queryItems)
+    }
+
+    /// Build image URL for an item
+    func buildImageURL(
+        itemId: String,
+        imageType: String,
+        maxWidth: Int? = nil,
+        maxHeight: Int? = nil,
+        quality: Int = Constants.UI.imageQuality
+    ) -> String {
+        var url = "\(baseURL)/Items/\(itemId)/Images/\(imageType)?quality=\(quality)"
+
+        if let width = maxWidth {
+            url += "&maxWidth=\(width)"
+        }
+
+        if let height = maxHeight {
+            url += "&maxHeight=\(height)"
+        }
+
+        return url
+    }
 }
