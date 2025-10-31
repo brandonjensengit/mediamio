@@ -9,9 +9,16 @@ import SwiftUI
 
 @main
 struct MediaMioApp: App {
+    @StateObject private var authService = AuthenticationService()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            if authService.isAuthenticated {
+                HomeView()
+            } else {
+                ServerEntryView()
+            }
         }
+        .environmentObject(authService)
     }
 }
