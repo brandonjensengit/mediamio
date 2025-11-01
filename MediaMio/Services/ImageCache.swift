@@ -189,12 +189,12 @@ class ImageCache {
             print("💿 Disk cache size: \(totalSize / 1024 / 1024) MB")
 
             // If over limit, remove oldest files
-            if totalSize > maxDiskCacheSize {
+            if totalSize > Int64(maxDiskCacheSize) {
                 // Sort by date (oldest first)
                 files.sort { $0.date < $1.date }
 
                 var removedSize: Int64 = 0
-                let targetRemovalSize = totalSize - (maxDiskCacheSize * 8 / 10)  // Remove down to 80% of max
+                let targetRemovalSize = totalSize - (Int64(maxDiskCacheSize) * 8 / 10)  // Remove down to 80% of max
 
                 for file in files {
                     if removedSize >= targetRemovalSize {

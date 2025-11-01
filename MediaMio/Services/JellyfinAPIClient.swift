@@ -311,6 +311,17 @@ class JellyfinAPIClient: ObservableObject {
         return try await get(endpoint: endpoint, queryItems: queryItems)
     }
 
+    /// Get similar items (recommendations)
+    func getSimilarItems(userId: String, itemId: String, limit: Int = 12) async throws -> ItemsResponse {
+        let endpoint = "/Items/\(itemId)/Similar"
+        let queryItems = [
+            URLQueryItem(name: "UserId", value: userId),
+            URLQueryItem(name: "Limit", value: String(limit)),
+            URLQueryItem(name: "Fields", value: "PrimaryImageAspectRatio,Path,Overview")
+        ]
+        return try await get(endpoint: endpoint, queryItems: queryItems)
+    }
+
     /// Build image URL for an item
     func buildImageURL(
         itemId: String,
