@@ -7,21 +7,30 @@
 
 import SwiftUI
 
-/// Horizontal scrolling row of media content
+/// Horizontal scrolling row of media content with Netflix-level focus memory
 struct ContentRow: View {
     let section: ContentSection
     let baseURL: String
+    let rowIndex: Int
+    let navigationManager: NavigationManager?
     let onItemSelect: (MediaItem) -> Void
     let onSeeAll: (() -> Void)?
+
+    @FocusState private var focusedItemId: String?
+    @State private var hasInitializedFocus: Bool = false
 
     init(
         section: ContentSection,
         baseURL: String,
+        rowIndex: Int = 0,
+        navigationManager: NavigationManager? = nil,
         onItemSelect: @escaping (MediaItem) -> Void,
         onSeeAll: (() -> Void)? = nil
     ) {
         self.section = section
         self.baseURL = baseURL
+        self.rowIndex = rowIndex
+        self.navigationManager = navigationManager
         self.onItemSelect = onItemSelect
         self.onSeeAll = onSeeAll
     }
@@ -58,12 +67,19 @@ struct ContentRow: View {
                     // Leading padding
                     Color.clear.frame(width: Constants.UI.defaultPadding - Constants.UI.cardSpacing)
 
-                    ForEach(section.items) { item in
+                    ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
                         PosterCard(
                             item: item,
                             baseURL: baseURL
                         ) {
                             onItemSelect(item)
+                        }
+                        .focused($focusedItemId, equals: item.id)
+                        .onChange(of: focusedItemId) { newValue in
+                            if newValue == item.id {
+                                // This item is now focused, save to navigation manager
+                                navigationManager?.rememberFocus(row: rowIndex, itemIndex: index)
+                            }
                         }
                     }
 
@@ -72,6 +88,16 @@ struct ContentRow: View {
                 }
             }
             .frame(height: Constants.UI.posterHeight + 100)  // Poster + text + spacing
+            .onAppear {
+                // Restore focus memory when row appears
+                if !hasInitializedFocus, let navManager = navigationManager {
+                    let rememberedIndex = navManager.recallFocus(for: rowIndex)
+                    if rememberedIndex < section.items.count {
+                        focusedItemId = section.items[rememberedIndex].id
+                    }
+                    hasInitializedFocus = true
+                }
+            }
         }
     }
 }

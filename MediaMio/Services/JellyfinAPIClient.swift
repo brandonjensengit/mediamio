@@ -322,13 +322,40 @@ class JellyfinAPIClient: ObservableObject {
         return try await get(endpoint: endpoint, queryItems: queryItems)
     }
 
+    /// Search for items
+    func searchItems(
+        userId: String,
+        searchTerm: String,
+        includeItemTypes: [String]? = nil,
+        limit: Int = 50,
+        startIndex: Int = 0
+    ) async throws -> ItemsResponse {
+        let endpoint = "/Users/\(userId)/Items"
+
+        var queryItems = [
+            URLQueryItem(name: "SearchTerm", value: searchTerm),
+            URLQueryItem(name: "Recursive", value: "true"),
+            URLQueryItem(name: "Fields", value: "PrimaryImageAspectRatio,Path,Overview"),
+            URLQueryItem(name: "ImageTypeLimit", value: "1"),
+            URLQueryItem(name: "EnableImageTypes", value: "Primary,Backdrop,Thumb"),
+            URLQueryItem(name: "Limit", value: String(limit)),
+            URLQueryItem(name: "StartIndex", value: String(startIndex))
+        ]
+
+        if let types = includeItemTypes {
+            queryItems.append(URLQueryItem(name: "IncludeItemTypes", value: types.joined(separator: ",")))
+        }
+
+        return try await get(endpoint: endpoint, queryItems: queryItems)
+    }
+
     /// Build image URL for an item
     func buildImageURL(
         itemId: String,
         imageType: String,
         maxWidth: Int? = nil,
         maxHeight: Int? = nil,
-        quality: Int = Constants.UI.imageQuality
+        quality: Int = 90
     ) -> String {
         var url = "\(baseURL)/Items/\(itemId)/Images/\(imageType)?quality=\(quality)"
 

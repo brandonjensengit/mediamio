@@ -24,6 +24,11 @@ struct ItemDetailView: View {
                     VStack(alignment: .leading, spacing: 50) {
                         let displayItem = viewModel.detailedItem ?? viewModel.item
 
+                        // TV Show Episode Info (if applicable)
+                        if displayItem.type == "Episode" {
+                            TVShowEpisodeInfoView(item: displayItem)
+                        }
+
                         // Overview
                         if let overview = displayItem.overview {
                             DetailSectionView(title: "Overview") {
@@ -74,6 +79,12 @@ struct ItemDetailView: View {
 struct DetailHeaderView: View {
     @ObservedObject var viewModel: ItemDetailViewModel
     @State private var backdropURL: String?
+    @FocusState private var focusedButton: FocusableButton?
+
+    enum FocusableButton {
+        case play
+        case favorite
+    }
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -149,7 +160,7 @@ struct DetailHeaderView: View {
 
                 // Action Buttons
                 HStack(spacing: 24) {
-                    // Play/Resume Button
+                    // Play/Resume Button (default focus)
                     DetailActionButton(
                         title: viewModel.hasProgress ? "Resume" : "Play",
                         icon: "play.fill",
@@ -157,6 +168,7 @@ struct DetailHeaderView: View {
                     ) {
                         viewModel.playItem()
                     }
+                    .focused($focusedButton, equals: .play)
 
                     // Favorite Button
                     DetailActionButton(
@@ -166,6 +178,7 @@ struct DetailHeaderView: View {
                     ) {
                         viewModel.toggleFavorite()
                     }
+                    .focused($focusedButton, equals: .favorite)
                 }
                 .padding(.bottom, 40)
             }
@@ -174,6 +187,8 @@ struct DetailHeaderView: View {
         .frame(height: 700)
         .onAppear {
             updateBackdropURL()
+            // Set default focus to Play button (Netflix-level UX)
+            focusedButton = .play
         }
         .onChange(of: viewModel.detailedItem) { _ in
             updateBackdropURL()
@@ -268,6 +283,49 @@ struct MetadataRow: View {
                 .font(.headline)
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+// MARK: - TV Show Episode Info
+
+struct TVShowEpisodeInfoView: View {
+    let item: MediaItem
+
+    var body: some View {
+        DetailSectionView(title: "Episode Information") {
+            VStack(alignment: .leading, spacing: 16) {
+                // Series Name
+                if let seriesName = item.seriesName {
+                    MetadataRow(label: "Series", value: seriesName)
+                }
+
+                // Season & Episode
+                HStack(spacing: 40) {
+                    if let seasonNum = item.parentIndexNumber {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Season")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("\(seasonNum)")
+                                .font(.system(size: 32, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                    }
+
+                    if let episodeNum = item.indexNumber {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Episode")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("\(episodeNum)")
+                                .font(.system(size: 32, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, Constants.UI.defaultPadding)
         }
     }
 }

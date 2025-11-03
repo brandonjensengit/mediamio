@@ -12,6 +12,7 @@ struct HomeView: View {
     @EnvironmentObject var authService: AuthenticationService
     @StateObject private var coordinator = NavigationCoordinator()
     @State private var viewModel: HomeViewModel?
+    @State private var isSidebarVisible = false
 
     var body: some View {
         NavigationStack(path: $coordinator.navigationPath) {
@@ -19,12 +20,33 @@ struct HomeView: View {
                 Color.black.ignoresSafeArea()
 
                 if let vm = viewModel {
-                    HomeContentView(viewModel: vm)
-                        .navigationDestination(for: MediaItem.self) { item in
-                            createItemDetailView(for: item)
+                    HStack(spacing: 0) {
+                        // Sidebar
+                        SidebarView(isVisible: $isSidebarVisible) { menuItem in
+                            handleMenuSelection(menuItem)
                         }
+                        .offset(x: isSidebarVisible ? 0 : -350)
+                        .animation(.easeInOut(duration: 0.3), value: isSidebarVisible)
+
+                        // Main content
+                        HomeContentView(viewModel: vm, isSidebarVisible: $isSidebarVisible)
+                            .offset(x: isSidebarVisible ? 0 : -350)
+                            .animation(.easeInOut(duration: 0.3), value: isSidebarVisible)
+                            .navigationDestination(for: MediaItem.self) { item in
+                                createItemDetailView(for: item)
+                            }
+                            .navigationDestination(for: ContentSection.self) { section in
+                                createLibraryView(for: section)
+                            }
+                            .navigationDestination(for: NavigationDestination.self) { destination in
+                                switch destination {
+                                case .search:
+                                    createSearchView()
+                                }
+                            }
+                    }
                 } else {
-                    LoadingView(message: "Initializing...")
+                    LoadingView(message: "Initializing...", showLogo: true)
                 }
             }
             .onAppear {
@@ -47,11 +69,60 @@ struct HomeView: View {
         ItemDetailViewWrapper(item: item, authService: authService, coordinator: coordinator)
     }
 
+    @ViewBuilder
+    private func createLibraryView(for section: ContentSection) -> some View {
+        LibraryViewWrapper(section: section, authService: authService, coordinator: coordinator)
+    }
+
+    @ViewBuilder
+    private func createSearchView() -> some View {
+        SearchViewWrapper(authService: authService, coordinator: coordinator)
+    }
+
     private func createAPIClient(for session: UserSession) -> JellyfinAPIClient {
         let apiClient = JellyfinAPIClient()
         apiClient.baseURL = session.serverURL
         apiClient.accessToken = session.accessToken
         return apiClient
+    }
+
+    private func handleMenuSelection(_ item: MenuItem) {
+        print("🎯 Menu selected: \(item.title)")
+
+        // Delay hiding to allow navigation to complete
+        Task {
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
+            isSidebarVisible = false
+        }
+
+        switch item {
+        case .home:
+            // Already on home, just close sidebar
+            coordinator.navigationPath.removeLast(coordinator.navigationPath.count)
+        case .search:
+            coordinator.navigateToSearch()
+        case .movies:
+            if let moviesSection = viewModel?.sections.first(where: {
+                if case .library(_, let name) = $0.type, name.lowercased().contains("movie") {
+                    return true
+                }
+                return false
+            }) {
+                coordinator.navigate(to: moviesSection)
+            }
+        case .tvShows:
+            if let tvSection = viewModel?.sections.first(where: {
+                if case .library(_, let name) = $0.type, name.lowercased().contains("tv") || name.lowercased().contains("show") {
+                    return true
+                }
+                return false
+            }) {
+                coordinator.navigate(to: tvSection)
+            }
+        case .favorites:
+            // Will be implemented later
+            print("⭐ Favorites not yet implemented")
+        }
     }
 }
 
@@ -87,7 +158,74 @@ struct ItemDetailViewWrapper: View {
     }
 }
 
+// MARK: - Library View Wrapper
+
+struct LibraryViewWrapper: View {
+    let section: ContentSection
+    let authService: AuthenticationService
+    let coordinator: NavigationCoordinator
+    @StateObject private var viewModel: LibraryViewModel
+
+    init(section: ContentSection, authService: AuthenticationService, coordinator: NavigationCoordinator) {
+        self.section = section
+        self.authService = authService
+        self.coordinator = coordinator
+
+        // Create ViewModel once and keep it alive
+        let session = authService.currentSession!
+        let apiClient = JellyfinAPIClient()
+        apiClient.baseURL = session.serverURL
+        apiClient.accessToken = session.accessToken
+        let contentService = ContentService(apiClient: apiClient, authService: authService)
+
+        _viewModel = StateObject(wrappedValue: LibraryViewModel(
+            section: section,
+            contentService: contentService,
+            authService: authService,
+            navigationCoordinator: coordinator
+        ))
+    }
+
+    var body: some View {
+        LibraryView(viewModel: viewModel)
+    }
+}
+
+// MARK: - Search View Wrapper
+
+struct SearchViewWrapper: View {
+    let authService: AuthenticationService
+    let coordinator: NavigationCoordinator
+    @StateObject private var viewModel: SearchViewModel
+
+    init(authService: AuthenticationService, coordinator: NavigationCoordinator) {
+        self.authService = authService
+        self.coordinator = coordinator
+
+        // Create ViewModel once and keep it alive
+        let session = authService.currentSession!
+        let apiClient = JellyfinAPIClient()
+        apiClient.baseURL = session.serverURL
+        apiClient.accessToken = session.accessToken
+        let contentService = ContentService(apiClient: apiClient, authService: authService)
+
+        _viewModel = StateObject(wrappedValue: SearchViewModel(
+            contentService: contentService,
+            authService: authService,
+            navigationCoordinator: coordinator
+        ))
+    }
+
+    var body: some View {
+        SearchView(viewModel: viewModel)
+    }
+}
+
 // MARK: - Navigation Coordinator
+
+enum NavigationDestination: Hashable {
+    case search
+}
 
 @MainActor
 class NavigationCoordinator: ObservableObject {
@@ -97,18 +235,30 @@ class NavigationCoordinator: ObservableObject {
         print("🧭 Navigating to: \(item.name)")
         navigationPath.append(item)
     }
+
+    func navigate(to section: ContentSection) {
+        print("🧭 Navigating to section: \(section.title)")
+        navigationPath.append(section)
+    }
+
+    func navigateToSearch() {
+        print("🧭 Navigating to: Search")
+        navigationPath.append(NavigationDestination.search)
+    }
 }
 
 // MARK: - Home Content View
 
 struct HomeContentView: View {
     @ObservedObject var viewModel: HomeViewModel
+    @Binding var isSidebarVisible: Bool
+    var navigationManager: NavigationManager? = nil
 
     var body: some View {
         ZStack {
             if viewModel.isLoading && !viewModel.hasContent {
                 // Initial loading state
-                LoadingView(message: "Loading your media...")
+                LoadingView(message: "Loading your media...", showLogo: true)
             } else if let error = viewModel.errorMessage {
                 // Error state
                 ErrorView(message: error) {
@@ -123,8 +273,20 @@ struct HomeContentView: View {
                 // Content
                 ScrollView(.vertical, showsIndicators: true) {
                     VStack(spacing: 0) {
-                        // Hero Banner
-                        if let featured = viewModel.featuredItem {
+                        // Hero Banner with auto-rotation (Netflix-style)
+                        if viewModel.featuredItems.count > 1 {
+                            HeroBannerRotating(
+                                items: viewModel.featuredItems,
+                                baseURL: viewModel.baseURL,
+                                onPlay: { item in
+                                    viewModel.playItem(item)
+                                },
+                                onInfo: { item in
+                                    viewModel.showItemDetails(item)
+                                }
+                            )
+                        } else if let featured = viewModel.featuredItem {
+                            // Single item fallback
                             HeroBanner(
                                 item: featured,
                                 baseURL: viewModel.baseURL
@@ -135,12 +297,14 @@ struct HomeContentView: View {
                             }
                         }
 
-                        // Content Sections
+                        // Content Sections with Netflix-level focus memory
                         VStack(spacing: Constants.UI.sectionSpacing) {
-                            ForEach(viewModel.sections) { section in
+                            ForEach(Array(viewModel.sections.enumerated()), id: \.element.id) { index, section in
                                 ContentRow(
                                     section: section,
-                                    baseURL: viewModel.baseURL
+                                    baseURL: viewModel.baseURL,
+                                    rowIndex: index,
+                                    navigationManager: navigationManager
                                 ) { item in
                                     viewModel.selectItem(item)
                                 } onSeeAll: {

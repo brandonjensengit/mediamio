@@ -59,7 +59,7 @@ struct LibrariesResponse: Codable {
 }
 
 // MARK: - Content Section
-struct ContentSection: Identifiable {
+struct ContentSection: Identifiable, Hashable {
     let id = UUID()
     let title: String
     var items: [MediaItem]
@@ -94,5 +94,15 @@ struct ContentSection: Identifiable {
 
     var count: Int {
         items.count
+    }
+
+    // Hashable conformance
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(title)
+        hasher.combine(type)
+    }
+
+    static func == (lhs: ContentSection, rhs: ContentSection) -> Bool {
+        lhs.title == rhs.title && lhs.type == rhs.type
     }
 }

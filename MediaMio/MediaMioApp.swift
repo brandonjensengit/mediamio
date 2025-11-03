@@ -3,6 +3,7 @@
 //  MediaMio
 //
 //  Created by Brandon Jensen on 10/31/25.
+//  Phase 1: Netflix-Level Navigation Refactor
 //
 
 import SwiftUI
@@ -14,7 +15,7 @@ struct MediaMioApp: App {
     var body: some Scene {
         WindowGroup {
             if authService.isAuthenticated {
-                HomeView()
+                MainTabView()
             } else {
                 ServerEntryView()
             }

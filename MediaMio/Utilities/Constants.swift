@@ -84,14 +84,14 @@ enum Constants {
 
     // MARK: - UI Constants
     enum UI {
-        // Focus Effects
-        static let focusScale: CGFloat = 1.08
+        // Focus Effects (Netflix-level specs)
+        static let focusScale: CGFloat = 1.1  // Netflix-level: 1.0 → 1.1
         static let normalScale: CGFloat = 1.0
-        static let focusShadowRadius: CGFloat = 20
-        static let animationDuration: Double = 0.2
+        static let focusShadowRadius: CGFloat = 20  // 20pt blur radius
+        static let animationDuration: Double = 0.2  // 200ms - feels instant
 
-        // Spacing
-        static let defaultPadding: CGFloat = 40
+        // Spacing (Netflix-level: 60pt edge padding)
+        static let defaultPadding: CGFloat = 60  // Edge breathing room
         static let cardSpacing: CGFloat = 30
         static let rowSpacing: CGFloat = 60
         static let sectionSpacing: CGFloat = 80

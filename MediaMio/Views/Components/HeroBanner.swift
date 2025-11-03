@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-/// Large hero banner for featured content
+/// Large hero banner for featured content with Netflix-style auto-rotation
 struct HeroBanner: View {
     let item: MediaItem
     let baseURL: String
@@ -15,6 +15,125 @@ struct HeroBanner: View {
     let onInfo: () -> Void
 
     @State private var backdropURL: String?
+
+    var body: some View {
+        HeroBannerContent(
+            item: item,
+            baseURL: baseURL,
+            backdropURL: backdropURL,
+            onPlay: onPlay,
+            onInfo: onInfo
+        )
+        .frame(height: Constants.UI.heroBannerHeight)
+        .onAppear {
+            // Generate backdrop URL
+            backdropURL = item.backdropImageURL(
+                baseURL: baseURL,
+                maxWidth: Constants.UI.backdropImageMaxWidth,
+                quality: Constants.UI.imageQuality
+            ) ?? item.primaryImageURL(
+                baseURL: baseURL,
+                maxWidth: Constants.UI.backdropImageMaxWidth,
+                quality: Constants.UI.imageQuality
+            )
+        }
+    }
+}
+
+/// Multi-item hero banner with auto-rotation (Netflix-style)
+struct HeroBannerRotating: View {
+    let items: [MediaItem]
+    let baseURL: String
+    let onPlay: (MediaItem) -> Void
+    let onInfo: (MediaItem) -> Void
+
+    @State private var currentIndex: Int = 0
+    @State private var rotationTimer: Timer?
+    @State private var isButtonFocused: Bool = false
+
+    private let rotationInterval: TimeInterval = 8.0
+    private let transitionDuration: TimeInterval = 0.8
+
+    var body: some View {
+        ZStack {
+            if !items.isEmpty {
+                // Multiple backdrops with crossfade
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    HeroBannerContent(
+                        item: item,
+                        baseURL: baseURL,
+                        backdropURL: generateBackdropURL(for: item),
+                        onPlay: { onPlay(item) },
+                        onInfo: { onInfo(item) },
+                        onFocusChange: { focused in
+                            isButtonFocused = focused
+                        }
+                    )
+                    .opacity(index == currentIndex ? 1 : 0)
+                    .animation(.easeInOut(duration: transitionDuration), value: currentIndex)
+                }
+            } else {
+                // Empty state
+                Color.black
+                    .frame(height: Constants.UI.heroBannerHeight)
+            }
+        }
+        .frame(height: Constants.UI.heroBannerHeight)
+        .onAppear {
+            startAutoRotation()
+        }
+        .onDisappear {
+            stopAutoRotation()
+        }
+        .onChange(of: isButtonFocused) { focused in
+            if focused {
+                stopAutoRotation()
+            } else {
+                startAutoRotation()
+            }
+        }
+    }
+
+    private func generateBackdropURL(for item: MediaItem) -> String? {
+        return item.backdropImageURL(
+            baseURL: baseURL,
+            maxWidth: Constants.UI.backdropImageMaxWidth,
+            quality: Constants.UI.imageQuality
+        ) ?? item.primaryImageURL(
+            baseURL: baseURL,
+            maxWidth: Constants.UI.backdropImageMaxWidth,
+            quality: Constants.UI.imageQuality
+        )
+    }
+
+    private func startAutoRotation() {
+        guard items.count > 1 else { return }
+
+        rotationTimer?.invalidate()
+        rotationTimer = Timer.scheduledTimer(withTimeInterval: rotationInterval, repeats: true) { _ in
+            withAnimation {
+                currentIndex = (currentIndex + 1) % items.count
+            }
+        }
+    }
+
+    private func stopAutoRotation() {
+        rotationTimer?.invalidate()
+        rotationTimer = nil
+    }
+}
+
+/// Shared hero banner content view
+private struct HeroBannerContent: View {
+    let item: MediaItem
+    let baseURL: String
+    let backdropURL: String?
+    let onPlay: () -> Void
+    let onInfo: () -> Void
+    var onFocusChange: ((Bool) -> Void)? = nil
+
+    @State private var playButtonFocused: Bool = false
+    @State private var infoButtonFocused: Bool = false
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -87,7 +206,11 @@ struct HeroBanner: View {
                     HeroBannerButton(
                         title: hasProgress ? "Resume" : "Play",
                         icon: "play.fill",
-                        style: .primary
+                        style: .primary,
+                        onFocusChange: { focused in
+                            playButtonFocused = focused
+                            onFocusChange?(focused)
+                        }
                     ) {
                         onPlay()
                     }
@@ -96,7 +219,11 @@ struct HeroBanner: View {
                     HeroBannerButton(
                         title: "More Info",
                         icon: "info.circle",
-                        style: .secondary
+                        style: .secondary,
+                        onFocusChange: { focused in
+                            infoButtonFocused = focused
+                            onFocusChange?(focused)
+                        }
                     ) {
                         onInfo()
                     }
@@ -104,19 +231,6 @@ struct HeroBanner: View {
                 .padding(.bottom, 40)
             }
             .padding(.horizontal, Constants.UI.defaultPadding)
-        }
-        .frame(height: Constants.UI.heroBannerHeight)
-        .onAppear {
-            // Generate backdrop URL
-            backdropURL = item.backdropImageURL(
-                baseURL: baseURL,
-                maxWidth: Constants.UI.backdropImageMaxWidth,
-                quality: Constants.UI.imageQuality
-            ) ?? item.primaryImageURL(
-                baseURL: baseURL,
-                maxWidth: Constants.UI.backdropImageMaxWidth,
-                quality: Constants.UI.imageQuality
-            )
         }
     }
 
@@ -138,6 +252,7 @@ struct HeroBannerButton: View {
     let title: String
     let icon: String
     let style: ButtonStyle
+    var onFocusChange: ((Bool) -> Void)? = nil
     let action: () -> Void
 
     @Environment(\.isFocused) private var isFocused
@@ -184,6 +299,9 @@ struct HeroBannerButton: View {
             .animation(.easeInOut(duration: 0.2), value: isFocused)
         }
         .buttonStyle(.plain)
+        .onChange(of: isFocused) { focused in
+            onFocusChange?(focused)
+        }
     }
 }
 

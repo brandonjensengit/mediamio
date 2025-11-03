@@ -19,6 +19,7 @@ class ItemDetailViewModel: ObservableObject {
     private let apiClient: JellyfinAPIClient
     private let authService: AuthenticationService
     weak var navigationCoordinator: NavigationCoordinator?
+    weak var navigationManager: NavigationManager?
 
     var baseURL: String {
         authService.currentSession?.serverURL ?? ""
@@ -28,11 +29,18 @@ class ItemDetailViewModel: ObservableObject {
         authService.currentSession?.user.id
     }
 
-    init(item: MediaItem, apiClient: JellyfinAPIClient, authService: AuthenticationService, navigationCoordinator: NavigationCoordinator? = nil) {
+    init(
+        item: MediaItem,
+        apiClient: JellyfinAPIClient,
+        authService: AuthenticationService,
+        navigationCoordinator: NavigationCoordinator? = nil,
+        navigationManager: NavigationManager? = nil
+    ) {
         self.item = item
         self.apiClient = apiClient
         self.authService = authService
         self.navigationCoordinator = navigationCoordinator
+        self.navigationManager = navigationManager
     }
 
     // MARK: - Load Content
@@ -86,7 +94,12 @@ class ItemDetailViewModel: ObservableObject {
 
     func playItem() {
         print("▶️ Play: \(item.name)")
-        // Will be implemented in Phase 4 (Video Playback)
+
+        // Use NavigationManager if available (new tab-based navigation)
+        if let navManager = navigationManager {
+            navManager.playItem(displayItem)
+        }
+        // Will be fully implemented in Phase 5 (Video Player)
     }
 
     func toggleFavorite() {
@@ -96,7 +109,14 @@ class ItemDetailViewModel: ObservableObject {
 
     func selectSimilarItem(_ item: MediaItem) {
         print("📺 Selected similar item: \(item.name)")
-        navigationCoordinator?.navigate(to: item)
+
+        // Use NavigationManager if available (new tab-based navigation)
+        if let navManager = navigationManager {
+            navManager.showDetail(for: item)
+        } else {
+            // Fallback to old navigation coordinator
+            navigationCoordinator?.navigate(to: item)
+        }
     }
 
     // MARK: - Computed Properties

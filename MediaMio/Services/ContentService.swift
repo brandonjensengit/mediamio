@@ -143,7 +143,9 @@ class ContentService: ObservableObject {
         libraryId: String,
         itemTypes: [String]? = nil,
         limit: Int = 50,
-        startIndex: Int = 0
+        startIndex: Int = 0,
+        sortBy: String? = nil,
+        sortOrder: String? = nil
     ) async throws -> ItemsResponse {
         guard let userId = userId else {
             throw APIError.authenticationFailed
@@ -153,6 +155,30 @@ class ContentService: ObservableObject {
             userId: userId,
             parentId: libraryId,
             includeItemTypes: itemTypes,
+            limit: limit,
+            startIndex: startIndex,
+            sortBy: sortBy,
+            sortOrder: sortOrder
+        )
+    }
+
+    // MARK: - Search
+
+    /// Search for items
+    func searchItems(
+        searchTerm: String,
+        includeItemTypes: [String]? = nil,
+        limit: Int = 50,
+        startIndex: Int = 0
+    ) async throws -> ItemsResponse {
+        guard let userId = userId else {
+            throw APIError.authenticationFailed
+        }
+
+        return try await apiClient.searchItems(
+            userId: userId,
+            searchTerm: searchTerm,
+            includeItemTypes: includeItemTypes,
             limit: limit,
             startIndex: startIndex
         )

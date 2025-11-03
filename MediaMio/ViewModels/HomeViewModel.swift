@@ -12,6 +12,7 @@ import Combine
 class HomeViewModel: ObservableObject {
     @Published var sections: [ContentSection] = []
     @Published var featuredItem: MediaItem?
+    @Published var featuredItems: [MediaItem] = [] // Netflix-style rotating hero items
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
     @Published var selectedItem: MediaItem?
@@ -19,15 +20,22 @@ class HomeViewModel: ObservableObject {
     private let contentService: ContentService
     private let authService: AuthenticationService
     weak var navigationCoordinator: NavigationCoordinator?
+    weak var navigationManager: NavigationManager?
 
     var baseURL: String {
         authService.currentSession?.serverURL ?? ""
     }
 
-    init(contentService: ContentService, authService: AuthenticationService, navigationCoordinator: NavigationCoordinator? = nil) {
+    init(
+        contentService: ContentService,
+        authService: AuthenticationService,
+        navigationCoordinator: NavigationCoordinator? = nil,
+        navigationManager: NavigationManager? = nil
+    ) {
         self.contentService = contentService
         self.authService = authService
         self.navigationCoordinator = navigationCoordinator
+        self.navigationManager = navigationManager
     }
 
     // MARK: - Load Content
@@ -61,6 +69,23 @@ class HomeViewModel: ObservableObject {
                 self.featuredItem = firstItem
             }
 
+            // Populate featured items for rotating hero banner (Netflix-style)
+            // Get up to 5 items from continue watching and recently added
+            var heroItems: [MediaItem] = []
+
+            // Get items from first section (Continue Watching)
+            if let firstSection = loadedSections.first {
+                heroItems.append(contentsOf: firstSection.items.prefix(3))
+            }
+
+            // Add items from second section (Recently Added) if needed
+            if heroItems.count < 5 && loadedSections.count > 1 {
+                let remaining = 5 - heroItems.count
+                heroItems.append(contentsOf: loadedSections[1].items.prefix(remaining))
+            }
+
+            self.featuredItems = heroItems
+
             isLoading = false
 
         } catch {
@@ -81,25 +106,45 @@ class HomeViewModel: ObservableObject {
     func selectItem(_ item: MediaItem) {
         print("📺 Selected: \(item.name)")
         selectedItem = item
-        navigationCoordinator?.navigate(to: item)
+
+        // Use NavigationManager if available (new tab-based navigation)
+        if let navManager = navigationManager {
+            navManager.showDetail(for: item)
+        } else {
+            // Fallback to old navigation coordinator
+            navigationCoordinator?.navigate(to: item)
+        }
     }
 
     func playItem(_ item: MediaItem) {
         print("▶️ Play: \(item.name)")
-        // Will be implemented in Phase 4 (Video Playback)
         selectedItem = item
-        navigationCoordinator?.navigate(to: item)
+
+        // Use NavigationManager if available (new tab-based navigation)
+        if let navManager = navigationManager {
+            navManager.playItem(item)
+        } else {
+            // Fallback to old navigation coordinator
+            navigationCoordinator?.navigate(to: item)
+        }
     }
 
     func showItemDetails(_ item: MediaItem) {
         print("ℹ️ Show details for: \(item.name)")
         selectedItem = item
-        navigationCoordinator?.navigate(to: item)
+
+        // Use NavigationManager if available (new tab-based navigation)
+        if let navManager = navigationManager {
+            navManager.showDetail(for: item)
+        } else {
+            // Fallback to old navigation coordinator
+            navigationCoordinator?.navigate(to: item)
+        }
     }
 
     func showSeeAll(for section: ContentSection) {
         print("👀 See all for: \(section.title)")
-        // Will be implemented in Phase 3 (Library browsing)
+        navigationCoordinator?.navigate(to: section)
     }
 
     // MARK: - Helpers

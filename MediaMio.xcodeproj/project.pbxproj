@@ -6,6 +6,18 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		BD2DF67C2EB7E842001C4B74 /* mediamioappicon.png in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF67B2EB7E842001C4B74 /* mediamioappicon.png */; };
+		BD2DF67E2EB7EA64001C4B74 /* logotext.png in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF67D2EB7EA64001C4B74 /* logotext.png */; };
+		BD2DF6862EB7EEB2001C4B74 /* mediamio-claude-code-workflow.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6822EB7EEB2001C4B74 /* mediamio-claude-code-workflow.md */; };
+		BD2DF6872EB7EEB2001C4B74 /* mediamio-navigation-quickref.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6832EB7EEB2001C4B74 /* mediamio-navigation-quickref.md */; };
+		BD2DF6882EB7EEB2001C4B74 /* jellyfin-appletv-prompt (1).md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6812EB7EEB2001C4B74 /* jellyfin-appletv-prompt (1).md */; };
+		BD2DF6892EB7EEB2001C4B74 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6852EB7EEB2001C4B74 /* README.md */; };
+		BD2DF68A2EB7EEB2001C4B74 /* mediamio-navigation-refactor-prompt.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6842EB7EEB2001C4B74 /* mediamio-navigation-refactor-prompt.md */; };
+		BD2DF6992EB8DC9A001C4B74 /* fix-video-playback-prompt.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6972EB8DC9A001C4B74 /* fix-video-playback-prompt.md */; };
+		BD2DF69A2EB8DC9A001C4B74 /* video-playback-flowchart.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6982EB8DC9A001C4B74 /* video-playback-flowchart.md */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		BD2DF5842EB51369001C4B74 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +39,15 @@
 		BD2DF5762EB51367001C4B74 /* MediaMio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MediaMio.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BD2DF5832EB51369001C4B74 /* MediaMioTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MediaMioTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BD2DF58D2EB51369001C4B74 /* MediaMioUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MediaMioUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		BD2DF67B2EB7E842001C4B74 /* mediamioappicon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = mediamioappicon.png; sourceTree = "<group>"; };
+		BD2DF67D2EB7EA64001C4B74 /* logotext.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = logotext.png; sourceTree = "<group>"; };
+		BD2DF6812EB7EEB2001C4B74 /* jellyfin-appletv-prompt (1).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "jellyfin-appletv-prompt (1).md"; sourceTree = "<group>"; };
+		BD2DF6822EB7EEB2001C4B74 /* mediamio-claude-code-workflow.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "mediamio-claude-code-workflow.md"; sourceTree = "<group>"; };
+		BD2DF6832EB7EEB2001C4B74 /* mediamio-navigation-quickref.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "mediamio-navigation-quickref.md"; sourceTree = "<group>"; };
+		BD2DF6842EB7EEB2001C4B74 /* mediamio-navigation-refactor-prompt.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "mediamio-navigation-refactor-prompt.md"; sourceTree = "<group>"; };
+		BD2DF6852EB7EEB2001C4B74 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		BD2DF6972EB8DC9A001C4B74 /* fix-video-playback-prompt.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "fix-video-playback-prompt.md"; sourceTree = "<group>"; };
+		BD2DF6982EB8DC9A001C4B74 /* video-playback-flowchart.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "video-playback-flowchart.md"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -79,6 +100,15 @@
 				BD2DF5862EB51369001C4B74 /* MediaMioTests */,
 				BD2DF5902EB51369001C4B74 /* MediaMioUITests */,
 				BD2DF5772EB51367001C4B74 /* Products */,
+				BD2DF67B2EB7E842001C4B74 /* mediamioappicon.png */,
+				BD2DF67D2EB7EA64001C4B74 /* logotext.png */,
+				BD2DF6812EB7EEB2001C4B74 /* jellyfin-appletv-prompt (1).md */,
+				BD2DF6822EB7EEB2001C4B74 /* mediamio-claude-code-workflow.md */,
+				BD2DF6832EB7EEB2001C4B74 /* mediamio-navigation-quickref.md */,
+				BD2DF6842EB7EEB2001C4B74 /* mediamio-navigation-refactor-prompt.md */,
+				BD2DF6852EB7EEB2001C4B74 /* README.md */,
+				BD2DF6972EB8DC9A001C4B74 /* fix-video-playback-prompt.md */,
+				BD2DF6982EB8DC9A001C4B74 /* video-playback-flowchart.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -212,6 +242,15 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BD2DF6862EB7EEB2001C4B74 /* mediamio-claude-code-workflow.md in Resources */,
+				BD2DF6872EB7EEB2001C4B74 /* mediamio-navigation-quickref.md in Resources */,
+				BD2DF6992EB8DC9A001C4B74 /* fix-video-playback-prompt.md in Resources */,
+				BD2DF69A2EB8DC9A001C4B74 /* video-playback-flowchart.md in Resources */,
+				BD2DF6882EB7EEB2001C4B74 /* jellyfin-appletv-prompt (1).md in Resources */,
+				BD2DF6892EB7EEB2001C4B74 /* README.md in Resources */,
+				BD2DF68A2EB7EEB2001C4B74 /* mediamio-navigation-refactor-prompt.md in Resources */,
+				BD2DF67C2EB7E842001C4B74 /* mediamioappicon.png in Resources */,
+				BD2DF67E2EB7EA64001C4B74 /* logotext.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
