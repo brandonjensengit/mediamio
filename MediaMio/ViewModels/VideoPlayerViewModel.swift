@@ -20,14 +20,27 @@ class VideoPlayerViewModel: ObservableObject {
     @Published var bufferedProgress: Double = 0.0  // 0-1
     @Published var currentTime: Double = 0.0  // seconds
     @Published var duration: Double = 0.0  // seconds
+    @Published var showSkipIntroButton: Bool = false
+
+    // Debug stats
+    @Published var currentBitrate: Double = 0.0  // bits per second
+    @Published var observedBitrate: Double = 0.0  // observed bits per second from player
+    @Published var availableSubtitles: [SubtitleTrack] = []
+    @Published var selectedSubtitleIndex: Int? = nil  // nil = off
 
     let item: MediaItem
     private let authService: AuthenticationService
+    private let settingsManager = SettingsManager()
     private var timeObserver: Any?
     private var progressReportTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
     private var hasReportedStart: Bool = false
     private var isLoadingVideo: Bool = false
+
+    // Intro/Credits markers
+    private var introStart: Double?
+    private var introEnd: Double?
+    private var hasSkippedIntro: Bool = false
 
     var baseURL: String {
         authService.currentSession?.serverURL ?? ""
@@ -150,15 +163,34 @@ class VideoPlayerViewModel: ObservableObject {
             if playerItem.status == .readyToPlay {
                 print("✅ Player item confirmed ready, proceeding with playback")
 
-                // Check for resume position
+                // Check for resume position and seek if needed
                 if let resumePosition = getResumePosition() {
-                    let seekTime = CMTime(seconds: resumePosition, preferredTimescale: 1)
-                    await avPlayer.seek(to: seekTime)
-                    print("⏩ Resuming from: \(formatTime(resumePosition))")
+                    print("⏩ Seeking to resume position: \(formatTime(resumePosition))")
+                    let seekTime = CMTime(seconds: resumePosition, preferredTimescale: 600)
+
+                    // Use completion handler to verify seek completed
+                    await withCheckedContinuation { continuation in
+                        avPlayer.seek(to: seekTime, toleranceBefore: .zero, toleranceAfter: .zero) { finished in
+                            if finished {
+                                print("✅ Seek completed successfully to \(self.formatTime(resumePosition))")
+                            } else {
+                                print("⚠️ Seek was interrupted or failed")
+                            }
+                            continuation.resume()
+                        }
+                    }
+                } else {
+                    print("▶️ Starting from beginning (no resume position)")
                 }
 
                 // Report playback start to Jellyfin
                 await reportPlaybackStart()
+
+                // Fetch intro markers for auto-skip
+                await fetchIntroMarkers()
+
+                // Configure subtitles based on settings
+                configureSubtitles()
             } else if playerItem.status == .unknown {
                 print("⏳ HLS stream still loading (status: unknown)")
                 print("⏳ Continuing - status observer will auto-start playback when ready")
@@ -183,19 +215,40 @@ class VideoPlayerViewModel: ObservableObject {
         var components = URLComponents(string: baseURL)
         components?.path = "/Videos/\(item.id)/master.m3u8"
 
-        // HLS streaming parameters
-        components?.queryItems = [
-            URLQueryItem(name: "VideoCodec", value: "h264"),
+        // Apply settings from SettingsManager
+        let videoCodec = VideoCodec(rawValue: settingsManager.videoCodec)?.jellyfinValue ?? "h264"
+        let maxBitrate = settingsManager.maxBitrate
+
+        // Build query items with settings
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "VideoCodec", value: videoCodec),
             URLQueryItem(name: "AudioCodec", value: "aac"),
-            URLQueryItem(name: "MaxStreamingBitrate", value: "20000000"),
+            URLQueryItem(name: "MaxStreamingBitrate", value: "\(maxBitrate)"),
             URLQueryItem(name: "PlaySessionId", value: UUID().uuidString),
             URLQueryItem(name: "MediaSourceId", value: item.id),
             URLQueryItem(name: "DeviceId", value: getDeviceId()),
             URLQueryItem(name: "api_key", value: accessToken)
         ]
 
+        // Apply video quality setting (max height)
+        if let videoQuality = VideoQuality(rawValue: settingsManager.videoQuality),
+           let maxHeight = videoQuality.maxHeight {
+            queryItems.append(URLQueryItem(name: "MaxHeight", value: "\(maxHeight)"))
+            print("📊 Applying video quality: \(videoQuality.rawValue) (max height: \(maxHeight))")
+        }
+
+        // Apply audio quality setting
+        if let audioQuality = AudioQuality(rawValue: settingsManager.audioQuality),
+           audioQuality.bitrate > 0 {
+            queryItems.append(URLQueryItem(name: "AudioBitrate", value: "\(audioQuality.bitrate)"))
+            print("📊 Applying audio quality: \(audioQuality.rawValue) (\(audioQuality.bitrate) bps)")
+        }
+
+        components?.queryItems = queryItems
+
         let url = components?.url
         print("🔗 HLS Master Playlist URL: \(url?.absoluteString ?? "nil")")
+        print("📊 Settings applied: Bitrate=\(maxBitrate/1_000_000)Mbps, Codec=\(videoCodec)")
         return url
     }
 
@@ -263,20 +316,197 @@ class VideoPlayerViewModel: ObservableObject {
     }
 
     private func getResumePosition() -> Double? {
+        print("🔍 Checking resume position for: \(item.name)")
+        print("   userData: \(item.userData != nil)")
+        print("   playbackPositionTicks: \(item.userData?.playbackPositionTicks ?? 0)")
+        print("   runTimeTicks: \(item.runTimeTicks ?? 0)")
+
         guard let userData = item.userData,
               let position = userData.playbackPositionTicks,
               let total = item.runTimeTicks else {
+            print("   ❌ No resume data available")
             return nil
         }
 
         let progress = Double(position) / Double(total) * 100.0
+        let seconds = Double(position) / 10_000_000.0
+
+        print("   Progress: \(String(format: "%.1f", progress))%")
+        print("   Resume position: \(formatTime(seconds))")
 
         // Only resume if between 1% and 95%
         if progress > 1.0 && progress < 95.0 {
-            return Double(position) / 10_000_000.0  // Convert ticks to seconds
+            print("   ✅ Will resume from \(formatTime(seconds))")
+            return seconds  // Convert ticks to seconds
+        } else {
+            print("   ⏭️ Progress outside resume range (1%-95%), starting from beginning")
+            return nil
+        }
+    }
+
+    // MARK: - Intro/Credits Detection
+
+    private func fetchIntroMarkers() async {
+        print("🎬 Fetching intro markers from Jellyfin")
+
+        guard let url = URL(string: "\(baseURL)/Shows/\(item.id)/IntroTimestamps") else {
+            print("❌ Failed to create intro markers URL")
+            return
         }
 
-        return nil
+        var request = URLRequest(url: url)
+        request.setValue(accessToken, forHTTPHeaderField: "X-Emby-Token")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            if let httpResponse = response as? HTTPURLResponse {
+                if httpResponse.statusCode == 200 {
+                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let showIntros = json["ShowIntroTimestamps"] as? [String: Any],
+                       let intro = showIntros.values.first as? [String: Any] {
+                        if let start = intro["IntroStart"] as? Double,
+                           let end = intro["IntroEnd"] as? Double {
+                            introStart = start
+                            introEnd = end
+                            print("✅ Intro detected: \(formatTime(start)) - \(formatTime(end))")
+                        }
+                    }
+                } else if httpResponse.statusCode == 404 {
+                    print("ℹ️ No intro markers available for this item")
+                } else {
+                    print("⚠️ Intro markers request returned: \(httpResponse.statusCode)")
+                }
+            }
+        } catch {
+            print("⚠️ Failed to fetch intro markers: \(error)")
+        }
+    }
+
+    func skipIntro() {
+        guard let player = player, let end = introEnd else { return }
+        print("⏭️ Skipping intro to: \(formatTime(end))")
+        let seekTime = CMTime(seconds: end, preferredTimescale: 600)
+        player.seek(to: seekTime, toleranceBefore: .zero, toleranceAfter: .zero)
+        hasSkippedIntro = true
+        showSkipIntroButton = false
+    }
+
+    private func checkIntroSkip(at currentTime: Double) {
+        guard let start = introStart, let end = introEnd else { return }
+        guard !hasSkippedIntro else { return }
+
+        // Check if we're in the intro range
+        let isInIntro = currentTime >= start && currentTime <= end
+
+        if isInIntro {
+            // Show skip button if enabled in settings
+            if settingsManager.showSkipIntroButton {
+                showSkipIntroButton = true
+            }
+
+            // Auto-skip if enabled in settings
+            if settingsManager.autoSkipIntros {
+                // Add a small delay countdown if configured
+                let countdown = settingsManager.skipIntroCountdown
+                if countdown > 0 {
+                    // Check if we're at the start of intro (within 1 second)
+                    if abs(currentTime - start) < 1.0 {
+                        print("⏳ Auto-skipping intro in \(countdown) seconds...")
+                        DispatchQueue.main.asyncAfter(deadline: .now() + Double(countdown)) { [weak self] in
+                            guard let self = self, !self.hasSkippedIntro else { return }
+                            self.skipIntro()
+                        }
+                    }
+                } else {
+                    // Skip immediately
+                    skipIntro()
+                }
+            }
+        } else if currentTime > end {
+            // Past the intro, hide button
+            showSkipIntroButton = false
+        }
+    }
+
+    // MARK: - Subtitle Configuration
+
+    private func configureSubtitles() {
+        guard let player = player, let playerItem = player.currentItem else {
+            return
+        }
+
+        // Get available subtitle tracks
+        guard let group = playerItem.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) else {
+            return
+        }
+
+        // Populate available subtitles
+        availableSubtitles = group.options.enumerated().map { index, option in
+            SubtitleTrack(
+                index: index,
+                displayName: option.displayName,
+                languageCode: option.locale?.languageCode ?? "unknown",
+                option: option
+            )
+        }
+
+        let subtitleMode = SubtitleMode(rawValue: settingsManager.subtitleMode) ?? .off
+
+        switch subtitleMode {
+        case .off:
+            // Disable all subtitle tracks
+            playerItem.select(nil, in: group)
+            selectedSubtitleIndex = nil
+
+        case .on, .foreignOnly, .smart:
+            // Enable subtitles based on default language setting
+            let defaultLang = settingsManager.defaultSubtitleLanguage
+
+            // Try to find matching language
+            let matchingOption = group.options.enumerated().first { _, option in
+                if let locale = option.locale {
+                    return locale.languageCode == defaultLang
+                }
+                return false
+            }
+
+            if let (index, option) = matchingOption {
+                playerItem.select(option, in: group)
+                selectedSubtitleIndex = index
+            } else if let firstOption = group.options.first {
+                playerItem.select(firstOption, in: group)
+                selectedSubtitleIndex = 0
+            }
+        }
+    }
+
+    func selectSubtitle(at index: Int?) {
+        guard let player = player, let playerItem = player.currentItem else {
+            return
+        }
+
+        guard let group = playerItem.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) else {
+            return
+        }
+
+        if let index = index, index >= 0 && index < group.options.count {
+            // Enable subtitle at index
+            let option = group.options[index]
+            playerItem.select(option, in: group)
+            selectedSubtitleIndex = index
+        } else {
+            // Disable subtitles
+            playerItem.select(nil, in: group)
+            selectedSubtitleIndex = nil
+        }
+    }
+
+    var currentSubtitleName: String {
+        if let index = selectedSubtitleIndex, index < availableSubtitles.count {
+            return availableSubtitles[index].displayName
+        }
+        return "Off"
     }
 
     // MARK: - Player Observers
@@ -295,6 +525,12 @@ class VideoPlayerViewModel: ObservableObject {
                 self.currentTime = currentSeconds
                 self.duration = durationSeconds
                 self.progress = currentSeconds / durationSeconds
+
+                // Check for intro skip
+                self.checkIntroSkip(at: currentSeconds)
+
+                // Update observed bitrate from player
+                self.updateObservedBitrate()
             }
         }
 
@@ -317,15 +553,40 @@ class VideoPlayerViewModel: ObservableObject {
                     if let duration = self?.player?.currentItem?.duration.seconds {
                         print("✅ Duration: \(duration)s")
                     }
-                    // CRITICAL: Start playback when ready
-                    DispatchQueue.main.async {
-                        self?.player?.play()
+
+                    // CRITICAL: Check for resume position before starting playback
+                    Task { @MainActor in
+                        guard let self = self, let player = self.player else { return }
+
+                        // Check if we should resume from a saved position
+                        if let resumePosition = self.getResumePosition() {
+                            print("⏩ [Status Observer] Seeking to resume position: \(self.formatTime(resumePosition))")
+                            let seekTime = CMTime(seconds: resumePosition, preferredTimescale: 600)
+
+                            await withCheckedContinuation { continuation in
+                                player.seek(to: seekTime, toleranceBefore: .zero, toleranceAfter: .zero) { finished in
+                                    if finished {
+                                        print("✅ [Status Observer] Seek completed successfully")
+                                    } else {
+                                        print("⚠️ [Status Observer] Seek was interrupted")
+                                    }
+                                    continuation.resume()
+                                }
+                            }
+                        } else {
+                            print("▶️ [Status Observer] Starting from beginning")
+                        }
+
+                        // Start playback after seeking (or immediately if no resume)
+                        player.play()
                         print("▶️ AUTO-STARTED playback from .readyToPlay status")
 
                         // Report to Jellyfin if not already reported
-                        Task {
-                            await self?.reportPlaybackStart()
-                        }
+                        await self.reportPlaybackStart()
+
+                        // Fetch intro markers and configure subtitles
+                        await self.fetchIntroMarkers()
+                        self.configureSubtitles()
                     }
                 case .failed:
                     print("❌ Player item failed")
@@ -454,6 +715,22 @@ class VideoPlayerViewModel: ObservableObject {
 
     func cleanup() {
         print("🧹 Cleaning up VideoPlayerViewModel")
+
+        // Calculate if video was mostly watched
+        let progressPercent = (duration > 0) ? (currentTime / duration) * 100.0 : 0.0
+        let wasCompleted = progressPercent >= 90.0
+
+        print("📊 Final position: \(formatTime(currentTime)) / \(formatTime(duration)) (\(String(format: "%.1f", progressPercent))%)")
+
+        // Report playback stopped with final position
+        Task {
+            await reportPlaybackStopped(completed: wasCompleted)
+
+            // Mark as watched if >= 90% complete
+            if wasCompleted {
+                await markAsWatched()
+            }
+        }
 
         // Cancel all Combine subscriptions
         cancellables.removeAll()
@@ -602,5 +879,94 @@ class VideoPlayerViewModel: ObservableObject {
         } catch {
             print("⚠️ Failed to report playback stopped: \(error)")
         }
+    }
+
+    private func markAsWatched() async {
+        print("✅ Marking item as watched (>= 90% complete)")
+
+        guard let url = URL(string: "\(baseURL)/Users/\(userId)/PlayedItems/\(item.id)") else {
+            print("❌ Failed to create mark as watched URL")
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(accessToken, forHTTPHeaderField: "X-Emby-Token")
+
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            if let httpResponse = response as? HTTPURLResponse {
+                print("✅ Marked as watched: \(httpResponse.statusCode)")
+            }
+        } catch {
+            print("⚠️ Failed to mark as watched: \(error)")
+        }
+    }
+
+    // MARK: - Debug Stats
+
+    private func updateObservedBitrate() {
+        guard let playerItem = player?.currentItem else { return }
+
+        // Get access log to read current bitrate
+        if let accessLog = playerItem.accessLog(),
+           let lastEvent = accessLog.events.last {
+            observedBitrate = lastEvent.indicatedBitrate
+        }
+    }
+
+    var debugStats: DebugStats {
+        let videoQuality = VideoQuality(rawValue: settingsManager.videoQuality) ?? .auto
+        let audioQuality = AudioQuality(rawValue: settingsManager.audioQuality) ?? .high
+        let videoCodec = VideoCodec(rawValue: settingsManager.videoCodec) ?? .h264
+        let subtitleMode = SubtitleMode(rawValue: settingsManager.subtitleMode) ?? .off
+
+        return DebugStats(
+            videoQuality: videoQuality.rawValue,
+            maxBitrate: settingsManager.maxBitrate,
+            observedBitrate: observedBitrate,
+            videoCodec: videoCodec.rawValue,
+            audioQuality: audioQuality.rawValue,
+            subtitleMode: subtitleMode.rawValue,
+            bufferProgress: bufferedProgress * 100.0
+        )
+    }
+}
+
+// MARK: - Subtitle Track Model
+
+struct SubtitleTrack: Identifiable {
+    let index: Int
+    let displayName: String
+    let languageCode: String
+    let option: AVMediaSelectionOption
+
+    var id: Int { index }
+}
+
+// MARK: - Debug Stats Model
+
+struct DebugStats {
+    let videoQuality: String
+    let maxBitrate: Int
+    let observedBitrate: Double
+    let videoCodec: String
+    let audioQuality: String
+    let subtitleMode: String
+    let bufferProgress: Double
+
+    var maxBitrateMbps: String {
+        return String(format: "%.1f Mbps", Double(maxBitrate) / 1_000_000.0)
+    }
+
+    var observedBitrateMbps: String {
+        if observedBitrate > 0 {
+            return String(format: "%.2f Mbps", observedBitrate / 1_000_000.0)
+        }
+        return "N/A"
+    }
+
+    var bufferPercent: String {
+        return String(format: "%.0f%%", bufferProgress)
     }
 }

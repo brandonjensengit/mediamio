@@ -10,6 +10,7 @@ import SwiftUI
 
 struct MainTabView: View {
     @EnvironmentObject var authService: AuthenticationService
+    @EnvironmentObject var appState: AppState
     @StateObject private var navigationManager = NavigationManager()
 
     var body: some View {
@@ -29,7 +30,7 @@ struct MainTabView: View {
                 .tag(Tab.search)
 
             // Library Tab
-            LibraryTabView()
+            LibraryTabViewWrapper()
                 .tabItem {
                     Label(Tab.library.title, systemImage: Tab.library.icon)
                 }
@@ -65,6 +66,7 @@ struct MainTabView: View {
 
 struct HomeTabView: View {
     @EnvironmentObject var authService: AuthenticationService
+    @EnvironmentObject var appState: AppState
     @EnvironmentObject var navigationManager: NavigationManager
     @State private var viewModel: HomeViewModel?
 
@@ -78,7 +80,7 @@ struct HomeTabView: View {
                 )
                 .navigationBarHidden(true)
             } else {
-                LoadingView(message: "Initializing...", showLogo: true)
+                Color.black.ignoresSafeArea()
                     .onAppear {
                         initializeViewModel()
                     }
@@ -98,7 +100,8 @@ struct HomeTabView: View {
             contentService: contentService,
             authService: authService,
             navigationCoordinator: nil,
-            navigationManager: navigationManager
+            navigationManager: navigationManager,
+            appState: appState
         )
     }
 }
@@ -108,15 +111,21 @@ struct HomeTabView: View {
 struct SearchTabView: View {
     @EnvironmentObject var authService: AuthenticationService
     @EnvironmentObject var navigationManager: NavigationManager
+    @StateObject private var coordinator = NavigationCoordinator()
     @State private var viewModel: SearchViewModel?
 
     var body: some View {
         NavigationStack {
             if let vm = viewModel {
-                SearchView(viewModel: vm)
-                    .navigationBarHidden(true)
+                SearchView(
+                    viewModel: vm,
+                    authService: authService,
+                    coordinator: coordinator,
+                    navigationManager: navigationManager
+                )
+                .navigationBarHidden(true)
             } else {
-                LoadingView(message: "Initializing...", showLogo: true)
+                Color.black.ignoresSafeArea()
                     .onAppear {
                         initializeViewModel()
                     }
@@ -135,34 +144,44 @@ struct SearchTabView: View {
         viewModel = SearchViewModel(
             contentService: contentService,
             authService: authService,
-            navigationCoordinator: nil // Will be replaced with navigationManager
+            navigationCoordinator: coordinator
         )
     }
 }
 
-// MARK: - Placeholder Views
+// MARK: - Library Tab Wrapper
 
-struct LibraryTabView: View {
+struct LibraryTabViewWrapper: View {
+    @EnvironmentObject var authService: AuthenticationService
+    @EnvironmentObject var navigationManager: NavigationManager
+    @StateObject private var coordinator = NavigationCoordinator()
+    @State private var contentService: ContentService?
+
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-
-            VStack(spacing: 30) {
-                Image(systemName: "square.stack.fill")
-                    .font(.system(size: 80))
-                    .foregroundColor(.white.opacity(0.5))
-
-                VStack(spacing: 12) {
-                    Text("Library")
-                        .font(.system(size: 48, weight: .bold))
-                        .foregroundColor(.white)
-
-                    Text("Coming in Phase 3")
-                        .font(.title3)
-                        .foregroundColor(.secondary)
-                }
+        NavigationStack {
+            if let service = contentService {
+                LibraryTabView(
+                    contentService: service,
+                    authService: authService,
+                    navigationCoordinator: coordinator
+                )
+                .navigationBarHidden(true)
+            } else {
+                Color.black.ignoresSafeArea()
+                    .onAppear {
+                        initializeServices()
+                    }
             }
         }
+    }
+
+    private func initializeServices() {
+        guard contentService == nil, let session = authService.currentSession else { return }
+
+        let apiClient = JellyfinAPIClient()
+        apiClient.baseURL = session.serverURL
+        apiClient.accessToken = session.accessToken
+        contentService = ContentService(apiClient: apiClient, authService: authService)
     }
 }
 
@@ -170,33 +189,10 @@ struct SettingsTabView: View {
     @EnvironmentObject var authService: AuthenticationService
 
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-
-            VStack(spacing: 30) {
-                Image(systemName: "gearshape.fill")
-                    .font(.system(size: 80))
-                    .foregroundColor(.white.opacity(0.5))
-
-                VStack(spacing: 12) {
-                    Text("Settings")
-                        .font(.system(size: 48, weight: .bold))
-                        .foregroundColor(.white)
-
-                    Text("Configure your preferences")
-                        .font(.title3)
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-                    .frame(height: 100)
-
-                // Sign Out button
-                FocusableButton(title: "Sign Out", style: .destructive) {
-                    authService.logout()
-                }
-                .frame(width: 500)
-            }
+        NavigationStack {
+            SettingsView()
+                .environmentObject(authService)
+                .navigationBarHidden(true)
         }
     }
 }

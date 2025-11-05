@@ -32,21 +32,23 @@ struct HomeView: View {
                         HomeContentView(viewModel: vm, isSidebarVisible: $isSidebarVisible)
                             .offset(x: isSidebarVisible ? 0 : -350)
                             .animation(.easeInOut(duration: 0.3), value: isSidebarVisible)
-                            .navigationDestination(for: MediaItem.self) { item in
-                                createItemDetailView(for: item)
-                            }
-                            .navigationDestination(for: ContentSection.self) { section in
-                                createLibraryView(for: section)
-                            }
-                            .navigationDestination(for: NavigationDestination.self) { destination in
-                                switch destination {
-                                case .search:
-                                    createSearchView()
-                                }
-                            }
                     }
                 } else {
-                    LoadingView(message: "Initializing...", showLogo: true)
+                    Color.black.ignoresSafeArea()
+                }
+            }
+            .navigationDestination(for: MediaItem.self) { item in
+                createItemDetailView(for: item)
+            }
+            .navigationDestination(for: ContentSection.self) { section in
+                createLibraryView(for: section)
+            }
+            .navigationDestination(for: NavigationDestination.self) { destination in
+                switch destination {
+                case .search:
+                    createSearchView()
+                case .settings:
+                    createSettingsView()
                 }
             }
             .onAppear {
@@ -77,6 +79,12 @@ struct HomeView: View {
     @ViewBuilder
     private func createSearchView() -> some View {
         SearchViewWrapper(authService: authService, coordinator: coordinator)
+    }
+
+    @ViewBuilder
+    private func createSettingsView() -> some View {
+        SettingsView()
+            .environmentObject(authService)
     }
 
     private func createAPIClient(for session: UserSession) -> JellyfinAPIClient {
@@ -122,6 +130,8 @@ struct HomeView: View {
         case .favorites:
             // Will be implemented later
             print("⭐ Favorites not yet implemented")
+        case .settings:
+            coordinator.navigateToSettings()
         }
     }
 }
@@ -132,12 +142,14 @@ struct ItemDetailViewWrapper: View {
     let item: MediaItem
     let authService: AuthenticationService
     let coordinator: NavigationCoordinator
+    var navigationManager: NavigationManager? = nil
     @StateObject private var viewModel: ItemDetailViewModel
 
-    init(item: MediaItem, authService: AuthenticationService, coordinator: NavigationCoordinator) {
+    init(item: MediaItem, authService: AuthenticationService, coordinator: NavigationCoordinator, navigationManager: NavigationManager? = nil) {
         self.item = item
         self.authService = authService
         self.coordinator = coordinator
+        self.navigationManager = navigationManager
 
         // Create ViewModel once and keep it alive
         let session = authService.currentSession!
@@ -149,7 +161,8 @@ struct ItemDetailViewWrapper: View {
             item: item,
             apiClient: apiClient,
             authService: authService,
-            navigationCoordinator: coordinator
+            navigationCoordinator: coordinator,
+            navigationManager: navigationManager
         ))
     }
 
@@ -217,7 +230,11 @@ struct SearchViewWrapper: View {
     }
 
     var body: some View {
-        SearchView(viewModel: viewModel)
+        SearchView(
+            viewModel: viewModel,
+            authService: authService,
+            coordinator: coordinator
+        )
     }
 }
 
@@ -225,6 +242,7 @@ struct SearchViewWrapper: View {
 
 enum NavigationDestination: Hashable {
     case search
+    case settings
 }
 
 @MainActor
@@ -245,6 +263,11 @@ class NavigationCoordinator: ObservableObject {
         print("🧭 Navigating to: Search")
         navigationPath.append(NavigationDestination.search)
     }
+
+    func navigateToSettings() {
+        print("🧭 Navigating to: Settings")
+        navigationPath.append(NavigationDestination.settings)
+    }
 }
 
 // MARK: - Home Content View
@@ -253,12 +276,20 @@ struct HomeContentView: View {
     @ObservedObject var viewModel: HomeViewModel
     @Binding var isSidebarVisible: Bool
     var navigationManager: NavigationManager? = nil
+    @State private var hasSetInitialScroll = false
+
+    private func isLibrarySection(_ section: ContentSection) -> Bool {
+        if case .library = section.type {
+            return true
+        }
+        return false
+    }
 
     var body: some View {
         ZStack {
             if viewModel.isLoading && !viewModel.hasContent {
                 // Initial loading state
-                LoadingView(message: "Loading your media...", showLogo: true)
+                Color.black.ignoresSafeArea()
             } else if let error = viewModel.errorMessage {
                 // Error state
                 ErrorView(message: error) {
@@ -271,49 +302,79 @@ struct HomeContentView: View {
                 EmptyHomeView()
             } else {
                 // Content
-                ScrollView(.vertical, showsIndicators: true) {
-                    VStack(spacing: 0) {
-                        // Hero Banner with auto-rotation (Netflix-style)
-                        if viewModel.featuredItems.count > 1 {
-                            HeroBannerRotating(
-                                items: viewModel.featuredItems,
-                                baseURL: viewModel.baseURL,
-                                onPlay: { item in
-                                    viewModel.playItem(item)
-                                },
-                                onInfo: { item in
-                                    viewModel.showItemDetails(item)
-                                }
-                            )
-                        } else if let featured = viewModel.featuredItem {
-                            // Single item fallback
-                            HeroBanner(
-                                item: featured,
-                                baseURL: viewModel.baseURL
-                            ) {
-                                viewModel.playItem(featured)
-                            } onInfo: {
-                                viewModel.showItemDetails(featured)
-                            }
-                        }
+                ScrollViewReader { proxy in
+                    ScrollView(.vertical, showsIndicators: true) {
+                        VStack(spacing: 0) {
+                            // Invisible anchor at the very top
+                            Color.clear
+                                .frame(height: 1)
+                                .id("top")
 
-                        // Content Sections with Netflix-level focus memory
-                        VStack(spacing: Constants.UI.sectionSpacing) {
-                            ForEach(Array(viewModel.sections.enumerated()), id: \.element.id) { index, section in
-                                ContentRow(
-                                    section: section,
+                            // Hero Banner with auto-rotation (Netflix-style)
+                            if viewModel.featuredItems.count > 1 {
+                                HeroBannerRotating(
+                                    items: viewModel.featuredItems,
                                     baseURL: viewModel.baseURL,
-                                    rowIndex: index,
-                                    navigationManager: navigationManager
-                                ) { item in
-                                    viewModel.selectItem(item)
-                                } onSeeAll: {
-                                    viewModel.showSeeAll(for: section)
+                                    onPlay: { item in
+                                        viewModel.playItem(item)
+                                    },
+                                    onInfo: { item in
+                                        viewModel.showItemDetails(item)
+                                    }
+                                )
+                            } else if let featured = viewModel.featuredItem {
+                                // Single item fallback
+                                HeroBanner(
+                                    item: featured,
+                                    baseURL: viewModel.baseURL
+                                ) {
+                                    viewModel.playItem(featured)
+                                } onInfo: {
+                                    viewModel.showItemDetails(featured)
+                                }
+                            }
+
+                            // Content Sections with Netflix-level focus memory
+                            VStack(spacing: Constants.UI.sectionSpacing) {
+                                ForEach(Array(viewModel.sections.enumerated()), id: \.element.id) { index, section in
+                                    // Only show "See All" for library sections (Movies, TV Shows, etc)
+                                    // Hide for Continue Watching and Recently Added
+                                    ContentRow(
+                                        section: section,
+                                        baseURL: viewModel.baseURL,
+                                        rowIndex: index,
+                                        navigationManager: navigationManager,
+                                        onItemSelect: { item in
+                                            viewModel.selectItem(item)
+                                        },
+                                        onSeeAll: isLibrarySection(section) ? { viewModel.showSeeAll(for: section) } : nil
+                                    )
+                                    .id("section-\(index)")
+                                }
+                            }
+                            .padding(.top, 40)
+                            .padding(.bottom, 60)
+                        }
+                        .onAppear {
+                            // Only scroll to top once on initial load
+                            guard !hasSetInitialScroll else {
+                                print("📍 HomeView: Already scrolled to top, skipping")
+                                return
+                            }
+                            print("📍 HomeView: VStack appeared, forcing scroll to top")
+                            hasSetInitialScroll = true
+
+                            // Fight the focus system with multiple scroll attempts
+                            // tvOS focus scrolls asynchronously, so we need to be persistent
+                            for delay in [0.1, 0.3, 0.5, 0.8, 1.2, 1.8] {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                                    proxy.scrollTo("top", anchor: .top)
+                                    if delay == 1.8 {
+                                        print("✅ HomeView: Final scroll to top complete")
+                                    }
                                 }
                             }
                         }
-                        .padding(.top, 40)
-                        .padding(.bottom, 60)
                     }
                 }
                 .refreshable {

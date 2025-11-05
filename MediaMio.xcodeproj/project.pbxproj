@@ -16,6 +16,17 @@
 		BD2DF68A2EB7EEB2001C4B74 /* mediamio-navigation-refactor-prompt.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6842EB7EEB2001C4B74 /* mediamio-navigation-refactor-prompt.md */; };
 		BD2DF6992EB8DC9A001C4B74 /* fix-video-playback-prompt.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6972EB8DC9A001C4B74 /* fix-video-playback-prompt.md */; };
 		BD2DF69A2EB8DC9A001C4B74 /* video-playback-flowchart.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6982EB8DC9A001C4B74 /* video-playback-flowchart.md */; };
+		BD2DF69F2EB9309A001C4B74 /* remote-controls-quick-fix.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF69E2EB9309A001C4B74 /* remote-controls-quick-fix.md */; };
+		BD2DF6A02EB9309A001C4B74 /* fix-remote-controls.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF69D2EB9309A001C4B74 /* fix-remote-controls.md */; };
+		BD2DF6A22EB933B3001C4B74 /* settings-implementation-guide.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6A12EB933B3001C4B74 /* settings-implementation-guide.md */; };
+		BD2DF6B72EB97B14001C4B74 /* ui-issues-quick-fix.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6B62EB97B14001C4B74 /* ui-issues-quick-fix.md */; };
+		BD2DF6BB2EB9A43D001C4B74 /* resume-playback-quick-fix.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6BA2EB9A43D001C4B74 /* resume-playback-quick-fix.md */; };
+		BD2DF6BD2EBAAB9D001C4B74 /* fix-settings-focus-overlay.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6BC2EBAAB9D001C4B74 /* fix-settings-focus-overlay.md */; };
+		BD2DF6C12EBAC1C2001C4B74 /* content-card-focus-quick-fix.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6C02EBAC1C2001C4B74 /* content-card-focus-quick-fix.md */; };
+		BD2DF6C32EBAFD6F001C4B74 /* library-show-all-implementation.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6C22EBAFD6F001C4B74 /* library-show-all-implementation.md */; };
+		BD2DF6E12EBB088D001C4B74 /* mediamioappicon 2.png in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6E02EBB088D001C4B74 /* mediamioappicon 2.png */; };
+		BD2DF6E32EBB9F4A001C4B74 /* appintrosound.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6E22EBB9F4A001C4B74 /* appintrosound.mp3 */; };
+		BD2DF6E52EBB9F50001C4B74 /* launch-experience-implementation.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6E42EBB9F50001C4B74 /* launch-experience-implementation.md */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -48,6 +59,17 @@
 		BD2DF6852EB7EEB2001C4B74 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		BD2DF6972EB8DC9A001C4B74 /* fix-video-playback-prompt.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "fix-video-playback-prompt.md"; sourceTree = "<group>"; };
 		BD2DF6982EB8DC9A001C4B74 /* video-playback-flowchart.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "video-playback-flowchart.md"; sourceTree = "<group>"; };
+		BD2DF69D2EB9309A001C4B74 /* fix-remote-controls.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "fix-remote-controls.md"; sourceTree = "<group>"; };
+		BD2DF69E2EB9309A001C4B74 /* remote-controls-quick-fix.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "remote-controls-quick-fix.md"; sourceTree = "<group>"; };
+		BD2DF6A12EB933B3001C4B74 /* settings-implementation-guide.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "settings-implementation-guide.md"; sourceTree = "<group>"; };
+		BD2DF6B62EB97B14001C4B74 /* ui-issues-quick-fix.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "ui-issues-quick-fix.md"; sourceTree = "<group>"; };
+		BD2DF6BA2EB9A43D001C4B74 /* resume-playback-quick-fix.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "resume-playback-quick-fix.md"; sourceTree = "<group>"; };
+		BD2DF6BC2EBAAB9D001C4B74 /* fix-settings-focus-overlay.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "fix-settings-focus-overlay.md"; sourceTree = "<group>"; };
+		BD2DF6C02EBAC1C2001C4B74 /* content-card-focus-quick-fix.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "content-card-focus-quick-fix.md"; sourceTree = "<group>"; };
+		BD2DF6C22EBAFD6F001C4B74 /* library-show-all-implementation.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "library-show-all-implementation.md"; sourceTree = "<group>"; };
+		BD2DF6E02EBB088D001C4B74 /* mediamioappicon 2.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "mediamioappicon 2.png"; sourceTree = "<group>"; };
+		BD2DF6E22EBB9F4A001C4B74 /* appintrosound.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = appintrosound.mp3; sourceTree = "<group>"; };
+		BD2DF6E42EBB9F50001C4B74 /* launch-experience-implementation.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "launch-experience-implementation.md"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -109,6 +131,17 @@
 				BD2DF6852EB7EEB2001C4B74 /* README.md */,
 				BD2DF6972EB8DC9A001C4B74 /* fix-video-playback-prompt.md */,
 				BD2DF6982EB8DC9A001C4B74 /* video-playback-flowchart.md */,
+				BD2DF69D2EB9309A001C4B74 /* fix-remote-controls.md */,
+				BD2DF69E2EB9309A001C4B74 /* remote-controls-quick-fix.md */,
+				BD2DF6A12EB933B3001C4B74 /* settings-implementation-guide.md */,
+				BD2DF6B62EB97B14001C4B74 /* ui-issues-quick-fix.md */,
+				BD2DF6BA2EB9A43D001C4B74 /* resume-playback-quick-fix.md */,
+				BD2DF6BC2EBAAB9D001C4B74 /* fix-settings-focus-overlay.md */,
+				BD2DF6C02EBAC1C2001C4B74 /* content-card-focus-quick-fix.md */,
+				BD2DF6C22EBAFD6F001C4B74 /* library-show-all-implementation.md */,
+				BD2DF6E02EBB088D001C4B74 /* mediamioappicon 2.png */,
+				BD2DF6E22EBB9F4A001C4B74 /* appintrosound.mp3 */,
+				BD2DF6E42EBB9F50001C4B74 /* launch-experience-implementation.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -242,15 +275,26 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BD2DF6E12EBB088D001C4B74 /* mediamioappicon 2.png in Resources */,
+				BD2DF6E32EBB9F4A001C4B74 /* appintrosound.mp3 in Resources */,
 				BD2DF6862EB7EEB2001C4B74 /* mediamio-claude-code-workflow.md in Resources */,
 				BD2DF6872EB7EEB2001C4B74 /* mediamio-navigation-quickref.md in Resources */,
 				BD2DF6992EB8DC9A001C4B74 /* fix-video-playback-prompt.md in Resources */,
 				BD2DF69A2EB8DC9A001C4B74 /* video-playback-flowchart.md in Resources */,
 				BD2DF6882EB7EEB2001C4B74 /* jellyfin-appletv-prompt (1).md in Resources */,
+				BD2DF6A22EB933B3001C4B74 /* settings-implementation-guide.md in Resources */,
 				BD2DF6892EB7EEB2001C4B74 /* README.md in Resources */,
 				BD2DF68A2EB7EEB2001C4B74 /* mediamio-navigation-refactor-prompt.md in Resources */,
+				BD2DF6C12EBAC1C2001C4B74 /* content-card-focus-quick-fix.md in Resources */,
+				BD2DF6C32EBAFD6F001C4B74 /* library-show-all-implementation.md in Resources */,
+				BD2DF6B72EB97B14001C4B74 /* ui-issues-quick-fix.md in Resources */,
 				BD2DF67C2EB7E842001C4B74 /* mediamioappicon.png in Resources */,
+				BD2DF69F2EB9309A001C4B74 /* remote-controls-quick-fix.md in Resources */,
+				BD2DF6A02EB9309A001C4B74 /* fix-remote-controls.md in Resources */,
+				BD2DF6BD2EBAAB9D001C4B74 /* fix-settings-focus-overlay.md in Resources */,
+				BD2DF6BB2EB9A43D001C4B74 /* resume-playback-quick-fix.md in Resources */,
 				BD2DF67E2EB7EA64001C4B74 /* logotext.png in Resources */,
+				BD2DF6E52EBB9F50001C4B74 /* launch-experience-implementation.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -455,6 +499,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 18.6;
 			};
 			name = Debug;
 		};
@@ -484,6 +529,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 18.6;
 			};
 			name = Release;
 		};

@@ -19,6 +19,7 @@ class HomeViewModel: ObservableObject {
 
     private let contentService: ContentService
     private let authService: AuthenticationService
+    private let appState: AppState?
     weak var navigationCoordinator: NavigationCoordinator?
     weak var navigationManager: NavigationManager?
 
@@ -30,12 +31,14 @@ class HomeViewModel: ObservableObject {
         contentService: ContentService,
         authService: AuthenticationService,
         navigationCoordinator: NavigationCoordinator? = nil,
-        navigationManager: NavigationManager? = nil
+        navigationManager: NavigationManager? = nil,
+        appState: AppState? = nil
     ) {
         self.contentService = contentService
         self.authService = authService
         self.navigationCoordinator = navigationCoordinator
         self.navigationManager = navigationManager
+        self.appState = appState
     }
 
     // MARK: - Load Content
@@ -88,10 +91,16 @@ class HomeViewModel: ObservableObject {
 
             isLoading = false
 
+            // Signal that content is loaded for splash screen
+            appState?.contentLoaded = true
+
         } catch {
             print("❌ Failed to load home content: \(error)")
             errorMessage = "Failed to load content: \(error.localizedDescription)"
             isLoading = false
+
+            // Even on error, allow splash to dismiss
+            appState?.contentLoaded = true
         }
     }
 
