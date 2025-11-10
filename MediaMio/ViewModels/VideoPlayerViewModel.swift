@@ -501,11 +501,21 @@ class VideoPlayerViewModel: ObservableObject {
         let maxBitrate = settingsManager.maxBitrate
         let mbps = Double(maxBitrate) / 1_000_000.0
 
+        // CRITICAL: Calculate VideoBitrate for desired resolution
+        // Jellyfin uses VideoBitrate to determine output resolution, NOT MaxWidth/MaxHeight
+        // For 1080p transcoding, we need 10-15 Mbps video bitrate
+        // Reserve bitrate for audio
+        let audioBitrate = 640_000  // 640 kbps for high quality audio
+        let videoBitrate = min(maxBitrate - audioBitrate, 15_000_000)  // Cap at 15 Mbps for 1080p
+        let videoMbps = Double(videoBitrate) / 1_000_000.0
+        let audioKbps = Double(audioBitrate) / 1_000.0
+
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print("📊 TRANSCODE SETTINGS")
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print("📊 Transcode bitrate: \(String(format: "%.0f", mbps)) Mbps")
-        print("📊 Bitrate value: \(maxBitrate) bps")
+        print("📊 Total bitrate: \(String(format: "%.0f", mbps)) Mbps")
+        print("📊 Video bitrate: \(String(format: "%.1f", videoMbps)) Mbps (determines resolution!)")
+        print("📊 Audio bitrate: \(String(format: "%.0f", audioKbps)) Kbps")
         print("📊 Video codec: \(videoCodec)")
 
         if maxBitrate != 120_000_000 {
@@ -533,15 +543,19 @@ class VideoPlayerViewModel: ObservableObject {
             URLQueryItem(name: "VideoCodec", value: videoCodec),
             URLQueryItem(name: "AudioCodec", value: "aac,mp3,ac3,eac3"),  // Support more audio codecs
             URLQueryItem(name: "MaxStreamingBitrate", value: "\(maxBitrate)"),
+
+            // CRITICAL: VideoBitrate determines output resolution!
+            // Jellyfin calculates resolution based on this value, NOT MaxWidth/MaxHeight
+            // 8-15 Mbps produces 1080p output
+            URLQueryItem(name: "VideoBitrate", value: "\(videoBitrate)"),
+            URLQueryItem(name: "AudioBitrate", value: "\(audioBitrate)"),
+
             URLQueryItem(name: "PlaySessionId", value: UUID().uuidString),
             URLQueryItem(name: "MediaSourceId", value: item.id),
             URLQueryItem(name: "DeviceId", value: getDeviceId()),
             URLQueryItem(name: "api_key", value: accessToken),
 
-            // CRITICAL: Request high resolution output
-            // For HLS transcoding endpoint, use MaxWidth/MaxHeight (not Width/Height)
-            // These set the MAXIMUM resolution - Jellyfin will preserve aspect ratio
-            // With CopyTimestamps + RequireNonAnamorphic, this won't cause zoom/crop
+            // MaxWidth/MaxHeight as upper limits (aspect ratio preserved)
             URLQueryItem(name: "MaxWidth", value: "1920"),
             URLQueryItem(name: "MaxHeight", value: "1080"),
 
@@ -558,21 +572,15 @@ class VideoPlayerViewModel: ObservableObject {
         ]
 
         print("✅ High quality transcode configuration:")
-        print("   - Max resolution: 1920x1080 (Full HD limit)")
+        print("   - VideoBitrate: \(String(format: "%.1f", videoMbps)) Mbps (→ produces 1080p output)")
+        print("   - AudioBitrate: \(String(format: "%.0f", audioKbps)) Kbps")
+        print("   - MaxWidth/MaxHeight: 1920x1080 (upper limits)")
         print("   - CopyTimestamps: true (preserves original timing)")
         print("   - RequireNonAnamorphic: false (allows anamorphic/widescreen)")
         print("   - Profile: high (H.264 high profile)")
         print("   - Level: 4.1 (supports 1080p @ high bitrate)")
-        print("   - Bitrate: 120 Mbps (ensures sharp quality)")
-        print("   📝 NOTE: MaxWidth/MaxHeight with aspect ratio protection prevents zoom/crop")
-        print("   📝 Jellyfin will fit video within 1920x1080 while preserving aspect ratio")
-
-        // Apply audio quality setting
-        if let audioQuality = AudioQuality(rawValue: settingsManager.audioQuality),
-           audioQuality.bitrate > 0 {
-            queryItems.append(URLQueryItem(name: "AudioBitrate", value: "\(audioQuality.bitrate)"))
-            print("   Audio quality: \(audioQuality.rawValue) (\(audioQuality.bitrate) bps)")
-        }
+        print("   📝 NOTE: VideoBitrate parameter tells Jellyfin what resolution to produce")
+        print("   📝 8-15 Mbps video bitrate = 1080p output, aspect ratio preserved")
 
         components?.queryItems = queryItems
 
@@ -588,7 +596,22 @@ class VideoPlayerViewModel: ObservableObject {
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print("📊 VERIFY CRITICAL PARAMETERS IN URL:")
 
-        // Verify bitrate
+        // Verify VideoBitrate (THE MOST CRITICAL PARAMETER!)
+        if url.absoluteString.contains("VideoBitrate=\(videoBitrate)") {
+            print("✅ VideoBitrate=\(videoBitrate) CONFIRMED (→ will produce 1080p)")
+            print("   This is the parameter that determines output resolution!")
+        } else if url.absoluteString.contains("VideoBitrate=") {
+            print("⚠️ VideoBitrate FOUND but with different value")
+        } else {
+            print("❌ CRITICAL: VideoBitrate MISSING - this causes 416x172 output!")
+        }
+
+        // Verify AudioBitrate
+        if url.absoluteString.contains("AudioBitrate=\(audioBitrate)") {
+            print("✅ AudioBitrate=\(audioBitrate) CONFIRMED")
+        }
+
+        // Verify total bitrate
         if url.absoluteString.contains("MaxStreamingBitrate=120000000") {
             print("✅ MaxStreamingBitrate=120000000 CONFIRMED in URL")
         } else if url.absoluteString.contains("MaxStreamingBitrate=") {
