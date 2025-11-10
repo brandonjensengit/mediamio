@@ -64,16 +64,22 @@ class CustomPlayerViewController: UIViewController {
         view.backgroundColor = .black
 
         setupPlayerLayer()
-        setupGradient()
         setupControlsContainer()
+        setupGradient()  // Must be after controls container
         setupTopBar()
         setupCenterControls()
         setupBottomBar()
+        setupFocusGuides()
         setupGestures()
         setupObservers()
 
-        // Show controls initially
+        // Show controls initially, then hide after delay if playing
         showControls()
+
+        // If already playing, start hide timer
+        if viewModel?.isPlaying == true {
+            hideControlsAfterDelay()
+        }
 
         print("✅ CustomPlayerViewController setup complete")
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -90,7 +96,12 @@ class CustomPlayerViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        playerLayer?.frame = view.bounds
+
+        // CRITICAL: Update player layer frame to match view bounds
+        if let playerLayer = playerLayer {
+            playerLayer.frame = view.bounds
+            print("📐 Updated playerLayer frame: \(view.bounds)")
+        }
 
         // Update gradient frame
         if let gradientLayer = gradientView.layer.sublayers?.first as? CAGradientLayer {
@@ -107,12 +118,22 @@ class CustomPlayerViewController: UIViewController {
         }
 
         print("📺 Setting up AVPlayerLayer")
+        print("   Player status: \(player.status.rawValue)")
+        print("   Player rate: \(player.rate)")
+        print("   View bounds: \(view.bounds)")
+
         playerLayer = AVPlayerLayer(player: player)
         playerLayer.frame = view.bounds
         playerLayer.videoGravity = .resizeAspect
-        view.layer.addSublayer(playerLayer)
+        playerLayer.backgroundColor = UIColor.clear.cgColor
 
-        print("   ✅ AVPlayerLayer added to view")
+        // CRITICAL: Insert at index 0 to be below everything
+        view.layer.insertSublayer(playerLayer, at: 0)
+
+        print("   Player layer frame: \(playerLayer.frame)")
+        print("   Player layer videoGravity: \(playerLayer.videoGravity)")
+        print("   View layer sublayers count: \(view.layer.sublayers?.count ?? 0)")
+        print("   ✅ AVPlayerLayer added at index 0")
     }
 
     // MARK: - UI Setup
@@ -127,7 +148,18 @@ class CustomPlayerViewController: UIViewController {
         gradientLayer.locations = [0.0, 0.4, 1.0]
         gradientLayer.frame = view.bounds
         gradientView.layer.addSublayer(gradientLayer)
-        view.addSubview(gradientView)
+
+        // Add gradient to controls container (not main view)
+        controlsContainer.insertSubview(gradientView, at: 0)
+
+        // Layout gradient
+        gradientView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            gradientView.topAnchor.constraint(equalTo: controlsContainer.topAnchor),
+            gradientView.leadingAnchor.constraint(equalTo: controlsContainer.leadingAnchor),
+            gradientView.trailingAnchor.constraint(equalTo: controlsContainer.trailingAnchor),
+            gradientView.bottomAnchor.constraint(equalTo: controlsContainer.bottomAnchor)
+        ])
     }
 
     private func setupControlsContainer() {
@@ -370,6 +402,27 @@ class CustomPlayerViewController: UIViewController {
         ])
     }
 
+    // MARK: - Focus Guides
+
+    private func setupFocusGuides() {
+        // Focus guide: When moving up from bottom buttons, always go to play/pause
+        let bottomToPlayPauseFocusGuide = UIFocusGuide()
+        view.addLayoutGuide(bottomToPlayPauseFocusGuide)
+
+        // Position guide above the bottom buttons
+        NSLayoutConstraint.activate([
+            bottomToPlayPauseFocusGuide.topAnchor.constraint(equalTo: progressView.topAnchor, constant: -50),
+            bottomToPlayPauseFocusGuide.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            bottomToPlayPauseFocusGuide.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            bottomToPlayPauseFocusGuide.heightAnchor.constraint(equalToConstant: 50)
+        ])
+
+        // When moving up from any bottom button, guide to play/pause
+        bottomToPlayPauseFocusGuide.preferredFocusEnvironments = [playPauseButton]
+
+        print("✅ Focus guides configured")
+    }
+
     // MARK: - Gestures
 
     private func setupGestures() {
@@ -394,10 +447,22 @@ class CustomPlayerViewController: UIViewController {
     private func setupObservers() {
         // Observe isPlaying changes
         viewModel?.$isPlaying
+            .dropFirst() // Skip initial value
             .sink { [weak self] isPlaying in
+                print("🎮 isPlaying changed to: \(isPlaying)")
                 self?.updatePlayPauseButton()
                 if isPlaying {
+                    // Video started playing - hide controls after delay
+                    print("   ▶️ Video playing, scheduling auto-hide")
                     self?.hideControlsAfterDelay()
+                } else {
+                    // Video paused - keep controls visible
+                    print("   ⏸️ Video paused, keeping controls visible")
+                    self?.hideControlsTimer?.invalidate()
+                    self?.hideControlsTimer = nil
+                    if self?.isControlsVisible == false {
+                        self?.showControls()
+                    }
                 }
             }
             .store(in: &cancellables)
