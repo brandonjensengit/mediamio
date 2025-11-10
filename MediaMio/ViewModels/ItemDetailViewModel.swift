@@ -13,6 +13,9 @@ class ItemDetailViewModel: ObservableObject {
     @Published var item: MediaItem
     @Published var detailedItem: MediaItem?
     @Published var similarItems: [MediaItem] = []
+    @Published var seasons: [MediaItem] = []
+    @Published var episodes: [MediaItem] = []
+    @Published var selectedSeason: MediaItem?
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
 
@@ -69,6 +72,12 @@ class ItemDetailViewModel: ObservableObject {
 
             self.detailedItem = details
 
+            // Load seasons if this is a Series
+            if details.type == "Series" {
+                print("📄 Loading seasons for series...")
+                await loadSeasons()
+            }
+
             // Load similar items
             print("📄 Loading similar items...")
             if let similar = try? await apiClient.getSimilarItems(userId: userId, itemId: item.id, limit: 12) {
@@ -88,6 +97,47 @@ class ItemDetailViewModel: ObservableObject {
             errorMessage = "Failed to load details: \(error.localizedDescription)"
             isLoading = false
         }
+    }
+
+    func loadSeasons() async {
+        guard let userId = userId else { return }
+
+        do {
+            print("📺 Fetching seasons for series: \(item.id)")
+            let response = try await apiClient.getSeasons(userId: userId, seriesId: item.id)
+            self.seasons = response.items
+            print("✅ Loaded \(response.items.count) seasons")
+
+            // Auto-select first season and load its episodes
+            if let firstSeason = seasons.first {
+                await selectSeason(firstSeason)
+            }
+        } catch {
+            print("❌ Failed to load seasons: \(error)")
+        }
+    }
+
+    func selectSeason(_ season: MediaItem) async {
+        selectedSeason = season
+        await loadEpisodes(for: season)
+    }
+
+    func loadEpisodes(for season: MediaItem) async {
+        guard let userId = userId else { return }
+
+        do {
+            print("📺 Fetching episodes for season: \(season.id)")
+            let response = try await apiClient.getEpisodes(userId: userId, seriesId: item.id, seasonId: season.id)
+            self.episodes = response.items
+            print("✅ Loaded \(response.items.count) episodes")
+        } catch {
+            print("❌ Failed to load episodes: \(error)")
+        }
+    }
+
+    func playEpisode(_ episode: MediaItem) {
+        print("▶️ Play episode: \(episode.name)")
+        navigationManager?.playItem(episode)
     }
 
     // MARK: - Actions
@@ -129,11 +179,14 @@ class ItemDetailViewModel: ObservableObject {
         guard let userData = displayItem.userData,
               let position = userData.playbackPositionTicks,
               let total = displayItem.runTimeTicks else {
+            print("📊 hasProgress=false for '\(displayItem.name)': userData=\(displayItem.userData != nil), position=\(displayItem.userData?.playbackPositionTicks != nil), total=\(displayItem.runTimeTicks != nil)")
             return false
         }
 
         let progress = Double(position) / Double(total) * 100.0
-        return progress > 1.0 && progress < 95.0
+        let hasProgress = progress > 1.0 && progress < 95.0
+        print("📊 hasProgress=\(hasProgress) for '\(displayItem.name)': position=\(position), total=\(total), progress=\(String(format: "%.1f", progress))%")
+        return hasProgress
     }
 
     var progressPercentage: Double {

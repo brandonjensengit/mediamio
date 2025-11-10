@@ -27,6 +27,8 @@
 		BD2DF6E12EBB088D001C4B74 /* mediamioappicon 2.png in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6E02EBB088D001C4B74 /* mediamioappicon 2.png */; };
 		BD2DF6E32EBB9F4A001C4B74 /* appintrosound.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6E22EBB9F4A001C4B74 /* appintrosound.mp3 */; };
 		BD2DF6E52EBB9F50001C4B74 /* launch-experience-implementation.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6E42EBB9F50001C4B74 /* launch-experience-implementation.md */; };
+		BD2DF6EF2EBBE86A001C4B74 /* fix-blurry-video-quality.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6EE2EBBE86A001C4B74 /* fix-blurry-video-quality.md */; };
+		BD2DF6F32EC15B49001C4B74 /* hardware-decoding-quick-guide.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6F22EC15B49001C4B74 /* hardware-decoding-quick-guide.md */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,6 +72,8 @@
 		BD2DF6E02EBB088D001C4B74 /* mediamioappicon 2.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "mediamioappicon 2.png"; sourceTree = "<group>"; };
 		BD2DF6E22EBB9F4A001C4B74 /* appintrosound.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = appintrosound.mp3; sourceTree = "<group>"; };
 		BD2DF6E42EBB9F50001C4B74 /* launch-experience-implementation.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "launch-experience-implementation.md"; sourceTree = "<group>"; };
+		BD2DF6EE2EBBE86A001C4B74 /* fix-blurry-video-quality.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "fix-blurry-video-quality.md"; sourceTree = "<group>"; };
+		BD2DF6F22EC15B49001C4B74 /* hardware-decoding-quick-guide.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "hardware-decoding-quick-guide.md"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -139,9 +143,11 @@
 				BD2DF6BC2EBAAB9D001C4B74 /* fix-settings-focus-overlay.md */,
 				BD2DF6C02EBAC1C2001C4B74 /* content-card-focus-quick-fix.md */,
 				BD2DF6C22EBAFD6F001C4B74 /* library-show-all-implementation.md */,
+				BD2DF6EE2EBBE86A001C4B74 /* fix-blurry-video-quality.md */,
 				BD2DF6E02EBB088D001C4B74 /* mediamioappicon 2.png */,
 				BD2DF6E22EBB9F4A001C4B74 /* appintrosound.mp3 */,
 				BD2DF6E42EBB9F50001C4B74 /* launch-experience-implementation.md */,
+				BD2DF6F22EC15B49001C4B74 /* hardware-decoding-quick-guide.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -292,7 +298,9 @@
 				BD2DF69F2EB9309A001C4B74 /* remote-controls-quick-fix.md in Resources */,
 				BD2DF6A02EB9309A001C4B74 /* fix-remote-controls.md in Resources */,
 				BD2DF6BD2EBAAB9D001C4B74 /* fix-settings-focus-overlay.md in Resources */,
+				BD2DF6EF2EBBE86A001C4B74 /* fix-blurry-video-quality.md in Resources */,
 				BD2DF6BB2EB9A43D001C4B74 /* resume-playback-quick-fix.md in Resources */,
+				BD2DF6F32EC15B49001C4B74 /* hardware-decoding-quick-guide.md in Resources */,
 				BD2DF67E2EB7EA64001C4B74 /* logotext.png in Resources */,
 				BD2DF6E52EBB9F50001C4B74 /* launch-experience-implementation.md in Resources */,
 			);

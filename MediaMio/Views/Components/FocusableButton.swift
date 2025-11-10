@@ -53,6 +53,10 @@ struct FocusableButton: View {
                 .frame(height: Constants.UI.buttonHeight)
                 .background(style.backgroundColor)
                 .cornerRadius(Constants.UI.cornerRadius)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Constants.UI.cornerRadius)
+                        .stroke(Color.clear, lineWidth: 0)
+                )
                 .scaleEffect(envFocused ? Constants.UI.focusScale : Constants.UI.normalScale)
                 .shadow(
                     color: envFocused ? .white.opacity(0.4) : .clear,

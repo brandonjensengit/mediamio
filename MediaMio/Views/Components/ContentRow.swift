@@ -17,7 +17,6 @@ struct ContentRow: View {
     let onSeeAll: (() -> Void)?
 
     @FocusState private var focusedItemId: String?
-    @State private var hasInitializedFocus: Bool = false
 
     init(
         section: ContentSection,
@@ -86,18 +85,9 @@ struct ContentRow: View {
                     // Trailing padding
                     Color.clear.frame(width: Constants.UI.defaultPadding - Constants.UI.cardSpacing)
                 }
+                .padding(.vertical, 40)  // Extra vertical padding to prevent clipping when cards scale
             }
-            .frame(height: Constants.UI.posterHeight + 100)  // Poster + text + spacing
-            .onAppear {
-                // Restore focus memory when row appears
-                if !hasInitializedFocus, let navManager = navigationManager {
-                    let rememberedIndex = navManager.recallFocus(for: rowIndex)
-                    if rememberedIndex < section.items.count {
-                        focusedItemId = section.items[rememberedIndex].id
-                    }
-                    hasInitializedFocus = true
-                }
-            }
+            .frame(height: Constants.UI.posterHeight + 180)  // Increased from 100 to 180 for scale room
         }
     }
 }
@@ -155,8 +145,9 @@ struct LoadingContentRow: View {
 
                     Color.clear.frame(width: Constants.UI.defaultPadding - Constants.UI.cardSpacing)
                 }
+                .padding(.vertical, 40)
             }
-            .frame(height: Constants.UI.posterHeight + 100)
+            .frame(height: Constants.UI.posterHeight + 180)
         }
     }
 }
@@ -244,7 +235,8 @@ extension View {
             genres: nil,
             studios: nil,
             people: nil,
-            taglines: nil
+            taglines: nil,
+            mediaSources: nil
         )
     }
 

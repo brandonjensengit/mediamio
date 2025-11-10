@@ -267,6 +267,10 @@ class JellyfinAPIClient: ObservableObject {
         userId: String,
         parentId: String? = nil,
         includeItemTypes: [String]? = nil,
+        genres: [String]? = nil,
+        years: [Int]? = nil,
+        minRating: Double? = nil,
+        isPlayed: Bool? = nil,
         limit: Int = 50,
         startIndex: Int = 0,
         sortBy: String? = "SortName",
@@ -289,6 +293,26 @@ class JellyfinAPIClient: ObservableObject {
 
         if let types = includeItemTypes {
             queryItems.append(URLQueryItem(name: "IncludeItemTypes", value: types.joined(separator: ",")))
+        }
+
+        // Filter: Genres
+        if let genres = genres, !genres.isEmpty {
+            queryItems.append(URLQueryItem(name: "Genres", value: genres.joined(separator: ",")))
+        }
+
+        // Filter: Years
+        if let years = years, !years.isEmpty {
+            queryItems.append(URLQueryItem(name: "Years", value: years.map(String.init).joined(separator: ",")))
+        }
+
+        // Filter: Minimum Rating
+        if let minRating = minRating {
+            queryItems.append(URLQueryItem(name: "MinCommunityRating", value: String(minRating)))
+        }
+
+        // Filter: Played status
+        if let isPlayed = isPlayed {
+            queryItems.append(URLQueryItem(name: "IsPlayed", value: String(isPlayed)))
         }
 
         if let sortBy = sortBy {
@@ -317,6 +341,27 @@ class JellyfinAPIClient: ObservableObject {
         let queryItems = [
             URLQueryItem(name: "UserId", value: userId),
             URLQueryItem(name: "Limit", value: String(limit)),
+            URLQueryItem(name: "Fields", value: "PrimaryImageAspectRatio,Path,Overview")
+        ]
+        return try await get(endpoint: endpoint, queryItems: queryItems)
+    }
+
+    /// Get seasons for a TV series
+    func getSeasons(userId: String, seriesId: String) async throws -> ItemsResponse {
+        let endpoint = "/Shows/\(seriesId)/Seasons"
+        let queryItems = [
+            URLQueryItem(name: "UserId", value: userId),
+            URLQueryItem(name: "Fields", value: "PrimaryImageAspectRatio,ItemCounts")
+        ]
+        return try await get(endpoint: endpoint, queryItems: queryItems)
+    }
+
+    /// Get episodes for a TV series season
+    func getEpisodes(userId: String, seriesId: String, seasonId: String) async throws -> ItemsResponse {
+        let endpoint = "/Shows/\(seriesId)/Episodes"
+        let queryItems = [
+            URLQueryItem(name: "UserId", value: userId),
+            URLQueryItem(name: "SeasonId", value: seasonId),
             URLQueryItem(name: "Fields", value: "PrimaryImageAspectRatio,Path,Overview")
         ]
         return try await get(endpoint: endpoint, queryItems: queryItems)

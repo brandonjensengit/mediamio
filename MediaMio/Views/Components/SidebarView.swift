@@ -120,6 +120,7 @@ enum MenuItem: String, CaseIterable, Identifiable, Hashable {
     case movies = "Movies"
     case tvShows = "TV Shows"
     case favorites = "Favorites"
+    case settings = "Settings"
 
     var id: String { rawValue }
 
@@ -137,6 +138,8 @@ enum MenuItem: String, CaseIterable, Identifiable, Hashable {
             return "tv.fill"
         case .favorites:
             return "heart.fill"
+        case .settings:
+            return "gear"
         }
     }
 }

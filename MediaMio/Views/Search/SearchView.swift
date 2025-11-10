@@ -9,6 +9,9 @@ import SwiftUI
 
 struct SearchView: View {
     @ObservedObject var viewModel: SearchViewModel
+    let authService: AuthenticationService
+    let coordinator: NavigationCoordinator
+    var navigationManager: NavigationManager? = nil
     @FocusState private var isSearchFieldFocused: Bool
 
     private let columns = [
@@ -58,14 +61,23 @@ struct SearchView: View {
                             }
 
                             // Results grid
-                            LazyVGrid(columns: columns, spacing: 50) {
+                            LazyVGrid(columns: columns, spacing: 60) {  // Increased spacing for scale room
                                 ForEach(viewModel.results) { item in
-                                    PosterCard(
+                                    NavigationLink(destination: ItemDetailViewWrapper(
                                         item: item,
-                                        baseURL: viewModel.baseURL
-                                    ) {
-                                        viewModel.selectItem(item)
+                                        authService: authService,
+                                        coordinator: coordinator,
+                                        navigationManager: navigationManager
+                                    )) {
+                                        PosterCard(
+                                            item: item,
+                                            baseURL: viewModel.baseURL
+                                        ) {
+                                            print("🔍 Search result tapped: \(item.name)")
+                                        }
                                     }
+                                    .buttonStyle(.plain)
+                                    .padding(.vertical, 20)  // Vertical padding to prevent clipping
                                     .onAppear {
                                         // Load more when approaching end
                                         if item == viewModel.results.last {
@@ -247,10 +259,17 @@ struct NoResultsView: View {
     let authService = AuthenticationService()
     let apiClient = JellyfinAPIClient()
     let contentService = ContentService(apiClient: apiClient, authService: authService)
+    let coordinator = NavigationCoordinator()
     let viewModel = SearchViewModel(
         contentService: contentService,
-        authService: authService
+        authService: authService,
+        navigationCoordinator: coordinator
     )
 
-    SearchView(viewModel: viewModel)
+    SearchView(
+        viewModel: viewModel,
+        authService: authService,
+        coordinator: coordinator,
+        navigationManager: nil
+    )
 }

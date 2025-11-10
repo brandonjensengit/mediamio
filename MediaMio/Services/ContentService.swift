@@ -142,6 +142,7 @@ class ContentService: ObservableObject {
     func loadLibraryContent(
         libraryId: String,
         itemTypes: [String]? = nil,
+        filters: LibraryFilters? = nil,
         limit: Int = 50,
         startIndex: Int = 0,
         sortBy: String? = nil,
@@ -151,10 +152,42 @@ class ContentService: ObservableObject {
             throw APIError.authenticationFailed
         }
 
+        // Extract filter parameters
+        var genres: [String]?
+        var years: [Int]?
+        var minRating: Double?
+        var isPlayed: Bool?
+
+        if let filters = filters {
+            if !filters.selectedGenres.isEmpty {
+                genres = filters.selectedGenres.map { $0.rawValue }
+            }
+            if let yearRange = filters.yearRange {
+                var yearsList: [Int] = []
+                if let start = yearRange.start {
+                    yearsList.append(start)
+                }
+                if let end = yearRange.end, end != yearRange.start {
+                    yearsList.append(end)
+                }
+                years = yearsList.isEmpty ? nil : yearsList
+            }
+            if filters.minimumRating > 0 {
+                minRating = filters.minimumRating
+            }
+            if filters.showWatched != filters.showUnwatched {
+                isPlayed = filters.showWatched
+            }
+        }
+
         return try await apiClient.getLibraryItems(
             userId: userId,
             parentId: libraryId,
             includeItemTypes: itemTypes,
+            genres: genres,
+            years: years,
+            minRating: minRating,
+            isPlayed: isPlayed,
             limit: limit,
             startIndex: startIndex,
             sortBy: sortBy,
@@ -199,8 +232,6 @@ class ContentService: ObservableObject {
 
     /// Build image URL for a media item
     func getImageURL(for item: MediaItem, imageType: ImageType, width: Int? = nil) -> String? {
-        let itemId = item.id
-
         switch imageType {
         case .primary:
             return item.primaryImageURL(baseURL: baseURL, maxWidth: width ?? Constants.UI.posterImageMaxWidth)

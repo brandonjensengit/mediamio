@@ -17,6 +17,10 @@ struct CustomVideoPlayerController: UIViewControllerRepresentable {
     let player: AVPlayer
 
     func makeUIViewController(context: Context) -> AVPlayerViewController {
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("🎥 CustomVideoPlayerController.makeUIViewController()")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
         let controller = AVPlayerViewController()
         controller.player = player
         controller.showsPlaybackControls = false  // Hide default controls (we have custom ones)
@@ -24,11 +28,42 @@ struct CustomVideoPlayerController: UIViewControllerRepresentable {
         // Disable AVPlayerViewController's remote command handling
         controller.requiresLinearPlayback = false
 
+        // Diagnostic: Check player state
+        print("📊 Player status: \(player.status.rawValue)")
+        print("📊 Player rate: \(player.rate)")
+        if let item = player.currentItem {
+            print("📊 Player item status: \(item.status.rawValue)")
+            print("📊 Player item duration: \(item.duration.seconds)s")
+            print("📊 Player item tracks: \(item.tracks.count)")
+            print("📊 Player item presentation size: \(item.presentationSize)")
+
+            // Check for video tracks
+            let videoTracks = item.tracks.filter { track in
+                if let assetTrack = track.assetTrack {
+                    return assetTrack.mediaType == .video
+                }
+                return false
+            }
+            print("📊 Video tracks in player: \(videoTracks.count)")
+            if videoTracks.isEmpty {
+                print("❌ NO VIDEO TRACKS - This is why there's no video!")
+            }
+        } else {
+            print("⚠️ No player item!")
+        }
+
+        print("✅ AVPlayerViewController created")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
         return controller
     }
 
     func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
-        // Update if needed
+        // Only log if player changed
+        if uiViewController.player !== player {
+            print("🔄 CustomVideoPlayerController.updateUIViewController() - player changed")
+            uiViewController.player = player
+        }
     }
 }
 
@@ -259,6 +294,8 @@ struct PlayerControlsOverlay: View {
     @State private var pauseShowTask: Task<Void, Never>?
     @State private var lastSeekTime: Double = 0
     @State private var showSubtitlePicker = false
+    @State private var showBitratePicker = false
+    @StateObject private var settingsManager = SettingsManager()
     @FocusState private var focusedControl: PlayerControl?
 
     private var showControls: Binding<Bool> {
@@ -270,6 +307,7 @@ struct PlayerControlsOverlay: View {
         case seekBackward
         case seekForward
         case subtitle
+        case bitrate
         case audio
         case close
     }
@@ -296,238 +334,246 @@ struct PlayerControlsOverlay: View {
 
     var body: some View {
         ZStack {
-            // Always-present invisible button to ensure controls can come back
-            if !showControls.wrappedValue {
-                Button("") {
-                    withAnimation {
-                        showControls.wrappedValue = true
-                    }
-                    resetHideTimer()
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .opacity(0.01) // Nearly invisible but focusable
-                .buttonStyle(.plain)
-                .focused($focusedControl, equals: .playPause)
-            }
+            // Controls are ALWAYS present, just opacity changes
+            VStack {
+                // Top Bar with Metadata
+                HStack(alignment: .top) {
+                    // Title and Metadata
+                    VStack(alignment: .leading, spacing: 12) {
+                        // Title
+                        Text(viewModel.item.name)
+                            .font(.system(size: 36, weight: .bold))
+                            .foregroundColor(.white)
+                            .lineLimit(2)
 
-            if showControls.wrappedValue {
-                VStack {
-                    // Top Bar with Metadata
-                    HStack(alignment: .top) {
-                        // Title and Metadata
-                        VStack(alignment: .leading, spacing: 12) {
-                            // Title
-                            Text(viewModel.item.name)
-                                .font(.system(size: 36, weight: .bold))
-                                .foregroundColor(.white)
-                                .lineLimit(2)
-
-                            // Episode Info for TV Shows
-                            if let seriesName = viewModel.item.seriesName,
-                               let seasonNum = viewModel.item.parentIndexNumber,
-                               let episodeNum = viewModel.item.indexNumber {
-                                Text("\(seriesName) · S\(seasonNum):E\(episodeNum)")
-                                    .font(.title3)
-                                    .foregroundColor(.white.opacity(0.9))
-                            }
-
-                            // Metadata Badges
-                            HStack(spacing: 12) {
-                                // Year
-                                if let year = viewModel.item.yearText {
-                                    MetadataBadge(text: year, icon: nil)
-                                }
-
-                                // Rating
-                                if let rating = viewModel.item.ratingText {
-                                    MetadataBadge(text: rating, icon: "star.fill")
-                                }
-
-                                // Duration
-                                if let duration = viewModel.item.runtimeFormatted {
-                                    MetadataBadge(text: duration, icon: "clock")
-                                }
-
-                                // Official Rating
-                                if let officialRating = viewModel.item.officialRating {
-                                    MetadataBadge(text: officialRating, icon: nil, style: .outlined)
-                                }
-
-                                // Quality Badge
-                                MetadataBadge(text: qualityBadgeText, icon: nil, style: .outlined)
-                            }
+                        // Episode Info for TV Shows
+                        if let seriesName = viewModel.item.seriesName,
+                           let seasonNum = viewModel.item.parentIndexNumber,
+                           let episodeNum = viewModel.item.indexNumber {
+                            Text("\(seriesName) · S\(seasonNum):E\(episodeNum)")
+                                .font(.title3)
+                                .foregroundColor(.white.opacity(0.9))
                         }
+
+                        // Metadata Badges
+                        HStack(spacing: 12) {
+                            // Year
+                            if let year = viewModel.item.yearText {
+                                MetadataBadge(text: year, icon: nil)
+                            }
+
+                            // Rating
+                            if let rating = viewModel.item.ratingText {
+                                MetadataBadge(text: rating, icon: "star.fill")
+                            }
+
+                            // Duration
+                            if let duration = viewModel.item.runtimeFormatted {
+                                MetadataBadge(text: duration, icon: "clock")
+                            }
+
+                            // Official Rating
+                            if let officialRating = viewModel.item.officialRating {
+                                MetadataBadge(text: officialRating, icon: nil, style: .outlined)
+                            }
+
+                            // Quality Badge
+                            MetadataBadge(text: qualityBadgeText, icon: nil, style: .outlined)
+                        }
+                    }
+
+                    Spacer()
+
+                    // Close Button
+                    Button(action: onClose) {
+                        Image(systemName: "xmark")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                            .padding(20)
+                            .background(Color.black.opacity(0.5))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .focused($focusedControl, equals: .close)
+                }
+                .padding(.horizontal, 60)
+                .padding(.top, 60)
+
+                Spacer()
+
+                // Center Controls
+                HStack(spacing: 60) {
+                    // Seek Backward
+                    PlayerControlButton(
+                        icon: "gobackward.10",
+                        size: 60
+                    ) {
+                        viewModel.seekBackward()
+                        resetHideTimer()
+                    }
+                    .focused($focusedControl, equals: .seekBackward)
+
+                    // Play/Pause
+                    PlayerControlButton(
+                        icon: viewModel.isPlaying ? "pause.fill" : "play.fill",
+                        size: 80
+                    ) {
+                        viewModel.togglePlayPause()
+                        resetHideTimer()
+                    }
+                    .focused($focusedControl, equals: .playPause)
+
+                    // Seek Forward
+                    PlayerControlButton(
+                        icon: "goforward.10",
+                        size: 60
+                    ) {
+                        viewModel.seekForward()
+                        resetHideTimer()
+                    }
+                    .focused($focusedControl, equals: .seekForward)
+                }
+
+                Spacer()
+
+                // Bottom Bar - Progress and Options
+                VStack(spacing: 12) {
+                    // Skip Intro Button (when available)
+                    if viewModel.showSkipIntroButton {
+                        HStack {
+                            Spacer()
+                            Button(action: {
+                                viewModel.skipIntro()
+                                resetHideTimer()
+                            }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "forward.fill")
+                                        .font(.headline)
+                                    Text("Skip Intro")
+                                        .font(.headline)
+                                        .fontWeight(.semibold)
+                                }
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 12)
+                                .background(Color.white.opacity(0.9))
+                                .foregroundColor(.black)
+                                .cornerRadius(8)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.horizontal, 60)
+                        .padding(.bottom, 8)
+                    }
+
+                    // Time Display
+                    HStack {
+                        Text(viewModel.currentTimeFormatted)
+                            .font(.headline)
+                            .foregroundColor(.white)
 
                         Spacer()
 
-                        // Close Button
-                        Button(action: onClose) {
-                            Image(systemName: "xmark")
-                                .font(.title2)
-                                .foregroundColor(.white)
-                                .padding(20)
-                                .background(Color.black.opacity(0.5))
-                                .clipShape(Circle())
-                        }
-                        .buttonStyle(.plain)
-                        .focused($focusedControl, equals: .close)
+                        Text(viewModel.remainingTimeFormatted)
+                            .font(.headline)
+                            .foregroundColor(.white.opacity(0.8))
                     }
                     .padding(.horizontal, 60)
-                    .padding(.top, 60)
 
-                    Spacer()
-
-                    // Center Controls
-                    HStack(spacing: 60) {
-                        // Seek Backward
-                        PlayerControlButton(
-                            icon: "gobackward.10",
-                            size: 60
-                        ) {
-                            viewModel.seekBackward()
-                            resetHideTimer()
-                        }
-                        .focused($focusedControl, equals: .seekBackward)
-
-                        // Play/Pause
-                        PlayerControlButton(
-                            icon: viewModel.isPlaying ? "pause.fill" : "play.fill",
-                            size: 80
-                        ) {
-                            viewModel.togglePlayPause()
-                            resetHideTimer()
-                        }
-                        .focused($focusedControl, equals: .playPause)
-
-                        // Seek Forward
-                        PlayerControlButton(
-                            icon: "goforward.10",
-                            size: 60
-                        ) {
-                            viewModel.seekForward()
-                            resetHideTimer()
-                        }
-                        .focused($focusedControl, equals: .seekForward)
-                    }
-
-                    Spacer()
-
-                    // Bottom Bar - Progress and Options
-                    VStack(spacing: 12) {
-                        // Skip Intro Button (when available)
-                        if viewModel.showSkipIntroButton {
-                            HStack {
-                                Spacer()
-                                Button(action: {
-                                    viewModel.skipIntro()
-                                    resetHideTimer()
-                                }) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "forward.fill")
-                                            .font(.headline)
-                                        Text("Skip Intro")
-                                            .font(.headline)
-                                            .fontWeight(.semibold)
-                                    }
-                                    .padding(.horizontal, 24)
-                                    .padding(.vertical, 12)
-                                    .background(Color.white.opacity(0.9))
-                                    .foregroundColor(.black)
-                                    .cornerRadius(8)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            .padding(.horizontal, 60)
-                            .padding(.bottom, 8)
-                        }
-
-                        // Time Display
-                        HStack {
-                            Text(viewModel.currentTimeFormatted)
-                                .font(.headline)
-                                .foregroundColor(.white)
-
-                            Spacer()
-
-                            Text(viewModel.remainingTimeFormatted)
-                                .font(.headline)
-                                .foregroundColor(.white.opacity(0.8))
-                        }
-                        .padding(.horizontal, 60)
-
-                        // Progress Bar
-                        PlayerProgressBar(
-                            progress: viewModel.progress,
-                            bufferedProgress: viewModel.bufferedProgress
-                        )
-                        .frame(height: 8)
-                        .padding(.horizontal, 60)
-
-                        // Subtitle and Audio Options
-                        HStack(spacing: 20) {
-                            Spacer()
-
-                            // Subtitle Button
-                            Button(action: {
-                                showSubtitlePicker = true
-                                resetHideTimer()
-                            }) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "captions.bubble")
-                                        .font(.headline)
-                                    Text(viewModel.currentSubtitleName)
-                                        .font(.headline)
-                                }
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 10)
-                                .background(viewModel.selectedSubtitleIndex != nil ? Color.accentColor.opacity(0.5) : Color.white.opacity(0.2))
-                                .foregroundColor(.white)
-                                .cornerRadius(8)
-                            }
-                            .buttonStyle(.plain)
-                            .focused($focusedControl, equals: .subtitle)
-
-                            // Audio Button
-                            Button(action: {
-                                // TODO: Show audio selection sheet
-                                resetHideTimer()
-                            }) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "speaker.wave.2")
-                                        .font(.headline)
-                                    Text("Audio")
-                                        .font(.headline)
-                                }
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 10)
-                                .background(Color.white.opacity(0.2))
-                                .foregroundColor(.white)
-                                .cornerRadius(8)
-                            }
-                            .buttonStyle(.plain)
-                            .focused($focusedControl, equals: .audio)
-                        }
-                        .padding(.horizontal, 60)
-                        .padding(.top, 8)
-                    }
-                    .padding(.bottom, 60)
-                }
-                .background(
-                    LinearGradient(
-                        colors: [
-                            Color.black.opacity(0.7),
-                            Color.clear,
-                            Color.black.opacity(0.7)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
+                    // Progress Bar
+                    PlayerProgressBar(
+                        progress: viewModel.progress,
+                        bufferedProgress: viewModel.bufferedProgress
                     )
-                )
-                .transition(.opacity)
-                .animation(.easeInOut(duration: 0.3), value: showControls.wrappedValue)
+                    .frame(height: 8)
+                    .padding(.horizontal, 60)
+
+                    // Subtitle and Audio Options
+                    HStack(spacing: 20) {
+                        Spacer()
+
+                        // Subtitle Button
+                        Button(action: {
+                            showSubtitlePicker = true
+                            resetHideTimer()
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "captions.bubble")
+                                    .font(.headline)
+                                Text(viewModel.currentSubtitleName)
+                                    .font(.headline)
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(viewModel.selectedSubtitleIndex != nil ? Color.accentColor.opacity(0.5) : Color.white.opacity(0.2))
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                        .focused($focusedControl, equals: .subtitle)
+
+                        // Bitrate Button
+                        Button(action: {
+                            showBitratePicker = true
+                            resetHideTimer()
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "gauge.high")
+                                    .font(.headline)
+                                Text("\(Int(Double(settingsManager.maxBitrate) / 1_000_000)) Mbps")
+                                    .font(.headline)
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(Color.white.opacity(0.2))
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                        .focused($focusedControl, equals: .bitrate)
+
+                        // Audio Button
+                        Button(action: {
+                            // TODO: Show audio selection sheet
+                            resetHideTimer()
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "speaker.wave.2")
+                                    .font(.headline)
+                                Text("Audio")
+                                    .font(.headline)
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(Color.white.opacity(0.2))
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                        .focused($focusedControl, equals: .audio)
+                    }
+                    .padding(.horizontal, 60)
+                    .padding(.top, 8)
+                }
+                .padding(.bottom, 60)
             }
+            .background(
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(0.7),
+                        Color.clear,
+                        Color.black.opacity(0.7)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .opacity(showControls.wrappedValue ? 1.0 : 0.0)
+            .animation(.easeInOut(duration: 0.3), value: showControls.wrappedValue)
+            .allowsHitTesting(showControls.wrappedValue) // Only allow interaction when visible
         }
         .onAppear {
+            // Start with controls visible and play/pause focused
+            showControls.wrappedValue = true
             focusedControl = .playPause
             resetHideTimer()
             // Setup remote commands through coordinator
@@ -556,27 +602,37 @@ struct PlayerControlsOverlay: View {
             // When controls are shown (by remote or otherwise), reset timer
             if newValue {
                 resetHideTimer()
+                // Restore focus to play/pause when controls become visible
+                if focusedControl == nil {
+                    focusedControl = .playPause
+                }
+            }
+        }
+        .onChange(of: showControls.wrappedValue) { oldValue, newValue in
+            // When controls become visible, ensure focus is set
+            if newValue && !oldValue {
+                // Controls just became visible
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    if focusedControl == nil {
+                        focusedControl = .playPause
+                    }
+                }
             }
         }
         .onChange(of: viewModel.isPlaying) { oldValue, newValue in
             // Handle pause/play state changes
             if !newValue {
-                // Video paused - start timer to show controls after 10 seconds
-                print("⏸️ Video paused - starting 10s timer to show controls")
+                // Video paused - show controls immediately and keep them visible
+                print("⏸️ Video paused - showing controls")
                 pauseShowTask?.cancel()
-                pauseShowTask = Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
-
-                    guard !Task.isCancelled else { return }
-
-                    print("✅ 10s elapsed while paused - showing controls")
-                    withAnimation {
-                        showControls.wrappedValue = true
-                    }
+                withAnimation {
+                    showControls.wrappedValue = true
                 }
+                // Ensure focus is on play/pause
+                focusedControl = .playPause
             } else {
                 // Video playing - cancel pause timer and start hide timer
-                print("▶️ Video playing - canceling pause timer")
+                print("▶️ Video playing - starting auto-hide timer")
                 pauseShowTask?.cancel()
                 resetHideTimer()
             }
@@ -595,20 +651,26 @@ struct PlayerControlsOverlay: View {
                 }
             }
         }
-        // Intercept Menu button to show controls if hidden
+        // Intercept Menu/Back button press
         .onExitCommand {
+            // Always show controls first if they're hidden
             if !showControls.wrappedValue {
-                // Controls hidden: show them instead of exiting
                 withAnimation {
                     showControls.wrappedValue = true
                 }
+                focusedControl = .playPause
                 resetHideTimer()
+            } else if focusedControl != .close {
+                // Controls visible but not on close button - move focus to close
+                focusedControl = .close
             }
-            // If controls visible, let the close button be used to exit
-            // (Menu button will propagate and exit the fullScreenCover)
+            // If on close button, let it propagate to exit
         }
         .sheet(isPresented: $showSubtitlePicker) {
             SubtitlePickerModal(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showBitratePicker) {
+            BitratePickerModal(settingsManager: settingsManager)
         }
     }
 
@@ -652,16 +714,16 @@ struct PlayerControlButton: View {
                 .frame(width: size * 1.5, height: size * 1.5)
                 .background(
                     Circle()
-                        .fill(Color.white.opacity(isFocused ? 0.2 : 0.0))
+                        .fill(Color.white.opacity(isFocused ? 0.25 : 0.0))
                 )
                 .overlay(
                     Circle()
-                        .stroke(Color.clear, lineWidth: 0)
+                        .stroke(Color.white, lineWidth: isFocused ? 4 : 0)
                 )
-                .scaleEffect(isFocused ? 1.1 : 1.0)
+                .scaleEffect(isFocused ? 1.15 : 1.0)
                 .shadow(
-                    color: isFocused ? .white.opacity(0.3) : .clear,
-                    radius: isFocused ? 20 : 0
+                    color: isFocused ? .white.opacity(0.5) : .clear,
+                    radius: isFocused ? 30 : 0
                 )
                 .animation(.easeInOut(duration: 0.2), value: isFocused)
         }
@@ -841,7 +903,8 @@ struct ErrorPlayerView: View {
         genres: nil,
         studios: nil,
         people: nil,
-        taglines: nil
+        taglines: nil,
+        mediaSources: nil
     )
 
     VideoPlayerView(

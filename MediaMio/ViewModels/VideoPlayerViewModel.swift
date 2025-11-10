@@ -37,6 +37,11 @@ class VideoPlayerViewModel: ObservableObject {
     private var hasReportedStart: Bool = false
     private var isLoadingVideo: Bool = false
 
+    // Fallback state
+    private var currentPlaybackMode: PlaybackMode?
+    private var hasFallbackAttempted: Bool = false
+    private var fallbackCheckTask: Task<Void, Never>?
+
     // Intro/Credits markers
     private var introStart: Double?
     private var introEnd: Double?
@@ -70,6 +75,13 @@ class VideoPlayerViewModel: ObservableObject {
     // MARK: - Video Loading
 
     func loadVideoURL() async {
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("🎬 loadVideoURL() CALLED")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("📺 Item: \(item.name)")
+        print("🆔 Item ID: \(item.id)")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
         // Prevent duplicate loading
         guard !isLoadingVideo else {
             print("⚠️ Video already loading, skipping duplicate request")
@@ -88,7 +100,12 @@ class VideoPlayerViewModel: ObservableObject {
                 return
             }
 
-            print("🎬 Loading video from: \(streamURL.absoluteString)")
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            print("🎬 LOADING VIDEO")
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            print("📺 Title: \(item.name)")
+            print("🔗 URL: \(streamURL.absoluteString)")
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
             // Verify URL is accessible with proper headers
             var headRequest = URLRequest(url: streamURL)
@@ -102,8 +119,12 @@ class VideoPlayerViewModel: ObservableObject {
                 if let httpResponse = headResponse as? HTTPURLResponse {
                     print("✅ URL accessible: HTTP \(httpResponse.statusCode)")
                     print("✅ Content-Type: \(httpResponse.value(forHTTPHeaderField: "Content-Type") ?? "none")")
+                    if let contentLength = httpResponse.value(forHTTPHeaderField: "Content-Length") {
+                        print("✅ Content-Length: \(contentLength) bytes")
+                    }
 
                     if httpResponse.statusCode != 200 && httpResponse.statusCode != 206 {
+                        print("❌ Invalid HTTP status code: \(httpResponse.statusCode)")
                         errorMessage = "Server returned HTTP \(httpResponse.statusCode)"
                         isLoading = false
                         isLoadingVideo = false
@@ -114,18 +135,28 @@ class VideoPlayerViewModel: ObservableObject {
                 print("⚠️ HEAD request failed: \(error)")
                 let nsError = error as NSError
                 print("⚠️ Error domain: \(nsError.domain), code: \(nsError.code)")
+                print("⚠️ Continuing anyway (some servers don't support HEAD)")
                 // Don't abort - some servers don't support HEAD
             }
 
             // Create AVPlayer with asset that includes auth headers
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            print("🎬 CREATING AVPlayer")
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
             let asset = AVURLAsset(url: streamURL, options: [
                 "AVURLAssetHTTPHeaderFieldsKey": [
                     "X-Emby-Token": accessToken
                 ]
             ])
 
-            print("✅ Creating player item with authenticated asset...")
+            print("✅ Created AVURLAsset with auth headers")
             let playerItem = AVPlayerItem(asset: asset)
+
+            // CRITICAL: Configure buffering for faster loading
+            playerItem.preferredForwardBufferDuration = 10.0  // Buffer 10 seconds ahead
+            print("⚡ Configured 10-second forward buffer for fast loading")
+
             let avPlayer = AVPlayer(playerItem: playerItem)
 
             // Set audio session
@@ -137,6 +168,9 @@ class VideoPlayerViewModel: ObservableObject {
             // Setup observers
             setupTimeObserver()
             setupPlayerObservers(playerItem: playerItem)
+
+            // Setup automatic fallback if playback fails
+            setupPlaybackFallback(playerItem: playerItem)
 
             // Wait for player item to be ready
             print("⏳ Waiting for player item to be ready...")
@@ -211,6 +245,253 @@ class VideoPlayerViewModel: ObservableObject {
     }
 
     private func buildStreamingURL() -> URL? {
+        print("🎬 Building streaming URL for: \(item.name)")
+
+        // Get file size
+        let fileSize = item.mediaSources?.first?.size ?? 0
+        let fileSizeGB = Double(fileSize) / 1_000_000_000.0
+        print("📁 File size: \(String(format: "%.2f", fileSizeGB)) GB")
+
+        // Log media stream details
+        if let mediaSource = item.mediaSources?.first {
+            print("📦 Container: \(mediaSource.container ?? "unknown")")
+            print("📊 Bitrate: \(mediaSource.bitrate ?? 0) bps")
+
+            if let mediaStreams = mediaSource.mediaStreams {
+                for stream in mediaStreams {
+                    if stream.type?.lowercased() == "video" {
+                        print("🎥 Video stream: codec=\(stream.codec ?? "unknown"), \(stream.width ?? 0)x\(stream.height ?? 0)")
+                    } else if stream.type?.lowercased() == "audio" {
+                        print("🔊 Audio stream: codec=\(stream.codec ?? "unknown")")
+                    }
+                }
+            } else {
+                print("⚠️ No mediaStreams data available")
+            }
+        } else {
+            print("⚠️ No mediaSources data available")
+        }
+
+        // Check streaming mode setting
+        let streamingMode = StreamingMode(rawValue: settingsManager.streamingMode) ?? .auto
+        print("📊 Streaming mode: \(streamingMode.rawValue)")
+
+        // Use codec detection to determine best playback mode
+        let codecSupport = AppleTVCodecSupport.shared
+        let bestMode = codecSupport.getBestPlaybackMode(for: item)
+        print("🎯 Best playback mode: \(bestMode.rawValue)")
+
+        // Smart streaming strategy based on codec support and file size
+        if streamingMode == .auto {
+            // Use codec-based decision for best quality/performance
+            switch bestMode {
+            case .directPlay:
+                // Everything supported - direct play!
+                if let directPlayURL = buildDirectPlayURL() {
+                    currentPlaybackMode = .directPlay
+                    return directPlayURL
+                }
+                print("⚠️ Direct Play failed, trying Direct Stream")
+                fallthrough
+
+            case .directStream:
+                // Video supported, audio needs transcode
+                if let directStreamURL = buildDirectStreamURL() {
+                    currentPlaybackMode = .directStream
+                    return directStreamURL
+                }
+                print("⚠️ Direct Stream failed, trying Remux")
+                fallthrough
+
+            case .remux:
+                // Need container change (MKV→MP4)
+                if let remuxURL = buildRemuxURL() {
+                    currentPlaybackMode = .remux
+                    return remuxURL
+                }
+                print("⚠️ Remux failed, falling back to transcode")
+                fallthrough
+
+            case .transcode:
+                // Need full transcode
+                // For large files, transcode might actually be faster
+                if fileSizeGB > 25 {
+                    print("💡 Large file (\(String(format: "%.1f", fileSizeGB)) GB) - transcode will load faster")
+                }
+                currentPlaybackMode = .transcode
+                return buildTranscodeURL()
+            }
+        }
+        // Manual mode selection
+        else if streamingMode == .directPlay {
+            // Force Direct Play (or try Direct Stream if that fails)
+            if codecSupport.canDirectPlay(item), let directPlayURL = buildDirectPlayURL() {
+                currentPlaybackMode = .directPlay
+                return directPlayURL
+            } else if codecSupport.canDirectStream(item), let directStreamURL = buildDirectStreamURL() {
+                print("⚠️ Direct Play not possible, using Direct Stream instead")
+                currentPlaybackMode = .directStream
+                return directStreamURL
+            }
+            print("⚠️ Neither Direct Play nor Direct Stream available, falling back to transcoding")
+            currentPlaybackMode = .transcode
+            return buildTranscodeURL()
+        }
+        else {
+            // Force transcode
+            currentPlaybackMode = .transcode
+            return buildTranscodeURL()
+        }
+    }
+
+    private func buildDirectPlayURL() -> URL? {
+        print("💎 Attempting Direct Play - HLS with hardware decoding")
+
+        // Log original file codecs
+        if let mediaSource = item.mediaSources?.first {
+            print("📦 Original container: \(mediaSource.container ?? "unknown")")
+
+            if let mediaStreams = mediaSource.mediaStreams {
+                for stream in mediaStreams {
+                    if stream.type?.lowercased() == "video" {
+                        let codec = stream.codec ?? "unknown"
+                        let resolution = "\(stream.width ?? 0)x\(stream.height ?? 0)"
+                        print("🎥 Video codec: \(codec) @ \(resolution)")
+                    } else if stream.type?.lowercased() == "audio" {
+                        let codec = stream.codec ?? "unknown"
+                        print("🔊 Audio codec: \(codec)")
+                    }
+                }
+            }
+        }
+
+        // Use HLS endpoint instead of Download for better streaming
+        var components = URLComponents(string: baseURL)
+        components?.path = "/Videos/\(item.id)/master.m3u8"
+
+        let maxBitrate = settingsManager.maxBitrate
+
+        // Build query items - COPY both video and audio (no re-encoding!)
+        var queryItems: [URLQueryItem] = [
+            // CRITICAL: Copy both streams for true Direct Play
+            URLQueryItem(name: "VideoCodec", value: "copy"),
+            URLQueryItem(name: "AudioCodec", value: "copy"),
+
+            URLQueryItem(name: "MaxStreamingBitrate", value: "\(maxBitrate)"),
+            URLQueryItem(name: "PlaySessionId", value: UUID().uuidString),
+            URLQueryItem(name: "MediaSourceId", value: item.id),
+            URLQueryItem(name: "DeviceId", value: getDeviceId()),
+            URLQueryItem(name: "api_key", value: accessToken),
+
+            // Container and streaming settings
+            URLQueryItem(name: "Container", value: "ts"),
+            URLQueryItem(name: "SegmentLength", value: "3"),
+            URLQueryItem(name: "EnableAutoStreamCopy", value: "true"),
+
+            // Preserve timestamps and aspect ratio
+            URLQueryItem(name: "CopyTimestamps", value: "true"),
+            URLQueryItem(name: "RequireNonAnamorphic", value: "false")
+        ]
+
+        components?.queryItems = queryItems
+
+        guard let url = components?.url else {
+            print("❌ Failed to construct Direct Play URL")
+            return nil
+        }
+
+        print("🎬 Using URL: \(url.absoluteString)")
+        print("💎 DIRECT PLAY - HLS streaming, hardware decoded, 0% server CPU")
+        print("   VideoCodec: copy (no transcoding)")
+        print("   AudioCodec: copy (no transcoding)")
+        print("   Container: ts (MPEG Transport Stream)")
+        print("   Max Bitrate: \(String(format: "%.1f", Double(maxBitrate) / 1_000_000.0)) Mbps")
+        return url
+    }
+
+    private func buildDirectStreamURL() -> URL? {
+        print("🔊 Using Direct Stream - video native, transcode audio only")
+
+        // Use Jellyfin's HLS for direct streaming
+        var components = URLComponents(string: baseURL)
+        components?.path = "/Videos/\(item.id)/master.m3u8"
+
+        let maxBitrate = settingsManager.maxBitrate
+
+        // Build query items - COPY video, transcode audio
+        var queryItems: [URLQueryItem] = [
+            // CRITICAL: Copy video stream (no re-encoding!)
+            URLQueryItem(name: "VideoCodec", value: "copy"),
+
+            // Transcode audio to AAC (universally supported)
+            URLQueryItem(name: "AudioCodec", value: "aac"),
+
+            URLQueryItem(name: "MaxStreamingBitrate", value: "\(maxBitrate)"),
+            URLQueryItem(name: "PlaySessionId", value: UUID().uuidString),
+            URLQueryItem(name: "MediaSourceId", value: item.id),
+            URLQueryItem(name: "DeviceId", value: getDeviceId()),
+            URLQueryItem(name: "api_key", value: accessToken),
+
+            // Container and streaming settings
+            URLQueryItem(name: "Container", value: "ts,mp4"),
+            URLQueryItem(name: "SegmentLength", value: "3"),
+            URLQueryItem(name: "EnableAutoStreamCopy", value: "true"),
+
+            // Preserve timestamps and aspect ratio
+            URLQueryItem(name: "CopyTimestamps", value: "true"),
+            URLQueryItem(name: "RequireNonAnamorphic", value: "false")
+        ]
+
+        components?.queryItems = queryItems
+
+        let url = components?.url
+        print("🔗 Direct Stream URL: \(url?.absoluteString ?? "nil")")
+        print("💪 Apple TV hardware will decode video, 5-10% server CPU for audio")
+        return url
+    }
+
+    private func buildRemuxURL() -> URL? {
+        print("📦 Using Remux - container change only (MKV→MP4)")
+
+        // Use Jellyfin's HLS for remuxing
+        var components = URLComponents(string: baseURL)
+        components?.path = "/Videos/\(item.id)/master.m3u8"
+
+        let maxBitrate = settingsManager.maxBitrate
+
+        // Build query items - COPY everything, just change container
+        var queryItems: [URLQueryItem] = [
+            // CRITICAL: Copy both video and audio streams
+            URLQueryItem(name: "VideoCodec", value: "copy"),
+            URLQueryItem(name: "AudioCodec", value: "copy"),
+
+            URLQueryItem(name: "MaxStreamingBitrate", value: "\(maxBitrate)"),
+            URLQueryItem(name: "PlaySessionId", value: UUID().uuidString),
+            URLQueryItem(name: "MediaSourceId", value: item.id),
+            URLQueryItem(name: "DeviceId", value: getDeviceId()),
+            URLQueryItem(name: "api_key", value: accessToken),
+
+            // Change container to MP4/TS (from MKV)
+            URLQueryItem(name: "Container", value: "mp4,ts"),
+            URLQueryItem(name: "SegmentLength", value: "3"),
+            URLQueryItem(name: "EnableAutoStreamCopy", value: "true"),
+
+            // Preserve everything
+            URLQueryItem(name: "CopyTimestamps", value: "true"),
+            URLQueryItem(name: "RequireNonAnamorphic", value: "false")
+        ]
+
+        components?.queryItems = queryItems
+
+        let url = components?.url
+        print("🔗 Remux URL: \(url?.absoluteString ?? "nil")")
+        print("⚡ Fast container change, 10-20% server CPU, maximum quality")
+        return url
+    }
+
+    private func buildTranscodeURL() -> URL? {
+        print("⚠️ Using transcoding - quality may be reduced")
+
         // Use Jellyfin's HLS master playlist for adaptive streaming with transcoding
         var components = URLComponents(string: baseURL)
         components?.path = "/Videos/\(item.id)/master.m3u8"
@@ -218,37 +499,158 @@ class VideoPlayerViewModel: ObservableObject {
         // Apply settings from SettingsManager
         let videoCodec = VideoCodec(rawValue: settingsManager.videoCodec)?.jellyfinValue ?? "h264"
         let maxBitrate = settingsManager.maxBitrate
+        let mbps = Double(maxBitrate) / 1_000_000.0
+
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("📊 TRANSCODE SETTINGS")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("📊 Transcode bitrate: \(String(format: "%.0f", mbps)) Mbps")
+        print("📊 Bitrate value: \(maxBitrate) bps")
+        print("📊 Video codec: \(videoCodec)")
+
+        if maxBitrate != 120_000_000 {
+            print("⚠️ WARNING: Bitrate is NOT 120 Mbps!")
+            print("⚠️ Current: \(String(format: "%.0f", mbps)) Mbps")
+            print("⚠️ Expected: 120 Mbps")
+            print("⚠️ This will cause blurry video!")
+        }
+
+        if mbps < 40 {
+            print("❌ CRITICAL: Bitrate too low for HD content! (\(String(format: "%.0f", mbps)) Mbps)")
+            print("❌ Minimum recommended: 80 Mbps")
+            print("❌ Optimal: 120 Mbps")
+        } else if mbps >= 120 {
+            print("✅ Bitrate excellent for 4K content")
+        } else if mbps >= 80 {
+            print("⚠️ Bitrate acceptable for 1080p, but 120 Mbps recommended")
+        } else {
+            print("⚠️ Bitrate low - may cause quality issues")
+        }
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
         // Build query items with settings
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "VideoCodec", value: videoCodec),
-            URLQueryItem(name: "AudioCodec", value: "aac"),
+            URLQueryItem(name: "AudioCodec", value: "aac,mp3,ac3,eac3"),  // Support more audio codecs
             URLQueryItem(name: "MaxStreamingBitrate", value: "\(maxBitrate)"),
             URLQueryItem(name: "PlaySessionId", value: UUID().uuidString),
             URLQueryItem(name: "MediaSourceId", value: item.id),
             URLQueryItem(name: "DeviceId", value: getDeviceId()),
-            URLQueryItem(name: "api_key", value: accessToken)
+            URLQueryItem(name: "api_key", value: accessToken),
+
+            // CRITICAL: Fix aspect ratio / zoom issues
+            URLQueryItem(name: "CopyTimestamps", value: "true"),
+            URLQueryItem(name: "RequireNonAnamorphic", value: "false"),
+            URLQueryItem(name: "Profile", value: "high"),  // Use high quality H.264 profile
+            URLQueryItem(name: "Container", value: "ts,mp4"),
+            URLQueryItem(name: "SegmentLength", value: "3"),
+
+            // Enable auto stream copy when possible
+            URLQueryItem(name: "EnableAutoStreamCopy", value: "true")
         ]
 
-        // Apply video quality setting (max height)
-        if let videoQuality = VideoQuality(rawValue: settingsManager.videoQuality),
-           let maxHeight = videoQuality.maxHeight {
-            queryItems.append(URLQueryItem(name: "MaxHeight", value: "\(maxHeight)"))
-            print("📊 Applying video quality: \(videoQuality.rawValue) (max height: \(maxHeight))")
-        }
+        // DO NOT set MaxWidth/MaxHeight - let Jellyfin calculate proper dimensions
+        // This preserves aspect ratio and prevents zoom/crop issues
+        print("✅ Aspect ratio protection enabled:")
+        print("   - CopyTimestamps: true (preserves original timing)")
+        print("   - RequireNonAnamorphic: false (allows anamorphic)")
+        print("   - Profile: high (H.264 high profile)")
+        print("   - NO MaxWidth/MaxHeight (preserves original aspect ratio)")
 
         // Apply audio quality setting
         if let audioQuality = AudioQuality(rawValue: settingsManager.audioQuality),
            audioQuality.bitrate > 0 {
             queryItems.append(URLQueryItem(name: "AudioBitrate", value: "\(audioQuality.bitrate)"))
-            print("📊 Applying audio quality: \(audioQuality.rawValue) (\(audioQuality.bitrate) bps)")
+            print("   Audio quality: \(audioQuality.rawValue) (\(audioQuality.bitrate) bps)")
         }
 
         components?.queryItems = queryItems
 
-        let url = components?.url
-        print("🔗 HLS Master Playlist URL: \(url?.absoluteString ?? "nil")")
-        print("📊 Settings applied: Bitrate=\(maxBitrate/1_000_000)Mbps, Codec=\(videoCodec)")
+        guard let url = components?.url else {
+            print("❌ Failed to construct transcode URL")
+            return nil
+        }
+
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("🔗 TRANSCODE URL CONSTRUCTED")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("🎬 Using URL: \(url.absoluteString)")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("📊 VERIFY CRITICAL PARAMETERS IN URL:")
+
+        // Verify bitrate
+        if url.absoluteString.contains("MaxStreamingBitrate=120000000") {
+            print("✅ MaxStreamingBitrate=120000000 CONFIRMED in URL")
+        } else if url.absoluteString.contains("MaxStreamingBitrate=") {
+            // Extract the actual value from URL
+            if let range = url.absoluteString.range(of: "MaxStreamingBitrate="),
+               let endRange = url.absoluteString[range.upperBound...].range(of: "&") {
+                let bitrateString = url.absoluteString[range.upperBound..<endRange.lowerBound]
+                print("❌ WRONG BITRATE IN URL: MaxStreamingBitrate=\(bitrateString)")
+                if let bitrateValue = Int(bitrateString) {
+                    let actualMbps = Double(bitrateValue) / 1_000_000.0
+                    print("❌ Actual bitrate: \(String(format: "%.0f", actualMbps)) Mbps")
+                    print("❌ Expected: 120 Mbps")
+                }
+            } else {
+                // Try to find it at the end of URL (no & after)
+                if let range = url.absoluteString.range(of: "MaxStreamingBitrate=") {
+                    let bitrateString = String(url.absoluteString[range.upperBound...])
+                    print("❌ WRONG BITRATE IN URL: MaxStreamingBitrate=\(bitrateString)")
+                    if let bitrateValue = Int(bitrateString.components(separatedBy: "&").first ?? "") {
+                        let actualMbps = Double(bitrateValue) / 1_000_000.0
+                        print("❌ Actual bitrate: \(String(format: "%.0f", actualMbps)) Mbps")
+                        print("❌ Expected: 120 Mbps")
+                    }
+                }
+            }
+        } else {
+            print("❌ MaxStreamingBitrate NOT FOUND in URL!")
+        }
+
+        // Verify aspect ratio protection parameters
+        if url.absoluteString.contains("CopyTimestamps=true") {
+            print("✅ CopyTimestamps=true CONFIRMED")
+        } else {
+            print("❌ CopyTimestamps=true MISSING - aspect ratio may be wrong!")
+        }
+
+        if url.absoluteString.contains("RequireNonAnamorphic=false") {
+            print("✅ RequireNonAnamorphic=false CONFIRMED")
+        } else {
+            print("❌ RequireNonAnamorphic=false MISSING - may crop/zoom video!")
+        }
+
+        if url.absoluteString.contains("Profile=high") {
+            print("✅ Profile=high CONFIRMED (H.264 high profile)")
+        } else {
+            print("⚠️ Profile=high MISSING - lower quality encoding")
+        }
+
+        // Verify MaxWidth/MaxHeight are NOT present
+        if url.absoluteString.contains("MaxWidth=") || url.absoluteString.contains("MaxHeight=") {
+            print("❌ CRITICAL: MaxWidth/MaxHeight FOUND in URL!")
+            print("❌ This will cause aspect ratio issues!")
+            if url.absoluteString.contains("MaxWidth=") {
+                if let range = url.absoluteString.range(of: "MaxWidth="),
+                   let endRange = url.absoluteString[range.upperBound...].rangeOfCharacter(from: CharacterSet(charactersIn: "&")) {
+                    let value = url.absoluteString[range.upperBound..<endRange.lowerBound]
+                    print("❌ Found: MaxWidth=\(value)")
+                }
+            }
+            if url.absoluteString.contains("MaxHeight=") {
+                if let range = url.absoluteString.range(of: "MaxHeight="),
+                   let endRange = url.absoluteString[range.upperBound...].rangeOfCharacter(from: CharacterSet(charactersIn: "&")) {
+                    let value = url.absoluteString[range.upperBound..<endRange.lowerBound]
+                    print("❌ Found: MaxHeight=\(value)")
+                }
+            }
+        } else {
+            print("✅ MaxWidth/MaxHeight NOT present (aspect ratio preserved)")
+        }
+
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
         return url
     }
 
@@ -546,12 +948,104 @@ class VideoPlayerViewModel: ObservableObject {
         // Observe player item status changes
         playerItem.publisher(for: \.status)
             .sink { [weak self] status in
-                print("🔍 Player item status changed: \(status.rawValue)")
+                print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                print("🔍 PLAYER STATUS CHANGED")
+                print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+                let statusString: String
+                switch status {
+                case .unknown:
+                    statusString = "UNKNOWN (0)"
+                case .readyToPlay:
+                    statusString = "READY_TO_PLAY (1)"
+                case .failed:
+                    statusString = "FAILED (2)"
+                @unknown default:
+                    statusString = "UNKNOWN_NEW (\(status.rawValue))"
+                }
+                print("📊 Status: \(statusString)")
+
+                // Log player item details
+                if let asset = playerItem.asset as? AVURLAsset {
+                    print("🔗 URL: \(asset.url.absoluteString)")
+                }
+                print("⏱️  Duration: \(playerItem.duration.seconds)s")
+                print("📺 Tracks: \(playerItem.tracks.count)")
+
+                // Log any error details
+                if let error = playerItem.error {
+                    let nsError = error as NSError
+                    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                    print("❌ ERROR DETAILS:")
+                    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                    print("❌ Error: \(error.localizedDescription)")
+                    print("❌ Domain: \(nsError.domain)")
+                    print("❌ Code: \(nsError.code)")
+                    print("❌ UserInfo: \(nsError.userInfo)")
+                    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                }
+
+                print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
                 switch status {
                 case .readyToPlay:
                     print("✅ Player item is ready to play")
                     if let duration = self?.player?.currentItem?.duration.seconds {
                         print("✅ Duration: \(duration)s")
+                    }
+
+                    // DIAGNOSTIC: Check for video and audio tracks
+                    if let item = self?.player?.currentItem {
+                        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                        print("🔍 DIAGNOSTIC: Checking tracks")
+                        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                        print("📺 Total tracks: \(item.tracks.count)")
+
+                        // Check for video tracks
+                        let videoTracks = item.tracks.filter { track in
+                            if let assetTrack = track.assetTrack {
+                                return assetTrack.mediaType == .video
+                            }
+                            return false
+                        }
+                        print("🎥 Video tracks: \(videoTracks.count)")
+                        for (index, track) in videoTracks.enumerated() {
+                            if let assetTrack = track.assetTrack {
+                                print("   Video track \(index): enabled=\(track.isEnabled), nominalFrameRate=\(assetTrack.nominalFrameRate), dimensions=\(assetTrack.naturalSize)")
+                                print("   Codec: \(assetTrack.mediaType.rawValue)")
+                            }
+                        }
+
+                        // Check for audio tracks
+                        let audioTracks = item.tracks.filter { track in
+                            if let assetTrack = track.assetTrack {
+                                return assetTrack.mediaType == .audio
+                            }
+                            return false
+                        }
+                        print("🔊 Audio tracks: \(audioTracks.count)")
+                        for (index, track) in audioTracks.enumerated() {
+                            if let assetTrack = track.assetTrack {
+                                print("   Audio track \(index): enabled=\(track.isEnabled)")
+                            }
+                        }
+
+                        // Check presentation size
+                        print("📐 Presentation size: \(item.presentationSize)")
+
+                        if videoTracks.isEmpty {
+                            print("❌ CRITICAL: NO VIDEO TRACKS FOUND!")
+                            print("❌ This is why there's no video but sound works!")
+                        } else if videoTracks.allSatisfy({ !$0.isEnabled }) {
+                            print("❌ CRITICAL: Video tracks exist but ALL DISABLED!")
+                            print("❌ This is why there's no video but sound works!")
+                        } else if item.presentationSize == .zero {
+                            print("⚠️ WARNING: Presentation size is zero!")
+                            print("⚠️ Video may not render properly!")
+                        } else {
+                            print("✅ Video tracks present and enabled")
+                        }
+                        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
                     }
 
                     // CRITICAL: Check for resume position before starting playback
@@ -615,8 +1109,30 @@ class VideoPlayerViewModel: ObservableObject {
         player?.publisher(for: \.error)
             .sink { [weak self] error in
                 if let error = error {
-                    print("❌ Player error: \(error.localizedDescription)")
-                    print("❌ Player error code: \((error as NSError).code)")
+                    let nsError = error as NSError
+                    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                    print("❌ PLAYER ERROR DETECTED")
+                    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                    print("❌ Error: \(error.localizedDescription)")
+                    print("❌ Domain: \(nsError.domain)")
+                    print("❌ Code: \(nsError.code)")
+                    print("❌ UserInfo: \(nsError.userInfo)")
+
+                    // Check for common error codes
+                    if nsError.domain == "AVFoundationErrorDomain" {
+                        switch nsError.code {
+                        case -11800:
+                            print("❌ Error type: Failed to load media (unsupported format or network issue)")
+                        case -11828:
+                            print("❌ Error type: Cannot decode (codec not supported)")
+                        case -11850:
+                            print("❌ Error type: Unsupported format")
+                        default:
+                            print("❌ Error type: Unknown AVFoundation error")
+                        }
+                    }
+                    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
                     self?.errorMessage = error.localizedDescription
                 }
             }
@@ -654,6 +1170,157 @@ class VideoPlayerViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+    }
+
+    private func setupPlaybackFallback(playerItem: AVPlayerItem) {
+        // Cancel any existing fallback task
+        fallbackCheckTask?.cancel()
+
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("🛡️ AUTOMATIC FALLBACK ENABLED")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("🛡️ Current mode: \(currentPlaybackMode?.rawValue ?? "unknown")")
+        print("🛡️ Will check status after 3 seconds")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+        // Start a 3-second timer to check for playback failure
+        fallbackCheckTask = Task { @MainActor in
+            // Wait 3 seconds
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+
+            guard !Task.isCancelled else {
+                print("🛡️ Fallback check cancelled")
+                return
+            }
+
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            print("🛡️ FALLBACK CHECK (after 3 seconds)")
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            print("📊 Player item status: \(playerItem.status.rawValue)")
+            print("📊 Current mode: \(self.currentPlaybackMode?.rawValue ?? "unknown")")
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+            // Check if playback failed
+            if playerItem.status == .failed {
+                print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                print("❌ PLAYBACK FAILED - INITIATING FALLBACK")
+                print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+                if let error = playerItem.error {
+                    let nsError = error as NSError
+                    print("❌ Error: \(error.localizedDescription)")
+                    print("❌ Domain: \(nsError.domain)")
+                    print("❌ Code: \(nsError.code)")
+                    print("❌ UserInfo: \(nsError.userInfo)")
+                }
+
+                // Log current URL
+                if let asset = playerItem.asset as? AVURLAsset {
+                    print("❌ Failed URL: \(asset.url.absoluteString)")
+                }
+
+                // Check if we're already in transcode mode
+                if self.currentPlaybackMode == .transcode {
+                    print("❌ Already in transcode mode, cannot fallback further")
+                    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                    self.errorMessage = "Playback failed: \(playerItem.error?.localizedDescription ?? "Unknown error")"
+                    return
+                }
+
+                // Check if we've already attempted fallback
+                if self.hasFallbackAttempted {
+                    print("❌ Fallback already attempted, not retrying")
+                    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                    return
+                }
+
+                // Attempt fallback to transcode
+                print("🔄 Initiating automatic fallback to transcode mode...")
+                self.hasFallbackAttempted = true
+                self.errorMessage = "Switched to compatibility mode for better playback"
+                print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+                // Retry with transcode
+                await self.retryWithTranscode()
+            } else if playerItem.status == .readyToPlay {
+                print("✅ Playback successful - no fallback needed")
+            } else {
+                print("⏳ Playback still loading after 3 seconds (status: \(playerItem.status.rawValue))")
+            }
+        }
+    }
+
+    private func retryWithTranscode() async {
+        print("🔄 Retrying playback with transcode mode...")
+
+        // Clean up current player
+        cleanup()
+
+        // Force transcode mode
+        currentPlaybackMode = .transcode
+
+        // Rebuild URL with transcode
+        guard let transcodeURL = buildTranscodeURL() else {
+            print("❌ Failed to build transcode URL")
+            errorMessage = "Failed to retry playback"
+            return
+        }
+
+        // Reload video with transcode URL
+        do {
+            isLoading = true
+            isLoadingVideo = true
+
+            let asset = AVURLAsset(url: transcodeURL, options: [
+                "AVURLAssetHTTPHeaderFieldsKey": [
+                    "X-Emby-Token": accessToken
+                ]
+            ])
+
+            print("✅ Creating player item with transcode URL...")
+            let playerItem = AVPlayerItem(asset: asset)
+
+            // Configure buffering
+            playerItem.preferredForwardBufferDuration = 10.0
+
+            let avPlayer = AVPlayer(playerItem: playerItem)
+
+            // Set audio session
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+            try AVAudioSession.sharedInstance().setActive(true)
+
+            self.player = avPlayer
+
+            // Setup observers (but don't setup fallback again!)
+            setupTimeObserver()
+            setupPlayerObservers(playerItem: playerItem)
+
+            // Wait for player item to be ready
+            print("⏳ Waiting for transcode player item to be ready...")
+            await waitForPlayerItemReady(playerItem: playerItem)
+
+            if playerItem.status == .failed {
+                print("❌ Transcode also failed")
+                errorMessage = "Playback failed: \(playerItem.error?.localizedDescription ?? "Unknown error")"
+                self.player = nil
+                isLoading = false
+                isLoadingVideo = false
+                return
+            }
+
+            if playerItem.status == .readyToPlay {
+                print("✅ Transcode successful, starting playback")
+                isLoading = false
+                isLoadingVideo = false
+                avPlayer.play()
+                await reportPlaybackStart()
+            }
+        } catch {
+            print("❌ Error during transcode retry: \(error)")
+            errorMessage = "Failed to retry playback: \(error.localizedDescription)"
+            isLoading = false
+            isLoadingVideo = false
+        }
     }
 
     // MARK: - Playback Controls

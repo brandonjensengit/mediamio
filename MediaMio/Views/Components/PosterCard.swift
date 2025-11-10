@@ -13,12 +13,11 @@ struct PosterCard: View {
     let baseURL: String
     let onSelect: () -> Void
 
-    @Environment(\.isFocused) private var isFocused
+    @FocusState private var isFocused: Bool
     @State private var imageURL: String?
 
     var body: some View {
-        Button(action: onSelect) {
-            VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
                 // Poster Image
                 ZStack(alignment: .bottomLeading) {
                     PosterImageView(
@@ -26,6 +25,18 @@ struct PosterCard: View {
                         width: Constants.UI.posterWidth,
                         height: Constants.UI.posterHeight
                     )
+
+                    // Dark gradient at bottom for text readability
+                    LinearGradient(
+                        colors: [
+                            Color.clear,
+                            Color.black.opacity(0.8)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 80)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
 
                     // Progress indicator for resume items
                     if let progress = playbackProgress {
@@ -36,6 +47,7 @@ struct PosterCard: View {
                     }
                 }
                 .frame(width: Constants.UI.posterWidth, height: Constants.UI.posterHeight)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
 
                 // Title
                 Text(item.name)
@@ -76,15 +88,22 @@ struct PosterCard: View {
                     }
                 }
                 .frame(width: Constants.UI.posterWidth, alignment: .leading)
-            }
-            .scaleEffect(isFocused ? Constants.UI.focusScale : Constants.UI.normalScale)
-            .shadow(
-                color: isFocused ? .white.opacity(0.3) : .clear,
-                radius: isFocused ? Constants.UI.focusShadowRadius : 0
-            )
-            .animation(.easeInOut(duration: Constants.UI.animationDuration), value: isFocused)
         }
-        .buttonStyle(.plain)
+        .scaleEffect(isFocused ? 1.15 : 1.0)  // Increased from 1.1 to 1.15 for more pop
+        .shadow(
+            color: isFocused ? .black.opacity(0.8) : .clear,  // Darker shadow
+            radius: isFocused ? 30 : 0,  // Larger blur radius
+            x: 0,
+            y: isFocused ? 15 : 0  // More vertical offset for depth
+        )
+        .zIndex(isFocused ? 999 : 0)  // Much higher z-index to ensure it's on top
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isFocused)
+        .allowsHitTesting(true)
+        .focusable()
+        .focused($isFocused)
+        .onTapGesture {
+            onSelect()
+        }
         .onAppear {
             // Generate image URL
             imageURL = item.primaryImageURL(
@@ -168,7 +187,8 @@ struct ProgressBar: View {
         genres: nil,
         studios: nil,
         people: nil,
-        taglines: nil
+        taglines: nil,
+        mediaSources: nil
     )
 
     PosterCard(

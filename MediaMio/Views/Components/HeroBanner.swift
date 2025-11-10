@@ -238,11 +238,14 @@ private struct HeroBannerContent: View {
         guard let userData = item.userData,
               let position = userData.playbackPositionTicks,
               let total = item.runTimeTicks else {
+            print("📊 HeroBanner: hasProgress=false for '\(item.name)': userData=\(item.userData != nil), position=\(item.userData?.playbackPositionTicks != nil), total=\(item.runTimeTicks != nil)")
             return false
         }
 
         let progress = Double(position) / Double(total) * 100.0
-        return progress > 1.0 && progress < 95.0
+        let hasProgress = progress > 1.0 && progress < 95.0
+        print("📊 HeroBanner: hasProgress=\(hasProgress) for '\(item.name)': position=\(position), total=\(total), progress=\(String(format: "%.1f", progress))%")
+        return hasProgress
     }
 }
 
@@ -291,6 +294,10 @@ struct HeroBannerButton: View {
             .background(style.backgroundColor)
             .foregroundColor(style.foregroundColor)
             .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.clear, lineWidth: 0)
+            )
             .scaleEffect(isFocused ? 1.05 : 1.0)
             .shadow(
                 color: isFocused ? .white.opacity(0.3) : .clear,
@@ -369,7 +376,8 @@ struct MetadataBadge: View {
         genres: nil,
         studios: nil,
         people: nil,
-        taglines: nil
+        taglines: nil,
+        mediaSources: nil
     )
 
     HeroBanner(

@@ -10,6 +10,17 @@ import SwiftUI
 struct LibraryView: View {
     @ObservedObject var viewModel: LibraryViewModel
 
+    // Focus state
+    @FocusState private var filterFocus: LibraryFilterBar.FilterField?
+    @FocusState private var toolbarFocus: LibraryToolbar.ToolbarField?
+
+    // Modal state
+    @State private var showGenrePicker = false
+    @State private var showYearPicker = false
+    @State private var showRatingPicker = false
+    @State private var showStatusPicker = false
+    @State private var showSearch = false
+
     private let columns = [
         GridItem(.adaptive(minimum: 250, maximum: 350), spacing: 40)
     ]
@@ -35,14 +46,26 @@ struct LibraryView: View {
                 // Content
                 ScrollView(.vertical, showsIndicators: true) {
                     VStack(spacing: 0) {
-                        // Header with title and sort controls
-                        LibraryHeader(viewModel: viewModel)
-                            .padding(.horizontal, Constants.UI.defaultPadding)
-                            .padding(.top, 40)
-                            .padding(.bottom, 30)
+                        // Toolbar with title, sort, and search
+                        LibraryToolbar(
+                            viewModel: viewModel,
+                            showSearch: $showSearch,
+                            focusedField: $toolbarFocus
+                        )
+                        .padding(.top, 40)
+
+                        // Filter bar
+                        LibraryFilterBar(
+                            viewModel: viewModel,
+                            focusedField: $filterFocus
+                        )
+                        .padding(.bottom, 20)
+                        .onChange(of: filterFocus) { _, newValue in
+                            handleFilterFocusChange(newValue)
+                        }
 
                         // Grid of items
-                        LazyVGrid(columns: columns, spacing: 50) {
+                        LazyVGrid(columns: columns, spacing: 60) {
                             ForEach(viewModel.items) { item in
                                 PosterCard(
                                     item: item,
@@ -50,6 +73,7 @@ struct LibraryView: View {
                                 ) {
                                     viewModel.selectItem(item)
                                 }
+                                .padding(.vertical, 20)
                                 .onAppear {
                                     // Load more when approaching end
                                     if item == viewModel.items.last {
@@ -86,6 +110,41 @@ struct LibraryView: View {
         }
         .task {
             await viewModel.loadContent()
+            await viewModel.loadFilterOptions()
+        }
+        .sheet(isPresented: $showGenrePicker) {
+            GenrePickerModal(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showYearPicker) {
+            YearRangePickerModal(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showRatingPicker) {
+            RatingPickerModal(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showStatusPicker) {
+            StatusPickerModal(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showSearch) {
+            LibrarySearchModal(viewModel: viewModel)
+        }
+    }
+
+    // MARK: - Filter Focus Handling
+
+    private func handleFilterFocusChange(_ field: LibraryFilterBar.FilterField?) {
+        guard let field = field else { return }
+
+        switch field {
+        case .genre:
+            showGenrePicker = true
+        case .year:
+            showYearPicker = true
+        case .rating:
+            showRatingPicker = true
+        case .status:
+            showStatusPicker = true
+        case .clearAll:
+            break // Button action handles this
         }
     }
 }

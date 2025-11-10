@@ -35,6 +35,9 @@ struct MediaItem: Codable, Identifiable, Hashable {
     let people: [PersonInfo]?
     let taglines: [String]?
 
+    // Media sources (for file info)
+    let mediaSources: [MediaSource]?
+
     enum CodingKeys: String, CodingKey {
         case id = "Id"
         case name = "Name"
@@ -57,6 +60,7 @@ struct MediaItem: Codable, Identifiable, Hashable {
         case studios = "Studios"
         case people = "People"
         case taglines = "Taglines"
+        case mediaSources = "MediaSources"
     }
 
     // MARK: - Computed Properties
@@ -210,6 +214,44 @@ struct PersonInfo: Codable, Hashable {
         case role = "Role"
         case type = "Type"
         case primaryImageTag = "PrimaryImageTag"
+    }
+}
+
+// MARK: - Media Source
+struct MediaSource: Codable, Hashable {
+    let id: String?
+    let name: String?
+    let size: Int64?  // File size in bytes
+    let container: String?
+    let bitrate: Int?
+    let mediaStreams: [MediaStream]?
+
+    enum CodingKeys: String, CodingKey {
+        case id = "Id"
+        case name = "Name"
+        case size = "Size"
+        case container = "Container"
+        case bitrate = "Bitrate"
+        case mediaStreams = "MediaStreams"
+    }
+}
+
+// MARK: - Media Stream
+struct MediaStream: Codable, Hashable {
+    let type: String?  // "Video", "Audio", "Subtitle"
+    let codec: String?
+    let width: Int?
+    let height: Int?
+    let bitRate: Int?
+    let language: String?
+
+    enum CodingKeys: String, CodingKey {
+        case type = "Type"
+        case codec = "Codec"
+        case width = "Width"
+        case height = "Height"
+        case bitRate = "BitRate"
+        case language = "Language"
     }
 }
 

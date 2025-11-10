@@ -29,6 +29,11 @@ struct ItemDetailView: View {
                             TVShowEpisodeInfoView(item: displayItem)
                         }
 
+                        // TV Show Seasons & Episodes (if Series)
+                        if displayItem.type == "Series" {
+                            TVShowSeasonsView(viewModel: viewModel)
+                        }
+
                         // Overview
                         if let overview = displayItem.overview {
                             DetailSectionView(title: "Overview") {
@@ -158,29 +163,31 @@ struct DetailHeaderView: View {
                     }
                 }
 
-                // Action Buttons
-                HStack(spacing: 24) {
-                    // Play/Resume Button (default focus)
-                    DetailActionButton(
-                        title: viewModel.hasProgress ? "Resume" : "Play",
-                        icon: "play.fill",
-                        style: .primary
-                    ) {
-                        viewModel.playItem()
-                    }
-                    .focused($focusedButton, equals: .play)
+                // Action Buttons (hide Play for Series - episodes shown below)
+                if displayItem.type != "Series" {
+                    HStack(spacing: 24) {
+                        // Play/Resume Button (default focus)
+                        DetailActionButton(
+                            title: viewModel.hasProgress ? "Resume" : "Play",
+                            icon: "play.fill",
+                            style: .primary
+                        ) {
+                            viewModel.playItem()
+                        }
+                        .focused($focusedButton, equals: .play)
 
-                    // Favorite Button
-                    DetailActionButton(
-                        title: viewModel.isFavorite ? "Unfavorite" : "Favorite",
-                        icon: viewModel.isFavorite ? "heart.fill" : "heart",
-                        style: .secondary
-                    ) {
-                        viewModel.toggleFavorite()
+                        // Favorite Button
+                        DetailActionButton(
+                            title: viewModel.isFavorite ? "Unfavorite" : "Favorite",
+                            icon: viewModel.isFavorite ? "heart.fill" : "heart",
+                            style: .secondary
+                        ) {
+                            viewModel.toggleFavorite()
+                        }
+                        .focused($focusedButton, equals: .favorite)
                     }
-                    .focused($focusedButton, equals: .favorite)
+                    .padding(.bottom, 40)
                 }
-                .padding(.bottom, 40)
             }
             .padding(.horizontal, Constants.UI.defaultPadding)
         }
@@ -385,6 +392,147 @@ struct DetailActionButton: View {
     }
 }
 
+// MARK: - TV Show Seasons View
+
+struct TVShowSeasonsView: View {
+    @ObservedObject var viewModel: ItemDetailViewModel
+    @FocusState private var focusedEpisode: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 30) {
+            // Season Selector
+            if !viewModel.seasons.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 20) {
+                        ForEach(viewModel.seasons) { season in
+                            SeasonButton(
+                                season: season,
+                                isSelected: viewModel.selectedSeason?.id == season.id
+                            ) {
+                                Task {
+                                    await viewModel.selectSeason(season)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, Constants.UI.defaultPadding)
+                }
+            }
+
+            // Episodes List
+            if !viewModel.episodes.isEmpty {
+                DetailSectionView(title: viewModel.selectedSeason?.name ?? "Episodes") {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHStack(spacing: 30) {
+                            ForEach(viewModel.episodes) { episode in
+                                EpisodeCard(
+                                    episode: episode,
+                                    baseURL: viewModel.baseURL
+                                ) {
+                                    viewModel.playEpisode(episode)
+                                }
+                                .focused($focusedEpisode, equals: episode.id)
+                            }
+                        }
+                        .padding(.horizontal, Constants.UI.defaultPadding)
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct SeasonButton: View {
+    let season: MediaItem
+    let isSelected: Bool
+    let action: () -> Void
+
+    @Environment(\.isFocused) private var isFocused
+
+    var body: some View {
+        Button(action: action) {
+            Text(season.name)
+                .font(.title3)
+                .fontWeight(isSelected ? .bold : .regular)
+                .foregroundColor(isSelected ? .black : .white)
+                .padding(.horizontal, 30)
+                .padding(.vertical, 15)
+                .background(isSelected ? Color.white : Color.white.opacity(0.2))
+                .cornerRadius(8)
+                .scaleEffect(isFocused ? 1.05 : 1.0)
+                .shadow(
+                    color: isFocused ? .white.opacity(0.3) : .clear,
+                    radius: isFocused ? 15 : 0
+                )
+        }
+        .buttonStyle(.plain)
+        .animation(.easeInOut(duration: 0.2), value: isFocused)
+    }
+}
+
+struct EpisodeCard: View {
+    let episode: MediaItem
+    let baseURL: String
+    let action: () -> Void
+
+    @Environment(\.isFocused) private var isFocused
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 12) {
+                // Episode Thumbnail
+                ZStack {
+                    if let imageURL = episode.primaryImageURL(baseURL: baseURL, maxWidth: 400, quality: 90) {
+                        AsyncImageView(url: imageURL, contentMode: .fill)
+                            .frame(width: 400, height: 225)
+                            .clipped()
+                    } else {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(width: 400, height: 225)
+                    }
+
+                    // Play overlay
+                    Image(systemName: "play.circle.fill")
+                        .font(.system(size: 60))
+                        .foregroundColor(.white.opacity(0.9))
+                        .shadow(color: .black.opacity(0.5), radius: 10)
+                }
+                .cornerRadius(8)
+
+                // Episode Info
+                VStack(alignment: .leading, spacing: 4) {
+                    if let episodeNum = episode.indexNumber {
+                        Text("Episode \(episodeNum)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Text(episode.name)
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .lineLimit(2)
+
+                    if let overview = episode.overview {
+                        Text(overview)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(3)
+                    }
+                }
+                .frame(width: 400, alignment: .leading)
+            }
+            .scaleEffect(isFocused ? 1.05 : 1.0)
+            .shadow(
+                color: isFocused ? .white.opacity(0.3) : .clear,
+                radius: isFocused ? 15 : 0
+            )
+            .animation(.easeInOut(duration: 0.2), value: isFocused)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: - Preview
 
 #Preview {
@@ -412,7 +560,8 @@ struct DetailActionButton: View {
             StudioInfo(name: "Village Roadshow Pictures", id: "2")
         ],
         people: nil,
-        taglines: nil
+        taglines: nil,
+        mediaSources: nil
     )
 
     let authService = AuthenticationService()
