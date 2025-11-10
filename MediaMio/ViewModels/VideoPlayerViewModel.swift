@@ -538,10 +538,17 @@ class VideoPlayerViewModel: ObservableObject {
             URLQueryItem(name: "DeviceId", value: getDeviceId()),
             URLQueryItem(name: "api_key", value: accessToken),
 
+            // CRITICAL: Request high resolution output
+            // Apple TV 4K supports up to 4K, so request 1920x1080 as safe high quality target
+            // Jellyfin will scale UP if source is lower, or preserve if source is higher
+            URLQueryItem(name: "Width", value: "1920"),
+            URLQueryItem(name: "Height", value: "1080"),
+
             // CRITICAL: Fix aspect ratio / zoom issues
             URLQueryItem(name: "CopyTimestamps", value: "true"),
             URLQueryItem(name: "RequireNonAnamorphic", value: "false"),
             URLQueryItem(name: "Profile", value: "high"),  // Use high quality H.264 profile
+            URLQueryItem(name: "Level", value: "41"),  // H.264 Level 4.1 for 1080p
             URLQueryItem(name: "Container", value: "ts,mp4"),
             URLQueryItem(name: "SegmentLength", value: "3"),
 
@@ -549,13 +556,15 @@ class VideoPlayerViewModel: ObservableObject {
             URLQueryItem(name: "EnableAutoStreamCopy", value: "true")
         ]
 
-        // DO NOT set MaxWidth/MaxHeight - let Jellyfin calculate proper dimensions
-        // This preserves aspect ratio and prevents zoom/crop issues
-        print("✅ Aspect ratio protection enabled:")
+        print("✅ High quality transcode configuration:")
+        print("   - Target resolution: 1920x1080 (Full HD)")
         print("   - CopyTimestamps: true (preserves original timing)")
         print("   - RequireNonAnamorphic: false (allows anamorphic)")
         print("   - Profile: high (H.264 high profile)")
-        print("   - NO MaxWidth/MaxHeight (preserves original aspect ratio)")
+        print("   - Level: 4.1 (supports 1080p @ high bitrate)")
+        print("   - Bitrate: 120 Mbps (ensures sharp quality)")
+        print("   📝 NOTE: Using Width/Height (not MaxWidth/MaxHeight) to request target resolution")
+        print("   📝 Jellyfin will preserve aspect ratio and scale appropriately")
 
         // Apply audio quality setting
         if let audioQuality = AudioQuality(rawValue: settingsManager.audioQuality),
@@ -627,6 +636,25 @@ class VideoPlayerViewModel: ObservableObject {
             print("⚠️ Profile=high MISSING - lower quality encoding")
         }
 
+        // Verify Width/Height parameters (target resolution)
+        if url.absoluteString.contains("Width=1920") {
+            print("✅ Width=1920 CONFIRMED (requesting 1080p)")
+        } else {
+            print("⚠️ Width=1920 NOT FOUND in URL")
+        }
+
+        if url.absoluteString.contains("Height=1080") {
+            print("✅ Height=1080 CONFIRMED (requesting 1080p)")
+        } else {
+            print("⚠️ Height=1080 NOT FOUND in URL")
+        }
+
+        if url.absoluteString.contains("Level=41") {
+            print("✅ Level=41 CONFIRMED (H.264 Level 4.1)")
+        } else {
+            print("⚠️ Level=41 NOT FOUND in URL")
+        }
+
         // Verify MaxWidth/MaxHeight are NOT present
         if url.absoluteString.contains("MaxWidth=") || url.absoluteString.contains("MaxHeight=") {
             print("❌ CRITICAL: MaxWidth/MaxHeight FOUND in URL!")
@@ -646,7 +674,7 @@ class VideoPlayerViewModel: ObservableObject {
                 }
             }
         } else {
-            print("✅ MaxWidth/MaxHeight NOT present (aspect ratio preserved)")
+            print("✅ MaxWidth/MaxHeight NOT present (good - using Width/Height instead)")
         }
 
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")

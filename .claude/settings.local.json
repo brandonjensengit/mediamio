@@ -6,7 +6,8 @@
       "Bash(git add:*)",
       "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Premium launch experience and video player enhancements\n\nImplemented animated splash screen with startup sound and subtitle controls:\n\n- Added SplashScreenView with logo animation and audio playback\n- Created AudioManager for startup sound effects\n- Implemented AppState to coordinate splash screen with content loading\n- Added subtitle picker modal with tvOS-optimized UI\n- Enhanced VideoPlayerViewModel with subtitle track management\n- Configured tvOS app icons with proper dimensions and parallax layers\n- Removed intermediate loading screens for seamless transitions\n- Updated app architecture to load content in background during splash\n\nThe splash screen now waits for both minimum display time and content\nloading to complete before transitioning, ensuring smooth user experience\nfrom launch to home screen.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
       "Bash(git push:*)",
-      "Bash(xcodebuild:*)"
+      "Bash(xcodebuild:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
