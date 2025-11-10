@@ -32,7 +32,7 @@ struct CustomVideoPlayerController: UIViewControllerRepresentable {
         // Disable AVPlayerViewController's remote command handling
         controller.requiresLinearPlayback = false
 
-        // CRITICAL: Create UIKit overlay for proper focus navigation
+        // CRITICAL: Create UIKit overlay and add as child view controller
         print("🎬 Creating VideoOverlayViewController...")
         let overlayVC = VideoOverlayViewController()
         overlayVC.viewModel = viewModel
@@ -44,13 +44,25 @@ struct CustomVideoPlayerController: UIViewControllerRepresentable {
             showBitratePicker = true
         }
 
-        print("🎬 Setting customOverlayViewController on AVPlayerViewController...")
-        // Set as customOverlayViewController (NOT contentOverlayView!)
-        controller.customOverlayViewController = overlayVC
+        print("🎬 Adding overlay as child view controller...")
+        // Add as child view controller (proper view controller containment)
+        controller.addChild(overlayVC)
+        controller.view.addSubview(overlayVC.view)
+
+        // Set overlay view constraints to fill parent
+        overlayVC.view.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            overlayVC.view.topAnchor.constraint(equalTo: controller.view.topAnchor),
+            overlayVC.view.leadingAnchor.constraint(equalTo: controller.view.leadingAnchor),
+            overlayVC.view.trailingAnchor.constraint(equalTo: controller.view.trailingAnchor),
+            overlayVC.view.bottomAnchor.constraint(equalTo: controller.view.bottomAnchor)
+        ])
+
+        overlayVC.didMove(toParent: controller)
         context.coordinator.overlayViewController = overlayVC
 
-        print("   ✅ customOverlayViewController set: \(controller.customOverlayViewController != nil)")
-        print("   ✅ Coordinator overlay stored: \(context.coordinator.overlayViewController != nil)")
+        print("   ✅ Overlay added as child view controller")
+        print("   ✅ Overlay view added to view hierarchy")
 
         // Diagnostic: Check player state
         print("📊 Player status: \(player.status.rawValue)")
