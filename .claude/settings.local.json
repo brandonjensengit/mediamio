@@ -9,7 +9,10 @@
       "Bash(xcodebuild:*)",
       "Bash(git commit:*)",
       "WebSearch",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.tothenew.com)",
+      "WebFetch(domain:showmax.engineering)",
+      "WebFetch(domain:www.enekoalonso.com)"
     ],
     "deny": [],
     "ask": []

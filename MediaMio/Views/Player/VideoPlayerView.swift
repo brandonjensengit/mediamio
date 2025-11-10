@@ -74,7 +74,6 @@ struct VideoPlayerView: View {
     let authService: AuthenticationService
     @EnvironmentObject var navigationManager: NavigationManager
     @StateObject private var viewModel: VideoPlayerViewModel
-    @FocusState private var isPlayerFocused: Bool
 
     init(item: MediaItem, authService: AuthenticationService) {
         self.item = item
@@ -123,37 +122,9 @@ struct VideoPlayerView: View {
             // TODO: Enable with a settings toggle
             // DebugStatsOverlay(stats: viewModel.debugStats)
         }
-        .focusable()
-        .focused($isPlayerFocused)
-        .onAppear {
-            // Set focus to player for remote control
-            isPlayerFocused = true
-            print("🎮 Player focused for remote control")
-        }
         .onPlayPauseCommand {
             print("🎮 Play/Pause command received!")
             viewModel.togglePlayPause()
-        }
-        .onMoveCommand { direction in
-            // Only allow seeking when paused
-            guard !viewModel.isPlaying else {
-                print("🎮 Swipe ignored - video is playing")
-                return
-            }
-
-            switch direction {
-            case .left:
-                print("🎮 Swipe left - seeking backward")
-                viewModel.seekBackward()
-            case .right:
-                print("🎮 Swipe right - seeking forward")
-                viewModel.seekForward()
-            case .up, .down:
-                // Could be used for volume or showing/hiding controls
-                break
-            @unknown default:
-                break
-            }
         }
         .task {
             await viewModel.loadVideoURL()
