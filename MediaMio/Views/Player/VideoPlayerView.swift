@@ -11,113 +11,37 @@ import AVKit
 import MediaPlayer
 import Combine
 
-// MARK: - AVPlayerViewController Wrapper
+// MARK: - Custom Player Wrapper
 
-struct CustomVideoPlayerController: UIViewControllerRepresentable {
-    let player: AVPlayer
+struct CustomVideoPlayerRepresentable: UIViewControllerRepresentable {
     let viewModel: VideoPlayerViewModel
     let onClose: () -> Void
     @Binding var showSubtitlePicker: Bool
     @Binding var showBitratePicker: Bool
 
-    func makeUIViewController(context: Context) -> AVPlayerViewController {
+    func makeUIViewController(context: Context) -> CustomPlayerViewController {
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print("🎥 CustomVideoPlayerController.makeUIViewController()")
+        print("🎥 Creating CustomPlayerViewController")
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-        let controller = AVPlayerViewController()
-        controller.player = player
-        controller.showsPlaybackControls = false  // Hide default controls
-
-        // Disable AVPlayerViewController's remote command handling
-        controller.requiresLinearPlayback = false
-
-        // CRITICAL: Create UIKit overlay and add as child view controller
-        print("🎬 Creating VideoOverlayViewController...")
-        let overlayVC = VideoOverlayViewController()
-        overlayVC.viewModel = viewModel
-        overlayVC.onClose = onClose
-        overlayVC.onShowSubtitlePicker = {
+        let controller = CustomPlayerViewController()
+        controller.viewModel = viewModel
+        controller.onClose = onClose
+        controller.onShowSubtitlePicker = {
             showSubtitlePicker = true
         }
-        overlayVC.onShowBitratePicker = {
+        controller.onShowBitratePicker = {
             showBitratePicker = true
         }
 
-        print("🎬 Adding overlay as child view controller...")
-        // Add as child view controller (proper view controller containment)
-        controller.addChild(overlayVC)
-        controller.view.addSubview(overlayVC.view)
-
-        // Set overlay view constraints to fill parent
-        overlayVC.view.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            overlayVC.view.topAnchor.constraint(equalTo: controller.view.topAnchor),
-            overlayVC.view.leadingAnchor.constraint(equalTo: controller.view.leadingAnchor),
-            overlayVC.view.trailingAnchor.constraint(equalTo: controller.view.trailingAnchor),
-            overlayVC.view.bottomAnchor.constraint(equalTo: controller.view.bottomAnchor)
-        ])
-
-        overlayVC.didMove(toParent: controller)
-        context.coordinator.overlayViewController = overlayVC
-
-        print("   ✅ Overlay added as child view controller")
-        print("   ✅ Overlay view added to view hierarchy")
-
-        // Diagnostic: Check player state
-        print("📊 Player status: \(player.status.rawValue)")
-        print("📊 Player rate: \(player.rate)")
-        if let item = player.currentItem {
-            print("📊 Player item status: \(item.status.rawValue)")
-            print("📊 Player item duration: \(item.duration.seconds)s")
-            print("📊 Player item tracks: \(item.tracks.count)")
-            print("📊 Player item presentation size: \(item.presentationSize)")
-
-            // Check for video tracks
-            let videoTracks = item.tracks.filter { track in
-                if let assetTrack = track.assetTrack {
-                    return assetTrack.mediaType == .video
-                }
-                return false
-            }
-            print("📊 Video tracks in player: \(videoTracks.count)")
-            if videoTracks.isEmpty {
-                print("❌ NO VIDEO TRACKS - This is why there's no video!")
-            }
-        } else {
-            print("⚠️ No player item!")
-        }
-
-        print("✅ AVPlayerViewController created with custom overlay")
+        print("✅ CustomPlayerViewController created")
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
         return controller
     }
 
-    func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
-        print("🔄 CustomVideoPlayerController.updateUIViewController() - isPlaying: \(viewModel.isPlaying)")
-
-        // Update player if changed
-        if uiViewController.player !== player {
-            print("   Player changed, updating")
-            uiViewController.player = player
-        }
-
-        // Update overlay with latest data
-        context.coordinator.overlayViewController?.updateFromViewModel()
-
-        // Show overlay (it will handle auto-hide based on play state)
-        context.coordinator.overlayViewController?.show()
-
-        print("   ✅ Update complete")
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
-
-    class Coordinator {
-        var overlayViewController: VideoOverlayViewController?
+    func updateUIViewController(_ uiViewController: CustomPlayerViewController, context: Context) {
+        // Controller updates itself via Combine observers
     }
 }
 
@@ -147,10 +71,9 @@ struct VideoPlayerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            // AVPlayerViewController with UIKit overlay (for proper focus navigation)
-            if let player = viewModel.player {
-                CustomVideoPlayerController(
-                    player: player,
+            // Custom video player with AVPlayerLayer (full control)
+            if viewModel.player != nil {
+                CustomVideoPlayerRepresentable(
                     viewModel: viewModel,
                     onClose: {
                         navigationManager.closePlayer()
@@ -174,20 +97,12 @@ struct VideoPlayerView: View {
                     }
                 }
             }
-
-            // Debug Stats Overlay (top-right corner, always visible)
-            // TODO: Enable with a settings toggle
-            // DebugStatsOverlay(stats: viewModel.debugStats)
         }
         .sheet(isPresented: $showSubtitlePicker) {
             SubtitlePickerModal(viewModel: viewModel)
         }
         .sheet(isPresented: $showBitratePicker) {
             BitratePickerModal(settingsManager: settingsManager)
-        }
-        .onPlayPauseCommand {
-            print("🎮 Play/Pause command received!")
-            viewModel.togglePlayPause()
         }
         .task {
             await viewModel.loadVideoURL()
