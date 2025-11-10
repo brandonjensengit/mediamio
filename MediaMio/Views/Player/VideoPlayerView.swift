@@ -78,23 +78,21 @@ struct CustomVideoPlayerController: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
+        print("🔄 CustomVideoPlayerController.updateUIViewController() - isPlaying: \(viewModel.isPlaying)")
+
         // Update player if changed
         if uiViewController.player !== player {
-            print("🔄 CustomVideoPlayerController.updateUIViewController() - player changed")
+            print("   Player changed, updating")
             uiViewController.player = player
         }
 
         // Update overlay with latest data
         context.coordinator.overlayViewController?.updateFromViewModel()
 
-        // Show/hide overlay based on pause state
-        if viewModel.isPlaying {
-            // Playing - overlay will auto-hide after timer
-            context.coordinator.overlayViewController?.show()
-        } else {
-            // Paused - keep overlay visible
-            context.coordinator.overlayViewController?.show()
-        }
+        // Show overlay (it will handle auto-hide based on play state)
+        context.coordinator.overlayViewController?.show()
+
+        print("   ✅ Update complete")
     }
 
     func makeCoordinator() -> Coordinator {

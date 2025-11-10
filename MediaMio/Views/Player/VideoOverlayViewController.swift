@@ -54,8 +54,14 @@ class VideoOverlayViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
+        print("🎮 VideoOverlayViewController.viewDidLoad()")
+
         // CRITICAL: Transparent background so video shows through
         view.backgroundColor = .clear
+
+        // CRITICAL: Start with alpha = 1.0 (visible)
+        view.alpha = 1.0
+        isVisible = true
 
         setupGradient()
         setupTopBar()
@@ -64,8 +70,7 @@ class VideoOverlayViewController: UIViewController {
         setupLayout()
         setupGestureRecognizers()
 
-        // Start visible
-        show()
+        print("✅ VideoOverlayViewController setup complete, alpha = \(view.alpha)")
     }
 
     // MARK: - Focus Management (CRITICAL for tvOS)
@@ -354,7 +359,12 @@ class VideoOverlayViewController: UIViewController {
     // MARK: - Show/Hide Controls
 
     func show() {
-        guard !isVisible else { return }
+        print("🎮 VideoOverlayViewController.show() called - isVisible: \(isVisible), current alpha: \(view.alpha)")
+        guard !isVisible else {
+            print("   Already visible, skipping")
+            resetHideTimer()  // Still reset timer even if already visible
+            return
+        }
         isVisible = true
 
         UIView.animate(withDuration: 0.3) {
@@ -366,10 +376,15 @@ class VideoOverlayViewController: UIViewController {
         updateFocusIfNeeded()
 
         resetHideTimer()
+        print("   ✅ Overlay shown, alpha = \(view.alpha)")
     }
 
     func hide() {
-        guard isVisible else { return }
+        print("🎮 VideoOverlayViewController.hide() called - isVisible: \(isVisible), current alpha: \(view.alpha)")
+        guard isVisible else {
+            print("   Already hidden, skipping")
+            return
+        }
         isVisible = false
 
         UIView.animate(withDuration: 0.3) {
@@ -378,15 +393,23 @@ class VideoOverlayViewController: UIViewController {
 
         hideTimer?.invalidate()
         hideTimer = nil
+        print("   ✅ Overlay hidden, alpha = \(view.alpha)")
     }
 
     private func resetHideTimer() {
         hideTimer?.invalidate()
 
         // Only auto-hide if video is playing
-        guard viewModel?.isPlaying == true else { return }
+        let isPlaying = viewModel?.isPlaying ?? false
+        print("   🕐 resetHideTimer: isPlaying = \(isPlaying)")
+        guard isPlaying else {
+            print("   ⏸️  Video paused, not scheduling hide timer")
+            return
+        }
 
+        print("   ⏰ Scheduling hide timer for 4 seconds")
         hideTimer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: false) { [weak self] _ in
+            print("   ⏰ Hide timer fired!")
             self?.hide()
         }
     }
@@ -394,7 +417,12 @@ class VideoOverlayViewController: UIViewController {
     // MARK: - Update UI
 
     func updateFromViewModel() {
-        guard let viewModel = viewModel else { return }
+        guard let viewModel = viewModel else {
+            print("⚠️ updateFromViewModel: viewModel is nil")
+            return
+        }
+
+        print("🔄 updateFromViewModel: isPlaying = \(viewModel.isPlaying), progress = \(viewModel.progress)")
 
         // Update title
         titleLabel.text = viewModel.item.name
