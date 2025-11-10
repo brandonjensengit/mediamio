@@ -15,6 +15,10 @@ import Combine
 
 struct CustomVideoPlayerController: UIViewControllerRepresentable {
     let player: AVPlayer
+    let viewModel: VideoPlayerViewModel
+    let onClose: () -> Void
+    @Binding var showSubtitlePicker: Bool
+    @Binding var showBitratePicker: Bool
 
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -23,10 +27,25 @@ struct CustomVideoPlayerController: UIViewControllerRepresentable {
 
         let controller = AVPlayerViewController()
         controller.player = player
-        controller.showsPlaybackControls = false  // Hide default controls (we have custom ones)
+        controller.showsPlaybackControls = false  // Hide default controls
 
         // Disable AVPlayerViewController's remote command handling
         controller.requiresLinearPlayback = false
+
+        // CRITICAL: Create UIKit overlay for proper focus navigation
+        let overlayVC = VideoOverlayViewController()
+        overlayVC.viewModel = viewModel
+        overlayVC.onClose = onClose
+        overlayVC.onShowSubtitlePicker = {
+            showSubtitlePicker = true
+        }
+        overlayVC.onShowBitratePicker = {
+            showBitratePicker = true
+        }
+
+        // Set as customOverlayViewController (NOT contentOverlayView!)
+        controller.customOverlayViewController = overlayVC
+        context.coordinator.overlayViewController = overlayVC
 
         // Diagnostic: Check player state
         print("📊 Player status: \(player.status.rawValue)")
@@ -52,18 +71,38 @@ struct CustomVideoPlayerController: UIViewControllerRepresentable {
             print("⚠️ No player item!")
         }
 
-        print("✅ AVPlayerViewController created")
+        print("✅ AVPlayerViewController created with custom overlay")
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
         return controller
     }
 
     func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
-        // Only log if player changed
+        // Update player if changed
         if uiViewController.player !== player {
             print("🔄 CustomVideoPlayerController.updateUIViewController() - player changed")
             uiViewController.player = player
         }
+
+        // Update overlay with latest data
+        context.coordinator.overlayViewController?.updateFromViewModel()
+
+        // Show/hide overlay based on pause state
+        if viewModel.isPlaying {
+            // Playing - overlay will auto-hide after timer
+            context.coordinator.overlayViewController?.show()
+        } else {
+            // Paused - keep overlay visible
+            context.coordinator.overlayViewController?.show()
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    class Coordinator {
+        var overlayViewController: VideoOverlayViewController?
     }
 }
 
@@ -74,6 +113,9 @@ struct VideoPlayerView: View {
     let authService: AuthenticationService
     @EnvironmentObject var navigationManager: NavigationManager
     @StateObject private var viewModel: VideoPlayerViewModel
+    @StateObject private var settingsManager = SettingsManager()
+    @State private var showSubtitlePicker = false
+    @State private var showBitratePicker = false
 
     init(item: MediaItem, authService: AuthenticationService) {
         self.item = item
@@ -90,16 +132,24 @@ struct VideoPlayerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            // AVPlayerViewController (instead of SwiftUI VideoPlayer)
+            // AVPlayerViewController with UIKit overlay (for proper focus navigation)
             if let player = viewModel.player {
-                CustomVideoPlayerController(player: player)
-                    .ignoresSafeArea()
-                    .onAppear {
-                        viewModel.startPlayback()
-                    }
-                    .onDisappear {
-                        viewModel.pausePlayback()
-                    }
+                CustomVideoPlayerController(
+                    player: player,
+                    viewModel: viewModel,
+                    onClose: {
+                        navigationManager.closePlayer()
+                    },
+                    showSubtitlePicker: $showSubtitlePicker,
+                    showBitratePicker: $showBitratePicker
+                )
+                .ignoresSafeArea()
+                .onAppear {
+                    viewModel.startPlayback()
+                }
+                .onDisappear {
+                    viewModel.pausePlayback()
+                }
             } else if viewModel.isLoading {
                 LoadingView(message: "Loading video...", showLogo: false)
             } else if let error = viewModel.errorMessage {
@@ -110,17 +160,15 @@ struct VideoPlayerView: View {
                 }
             }
 
-            // Custom Controls Overlay (Our Netflix-style controls)
-            PlayerControlsOverlay(
-                viewModel: viewModel,
-                onClose: {
-                    navigationManager.closePlayer()
-                }
-            )
-
             // Debug Stats Overlay (top-right corner, always visible)
             // TODO: Enable with a settings toggle
             // DebugStatsOverlay(stats: viewModel.debugStats)
+        }
+        .sheet(isPresented: $showSubtitlePicker) {
+            SubtitlePickerModal(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showBitratePicker) {
+            BitratePickerModal(settingsManager: settingsManager)
         }
         .onPlayPauseCommand {
             print("🎮 Play/Pause command received!")
