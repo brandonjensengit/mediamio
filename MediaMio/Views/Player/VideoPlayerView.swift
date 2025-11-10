@@ -33,6 +33,7 @@ struct CustomVideoPlayerController: UIViewControllerRepresentable {
         controller.requiresLinearPlayback = false
 
         // CRITICAL: Create UIKit overlay for proper focus navigation
+        print("🎬 Creating VideoOverlayViewController...")
         let overlayVC = VideoOverlayViewController()
         overlayVC.viewModel = viewModel
         overlayVC.onClose = onClose
@@ -43,9 +44,13 @@ struct CustomVideoPlayerController: UIViewControllerRepresentable {
             showBitratePicker = true
         }
 
+        print("🎬 Setting customOverlayViewController on AVPlayerViewController...")
         // Set as customOverlayViewController (NOT contentOverlayView!)
         controller.customOverlayViewController = overlayVC
         context.coordinator.overlayViewController = overlayVC
+
+        print("   ✅ customOverlayViewController set: \(controller.customOverlayViewController != nil)")
+        print("   ✅ Coordinator overlay stored: \(context.coordinator.overlayViewController != nil)")
 
         // Diagnostic: Check player state
         print("📊 Player status: \(player.status.rawValue)")

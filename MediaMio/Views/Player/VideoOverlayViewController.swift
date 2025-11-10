@@ -54,7 +54,10 @@ class VideoOverlayViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print("🎮 VideoOverlayViewController.viewDidLoad()")
+        print("   View bounds: \(view.bounds)")
+        print("   View frame: \(view.frame)")
 
         // CRITICAL: Transparent background so video shows through
         view.backgroundColor = .clear
@@ -70,7 +73,28 @@ class VideoOverlayViewController: UIViewController {
         setupLayout()
         setupGestureRecognizers()
 
-        print("✅ VideoOverlayViewController setup complete, alpha = \(view.alpha)")
+        print("   View subviews count: \(view.subviews.count)")
+        print("   Gradient view frame: \(gradientView.frame)")
+        print("   View alpha: \(view.alpha)")
+        print("   View backgroundColor: \(String(describing: view.backgroundColor))")
+        print("✅ VideoOverlayViewController setup complete")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        print("🎮 VideoOverlayViewController.viewWillAppear()")
+        print("   View superview: \(String(describing: view.superview))")
+        print("   View window: \(String(describing: view.window))")
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        print("🎮 VideoOverlayViewController.viewDidAppear()")
+        print("   View bounds: \(view.bounds)")
+        print("   View frame: \(view.frame)")
+        print("   View alpha: \(view.alpha)")
+        print("   View is in hierarchy: \(view.window != nil)")
     }
 
     // MARK: - Focus Management (CRITICAL for tvOS)
@@ -93,6 +117,9 @@ class VideoOverlayViewController: UIViewController {
     // MARK: - Setup
 
     private func setupGradient() {
+        // TEMPORARY: Bright red background to verify overlay is rendering
+        gradientView.backgroundColor = UIColor.red.withAlphaComponent(0.5)
+
         let gradientLayer = CAGradientLayer()
         gradientLayer.colors = [
             UIColor.black.withAlphaComponent(0.7).cgColor,
@@ -101,8 +128,10 @@ class VideoOverlayViewController: UIViewController {
         ]
         gradientLayer.locations = [0.0, 0.4, 1.0]
         gradientLayer.frame = view.bounds
-        gradientView.layer.addSublayer(gradientLayer)
+        gradientView.layer.insertSublayer(gradientLayer, at: 0)  // Insert below, not add
         view.addSubview(gradientView)
+
+        print("   📐 Gradient view added with bounds: \(view.bounds)")
     }
 
     private func setupTopBar() {
