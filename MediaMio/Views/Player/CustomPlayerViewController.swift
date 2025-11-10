@@ -87,7 +87,74 @@ class CustomPlayerViewController: UIViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print("🎮 CustomPlayerViewController.viewDidAppear()")
+
+        // Debug: Check player layer status
+        if let playerLayer = playerLayer {
+            print("📺 Player layer status:")
+            print("   Frame: \(playerLayer.frame)")
+            print("   Bounds: \(playerLayer.bounds)")
+            print("   Hidden: \(playerLayer.isHidden)")
+            print("   Opacity: \(playerLayer.opacity)")
+            print("   videoGravity: \(playerLayer.videoGravity)")
+
+            if let player = playerLayer.player {
+                print("   Player attached: YES")
+                print("   Player rate: \(player.rate)")
+                print("   Player status: \(player.status.rawValue)")
+
+                if let item = player.currentItem {
+                    print("   Current item: YES")
+                    print("   Item status: \(item.status.rawValue)")
+                    print("   Item duration: \(item.duration.seconds)s")
+                    print("   Presentation size: \(item.presentationSize)")
+                    print("   Tracks count: \(item.tracks.count)")
+
+                    // Check for video tracks
+                    let videoTracks = item.tracks.filter { track in
+                        track.assetTrack?.mediaType == .video
+                    }
+                    print("   Video tracks: \(videoTracks.count)")
+
+                    if videoTracks.isEmpty {
+                        print("   ❌ NO VIDEO TRACKS!")
+                    } else {
+                        for (idx, track) in videoTracks.enumerated() {
+                            if let assetTrack = track.assetTrack {
+                                print("   Video track \(idx): enabled=\(track.isEnabled), size=\(assetTrack.naturalSize)")
+                            }
+                        }
+                    }
+                } else {
+                    print("   ❌ No current item!")
+                }
+            } else {
+                print("   ❌ No player attached!")
+            }
+
+            // Check superlayer
+            if let superlayer = playerLayer.superlayer {
+                print("   Superlayer: \(type(of: superlayer))")
+                print("   Superlayer bounds: \(superlayer.bounds)")
+            } else {
+                print("   ❌ No superlayer!")
+            }
+        } else {
+            print("❌ Player layer is nil!")
+        }
+
+        // Check view layer hierarchy
+        print("📐 View hierarchy:")
+        print("   View bounds: \(view.bounds)")
+        print("   View layer sublayers: \(view.layer.sublayers?.count ?? 0)")
+        if let sublayers = view.layer.sublayers {
+            for (idx, layer) in sublayers.enumerated() {
+                print("   Sublayer \(idx): \(type(of: layer)), frame=\(layer.frame), hidden=\(layer.isHidden)")
+            }
+        }
+
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
         // Set focus to play/pause button
         setNeedsFocusUpdate()
@@ -165,6 +232,9 @@ class CustomPlayerViewController: UIViewController {
     private func setupControlsContainer() {
         controlsContainer.backgroundColor = .clear
         controlsContainer.alpha = 1.0  // Start visible
+        controlsContainer.isUserInteractionEnabled = true  // Allow interaction with buttons
+
+        // CRITICAL: Don't block video layer below
         view.addSubview(controlsContainer)
 
         controlsContainer.translatesAutoresizingMaskIntoConstraints = false
@@ -174,6 +244,8 @@ class CustomPlayerViewController: UIViewController {
             controlsContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             controlsContainer.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
+
+        print("   Controls container setup: backgroundColor=\(String(describing: controlsContainer.backgroundColor))")
     }
 
     private func setupTopBar() {
@@ -405,22 +477,40 @@ class CustomPlayerViewController: UIViewController {
     // MARK: - Focus Guides
 
     private func setupFocusGuides() {
-        // Focus guide: When moving up from bottom buttons, always go to play/pause
-        let bottomToPlayPauseFocusGuide = UIFocusGuide()
-        view.addLayoutGuide(bottomToPlayPauseFocusGuide)
+        // Create focus guides for each bottom button to redirect upward focus to play/pause
+        // This allows swiping up from subtitle/bitrate/audio to reach play/pause
 
-        // Position guide above the bottom buttons
+        let subtitleGuide = UIFocusGuide()
+        view.addLayoutGuide(subtitleGuide)
         NSLayoutConstraint.activate([
-            bottomToPlayPauseFocusGuide.topAnchor.constraint(equalTo: progressView.topAnchor, constant: -50),
-            bottomToPlayPauseFocusGuide.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            bottomToPlayPauseFocusGuide.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            bottomToPlayPauseFocusGuide.heightAnchor.constraint(equalToConstant: 50)
+            subtitleGuide.leadingAnchor.constraint(equalTo: subtitleButton.leadingAnchor),
+            subtitleGuide.trailingAnchor.constraint(equalTo: subtitleButton.trailingAnchor),
+            subtitleGuide.bottomAnchor.constraint(equalTo: subtitleButton.topAnchor),
+            subtitleGuide.heightAnchor.constraint(equalToConstant: 1)
         ])
+        subtitleGuide.preferredFocusEnvironments = [playPauseButton]
 
-        // When moving up from any bottom button, guide to play/pause
-        bottomToPlayPauseFocusGuide.preferredFocusEnvironments = [playPauseButton]
+        let bitrateGuide = UIFocusGuide()
+        view.addLayoutGuide(bitrateGuide)
+        NSLayoutConstraint.activate([
+            bitrateGuide.leadingAnchor.constraint(equalTo: bitrateButton.leadingAnchor),
+            bitrateGuide.trailingAnchor.constraint(equalTo: bitrateButton.trailingAnchor),
+            bitrateGuide.bottomAnchor.constraint(equalTo: bitrateButton.topAnchor),
+            bitrateGuide.heightAnchor.constraint(equalToConstant: 1)
+        ])
+        bitrateGuide.preferredFocusEnvironments = [playPauseButton]
 
-        print("✅ Focus guides configured")
+        let audioGuide = UIFocusGuide()
+        view.addLayoutGuide(audioGuide)
+        NSLayoutConstraint.activate([
+            audioGuide.leadingAnchor.constraint(equalTo: audioButton.leadingAnchor),
+            audioGuide.trailingAnchor.constraint(equalTo: audioButton.trailingAnchor),
+            audioGuide.bottomAnchor.constraint(equalTo: audioButton.topAnchor),
+            audioGuide.heightAnchor.constraint(equalToConstant: 1)
+        ])
+        audioGuide.preferredFocusEnvironments = [playPauseButton]
+
+        print("✅ Focus guides configured (subtitle, bitrate, audio → play/pause)")
     }
 
     // MARK: - Gestures
