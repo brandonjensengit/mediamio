@@ -390,7 +390,11 @@ class VideoPlayerViewModel: ObservableObject {
 
             // Preserve timestamps and aspect ratio
             URLQueryItem(name: "CopyTimestamps", value: "true"),
-            URLQueryItem(name: "RequireNonAnamorphic", value: "false")
+            URLQueryItem(name: "RequireNonAnamorphic", value: "false"),
+
+            // Subtitle support
+            URLQueryItem(name: "SubtitleMethod", value: "Encode"),
+            URLQueryItem(name: "SubtitleCodec", value: "webvtt")
         ]
 
         components?.queryItems = queryItems
@@ -439,7 +443,11 @@ class VideoPlayerViewModel: ObservableObject {
 
             // Preserve timestamps and aspect ratio
             URLQueryItem(name: "CopyTimestamps", value: "true"),
-            URLQueryItem(name: "RequireNonAnamorphic", value: "false")
+            URLQueryItem(name: "RequireNonAnamorphic", value: "false"),
+
+            // Subtitle support
+            URLQueryItem(name: "SubtitleMethod", value: "Encode"),
+            URLQueryItem(name: "SubtitleCodec", value: "webvtt")
         ]
 
         components?.queryItems = queryItems
@@ -478,7 +486,11 @@ class VideoPlayerViewModel: ObservableObject {
 
             // Preserve everything
             URLQueryItem(name: "CopyTimestamps", value: "true"),
-            URLQueryItem(name: "RequireNonAnamorphic", value: "false")
+            URLQueryItem(name: "RequireNonAnamorphic", value: "false"),
+
+            // Subtitle support
+            URLQueryItem(name: "SubtitleMethod", value: "Encode"),
+            URLQueryItem(name: "SubtitleCodec", value: "webvtt")
         ]
 
         components?.queryItems = queryItems
@@ -568,7 +580,12 @@ class VideoPlayerViewModel: ObservableObject {
             URLQueryItem(name: "SegmentLength", value: "3"),
 
             // Enable auto stream copy when possible
-            URLQueryItem(name: "EnableAutoStreamCopy", value: "true")
+            URLQueryItem(name: "EnableAutoStreamCopy", value: "true"),
+
+            // CRITICAL: Subtitle support for HLS
+            // Jellyfin will encode subtitles into the HLS stream as additional tracks
+            URLQueryItem(name: "SubtitleMethod", value: "Encode"),  // Encode subtitles into stream
+            URLQueryItem(name: "SubtitleCodec", value: "webvtt")    // Use WebVTT for HLS compatibility
         ]
 
         print("✅ High quality transcode configuration:")
@@ -579,8 +596,11 @@ class VideoPlayerViewModel: ObservableObject {
         print("   - RequireNonAnamorphic: false (allows anamorphic/widescreen)")
         print("   - Profile: high (H.264 high profile)")
         print("   - Level: 4.1 (supports 1080p @ high bitrate)")
+        print("   - SubtitleMethod: Encode (subtitles in HLS stream)")
+        print("   - SubtitleCodec: webvtt (HLS-compatible format)")
         print("   📝 NOTE: VideoBitrate parameter tells Jellyfin what resolution to produce")
         print("   📝 8-15 Mbps video bitrate = 1080p output, aspect ratio preserved")
+        print("   📝 Subtitles will be available via native AVPlayer selector")
 
         components?.queryItems = queryItems
 

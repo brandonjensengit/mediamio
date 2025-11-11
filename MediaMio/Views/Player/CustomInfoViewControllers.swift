@@ -46,8 +46,6 @@ class BitrateSelectionViewController: UIViewController, AVPlayerViewControllerDe
         tableView.dataSource = self
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "BitrateCell")
         tableView.backgroundColor = .clear
-        tableView.separatorStyle = .singleLine
-        tableView.separatorColor = .white.withAlphaComponent(0.2)
         tableView.remembersLastFocusedIndexPath = true
 
         view.addSubview(tableView)
@@ -175,8 +173,6 @@ class AudioQualitySelectionViewController: UIViewController, AVPlayerViewControl
         tableView.dataSource = self
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "AudioCell")
         tableView.backgroundColor = .clear
-        tableView.separatorStyle = .singleLine
-        tableView.separatorColor = .white.withAlphaComponent(0.2)
         tableView.remembersLastFocusedIndexPath = true
 
         view.addSubview(tableView)
