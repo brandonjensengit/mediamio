@@ -26,6 +26,9 @@ class BitrateSelectionViewController: UIViewController, AVPlayerViewControllerDe
     init(settingsManager: SettingsManager) {
         self.settingsManager = settingsManager
         super.init(nibName: nil, bundle: nil)
+
+        // Set preferred content size for tvOS info panel
+        preferredContentSize = CGSize(width: 600, height: 400)
     }
 
     required init?(coder: NSCoder) {
@@ -37,10 +40,15 @@ class BitrateSelectionViewController: UIViewController, AVPlayerViewControllerDe
 
         title = "Video Quality"
 
+        view.backgroundColor = .clear
+
         tableView.delegate = self
         tableView.dataSource = self
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "BitrateCell")
         tableView.backgroundColor = .clear
+        tableView.separatorStyle = .singleLine
+        tableView.separatorColor = .white.withAlphaComponent(0.2)
+        tableView.remembersLastFocusedIndexPath = true
 
         view.addSubview(tableView)
         tableView.translatesAutoresizingMaskIntoConstraints = false
@@ -50,6 +58,16 @@ class BitrateSelectionViewController: UIViewController, AVPlayerViewControllerDe
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
         ])
+
+        print("📊 BitrateSelectionViewController loaded with \(bitrateOptions.count) options")
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+
+        // Force reload data when view appears
+        tableView.reloadData()
+        print("📊 BitrateSelectionViewController appeared, table reloaded")
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -68,10 +86,12 @@ class BitrateSelectionViewController: UIViewController, AVPlayerViewControllerDe
 extension BitrateSelectionViewController: UITableViewDelegate, UITableViewDataSource {
 
     func numberOfSections(in tableView: UITableView) -> Int {
+        print("📊 numberOfSections called: returning 1")
         return 1
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        print("📊 numberOfRowsInSection called: returning \(bitrateOptions.count)")
         return bitrateOptions.count
     }
 
@@ -79,16 +99,22 @@ extension BitrateSelectionViewController: UITableViewDelegate, UITableViewDataSo
         let cell = tableView.dequeueReusableCell(withIdentifier: "BitrateCell", for: indexPath)
         let option = bitrateOptions[indexPath.row]
 
+        // Configure cell for tvOS
         cell.textLabel?.text = option.label
         cell.textLabel?.textColor = .white
+        cell.textLabel?.font = UIFont.systemFont(ofSize: 29, weight: .regular)
         cell.backgroundColor = .clear
+        cell.contentView.backgroundColor = .clear
 
         // Show checkmark for selected option
         if option.value == settingsManager.maxBitrate {
             cell.accessoryType = .checkmark
+            cell.tintColor = .white
         } else {
             cell.accessoryType = .none
         }
+
+        print("📊 Configuring cell \(indexPath.row): \(option.label)")
 
         return cell
     }
@@ -129,6 +155,9 @@ class AudioQualitySelectionViewController: UIViewController, AVPlayerViewControl
     init(settingsManager: SettingsManager) {
         self.settingsManager = settingsManager
         super.init(nibName: nil, bundle: nil)
+
+        // Set preferred content size for tvOS info panel
+        preferredContentSize = CGSize(width: 600, height: 400)
     }
 
     required init?(coder: NSCoder) {
@@ -140,10 +169,15 @@ class AudioQualitySelectionViewController: UIViewController, AVPlayerViewControl
 
         title = "Audio Quality"
 
+        view.backgroundColor = .clear
+
         tableView.delegate = self
         tableView.dataSource = self
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "AudioCell")
         tableView.backgroundColor = .clear
+        tableView.separatorStyle = .singleLine
+        tableView.separatorColor = .white.withAlphaComponent(0.2)
+        tableView.remembersLastFocusedIndexPath = true
 
         view.addSubview(tableView)
         tableView.translatesAutoresizingMaskIntoConstraints = false
@@ -153,6 +187,16 @@ class AudioQualitySelectionViewController: UIViewController, AVPlayerViewControl
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
         ])
+
+        print("🔊 AudioQualitySelectionViewController loaded with \(audioQualityOptions.count) options")
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+
+        // Force reload data when view appears
+        tableView.reloadData()
+        print("🔊 AudioQualitySelectionViewController appeared, table reloaded")
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -171,10 +215,12 @@ class AudioQualitySelectionViewController: UIViewController, AVPlayerViewControl
 extension AudioQualitySelectionViewController: UITableViewDelegate, UITableViewDataSource {
 
     func numberOfSections(in tableView: UITableView) -> Int {
+        print("🔊 numberOfSections called: returning 1")
         return 1
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        print("🔊 numberOfRowsInSection called: returning \(audioQualityOptions.count)")
         return audioQualityOptions.count
     }
 
@@ -182,16 +228,22 @@ extension AudioQualitySelectionViewController: UITableViewDelegate, UITableViewD
         let cell = tableView.dequeueReusableCell(withIdentifier: "AudioCell", for: indexPath)
         let option = audioQualityOptions[indexPath.row]
 
+        // Configure cell for tvOS
         cell.textLabel?.text = option.label
         cell.textLabel?.textColor = .white
+        cell.textLabel?.font = UIFont.systemFont(ofSize: 29, weight: .regular)
         cell.backgroundColor = .clear
+        cell.contentView.backgroundColor = .clear
 
         // Show checkmark for selected option
         if option.value == settingsManager.audioQuality {
             cell.accessoryType = .checkmark
+            cell.tintColor = .white
         } else {
             cell.accessoryType = .none
         }
+
+        print("🔊 Configuring cell \(indexPath.row): \(option.label)")
 
         return cell
     }
