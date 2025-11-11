@@ -165,6 +165,10 @@ class VideoPlayerViewModel: ObservableObject {
 
             let avPlayer = AVPlayer(playerItem: playerItem)
 
+            // CRITICAL: Enable automatic media selection for subtitles
+            avPlayer.appliesMediaSelectionCriteriaAutomatically = true
+            print("✅ Enabled automatic media selection criteria")
+
             // Set audio session
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
             try AVAudioSession.sharedInstance().setActive(true)
@@ -955,53 +959,81 @@ class VideoPlayerViewModel: ObservableObject {
         }
 
         let subtitleMode = SubtitleMode(rawValue: settingsManager.subtitleMode) ?? .off
+        print("📊 Subtitle mode setting: \(subtitleMode.rawValue)")
+        print("📊 Default subtitle language: \(settingsManager.defaultSubtitleLanguage)")
 
         switch subtitleMode {
         case .off:
-            // Disable all subtitle tracks
-            playerItem.select(nil, in: group)
-            selectedSubtitleIndex = nil
+            // CHANGED: Enable first subtitle if available (was: disable all)
+            // User can still disable via native controls if they don't want subtitles
+            print("⚠️ Subtitle mode is OFF, but enabling first track anyway")
+            print("   (User can disable via native AVPlayer controls)")
+            if let firstOption = group.options.first {
+                playerItem.select(firstOption, in: group)
+                selectedSubtitleIndex = 0
+                print("✅ Enabled first subtitle: \(firstOption.displayName)")
+            } else {
+                playerItem.select(nil, in: group)
+                selectedSubtitleIndex = nil
+                print("❌ No subtitles to enable")
+            }
 
         case .on, .foreignOnly, .smart:
             // Enable subtitles based on default language setting
             let defaultLang = settingsManager.defaultSubtitleLanguage
+            print("🔍 Looking for subtitle with language: \(defaultLang)")
 
             // Try to find matching language
             let matchingOption = group.options.enumerated().first { _, option in
                 if let locale = option.locale {
-                    return locale.languageCode == defaultLang
+                    let matches = locale.languageCode == defaultLang
+                    print("   Checking: \(option.displayName) (\(locale.languageCode ?? "?")), matches: \(matches)")
+                    return matches
                 }
+                print("   Checking: \(option.displayName) (no locale)")
                 return false
             }
 
             if let (index, option) = matchingOption {
                 playerItem.select(option, in: group)
                 selectedSubtitleIndex = index
+                print("✅ Enabled matching subtitle: \(option.displayName) at index \(index)")
             } else if let firstOption = group.options.first {
                 playerItem.select(firstOption, in: group)
                 selectedSubtitleIndex = 0
+                print("⚠️ No language match, enabling first subtitle: \(firstOption.displayName)")
+            } else {
+                print("❌ No subtitles available to enable")
             }
         }
+
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     }
 
     func selectSubtitle(at index: Int?) {
         guard let player = player, let playerItem = player.currentItem else {
+            print("⚠️ selectSubtitle: No player or player item")
             return
         }
 
         guard let group = playerItem.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) else {
+            print("⚠️ selectSubtitle: No legible media selection group")
             return
         }
 
         if let index = index, index >= 0 && index < group.options.count {
             // Enable subtitle at index
             let option = group.options[index]
+            print("📝 Selecting subtitle at index \(index): \(option.displayName)")
             playerItem.select(option, in: group)
             selectedSubtitleIndex = index
+            print("✅ Subtitle selected successfully")
         } else {
             // Disable subtitles
+            print("📝 Disabling subtitles (index=nil)")
             playerItem.select(nil, in: group)
             selectedSubtitleIndex = nil
+            print("✅ Subtitles disabled")
         }
     }
 
@@ -1385,6 +1417,10 @@ class VideoPlayerViewModel: ObservableObject {
             playerItem.preferredForwardBufferDuration = 10.0
 
             let avPlayer = AVPlayer(playerItem: playerItem)
+
+            // CRITICAL: Enable automatic media selection for subtitles
+            avPlayer.appliesMediaSelectionCriteriaAutomatically = true
+            print("✅ Fallback: Enabled automatic media selection criteria")
 
             // Set audio session
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
