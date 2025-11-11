@@ -402,8 +402,8 @@ class VideoPlayerViewModel: ObservableObject {
             URLQueryItem(name: "CopyTimestamps", value: "true"),
             URLQueryItem(name: "RequireNonAnamorphic", value: "false"),
 
-            // Subtitle support - HLS includes subtitles as separate WebVTT segments
-            URLQueryItem(name: "SubtitleMethod", value: "Hls"),
+            // Subtitle support
+            URLQueryItem(name: "SubtitleMethod", value: "Encode"),
             URLQueryItem(name: "SubtitleCodec", value: "webvtt")
         ]
 
@@ -461,8 +461,8 @@ class VideoPlayerViewModel: ObservableObject {
             URLQueryItem(name: "CopyTimestamps", value: "true"),
             URLQueryItem(name: "RequireNonAnamorphic", value: "false"),
 
-            // Subtitle support - HLS includes subtitles as separate WebVTT segments
-            URLQueryItem(name: "SubtitleMethod", value: "Hls"),
+            // Subtitle support
+            URLQueryItem(name: "SubtitleMethod", value: "Encode"),
             URLQueryItem(name: "SubtitleCodec", value: "webvtt")
         ]
 
@@ -510,8 +510,8 @@ class VideoPlayerViewModel: ObservableObject {
             URLQueryItem(name: "CopyTimestamps", value: "true"),
             URLQueryItem(name: "RequireNonAnamorphic", value: "false"),
 
-            // Subtitle support - HLS includes subtitles as separate WebVTT segments
-            URLQueryItem(name: "SubtitleMethod", value: "Hls"),
+            // Subtitle support
+            URLQueryItem(name: "SubtitleMethod", value: "Encode"),
             URLQueryItem(name: "SubtitleCodec", value: "webvtt")
         ]
 
@@ -611,8 +611,8 @@ class VideoPlayerViewModel: ObservableObject {
             URLQueryItem(name: "EnableAutoStreamCopy", value: "true"),
 
             // CRITICAL: Subtitle support for HLS
-            // Jellyfin will include subtitles as separate WebVTT segments in HLS manifest
-            URLQueryItem(name: "SubtitleMethod", value: "Hls"),  // Include subtitles in HLS playlist
+            // Jellyfin will encode subtitles into the HLS stream
+            URLQueryItem(name: "SubtitleMethod", value: "Encode"),  // Encode subtitles into stream
             URLQueryItem(name: "SubtitleCodec", value: "webvtt")    // Use WebVTT for HLS compatibility
         ]
 
@@ -632,7 +632,7 @@ class VideoPlayerViewModel: ObservableObject {
         print("   - RequireNonAnamorphic: false (allows anamorphic/widescreen)")
         print("   - Profile: high (H.264 high profile)")
         print("   - Level: 4.1 (supports 1080p @ high bitrate)")
-        print("   - SubtitleMethod: Hls (subtitles as WebVTT segments)")
+        print("   - SubtitleMethod: Encode (subtitles in HLS stream)")
         print("   - SubtitleCodec: webvtt (HLS-compatible format)")
         print("   📝 NOTE: VideoBitrate parameter tells Jellyfin what resolution to produce")
         print("   📝 8-15 Mbps video bitrate = 1080p output, aspect ratio preserved")
