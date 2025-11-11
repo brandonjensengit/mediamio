@@ -947,6 +947,23 @@ class VideoPlayerViewModel: ObservableObject {
 
         print("✅ AVPlayer detected \(group.options.count) subtitle tracks")
 
+        // CRITICAL: Check if subtitle tracks are properly formatted
+        print("🔍 Detailed subtitle track analysis:")
+        for (index, option) in group.options.enumerated() {
+            print("   Track \(index):")
+            print("      Display name: \(option.displayName)")
+            print("      Locale: \(option.locale?.identifier ?? "NONE")")
+            print("      Language: \(option.locale?.languageCode ?? "NONE")")
+            print("      Characteristics: \(option.mediaType)")
+            print("      Has SDH: \(option.hasMediaCharacteristic(.describesMusicAndSoundForAccessibility))")
+            print("      Has forced: \(option.hasMediaCharacteristic(.isAuxiliaryContent))")
+            print("      Extendedlanguage tag: \(option.extendedLanguageTag ?? "none")")
+
+            if let asset = playerItem.asset as? AVURLAsset {
+                print("      Asset URL contains subtitle: \(asset.url.absoluteString.contains("SubtitleStreamIndex"))")
+            }
+        }
+
         // Populate available subtitles
         availableSubtitles = group.options.enumerated().map { index, option in
             print("   - Track \(index): \(option.displayName) (\(option.locale?.languageCode ?? "unknown"))")
@@ -1007,6 +1024,34 @@ class VideoPlayerViewModel: ObservableObject {
             }
         }
 
+        // CRITICAL: Verify subtitle is actually selected
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("🔍 VERIFYING SUBTITLE SELECTION")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        if let currentSelection = playerItem.currentMediaSelection.selectedMediaOption(in: group) {
+            print("✅ Currently selected subtitle: \(currentSelection.displayName)")
+            print("   Locale: \(currentSelection.locale?.identifier ?? "none")")
+            print("   Language code: \(currentSelection.locale?.languageCode ?? "none")")
+            print("   Has accessible content: \(currentSelection.hasMediaCharacteristic(.describesMusicAndSoundForAccessibility))")
+        } else {
+            print("❌ NO SUBTITLE IS CURRENTLY SELECTED!")
+            print("❌ This means playerItem.select() didn't work!")
+            print("❌ Trying to force selection again...")
+
+            // Try forcing selection one more time
+            if let firstOption = group.options.first {
+                print("🔄 Force-selecting first subtitle again: \(firstOption.displayName)")
+                playerItem.select(firstOption, in: group)
+
+                // Check again
+                if let verification = playerItem.currentMediaSelection.selectedMediaOption(in: group) {
+                    print("✅ Force selection worked: \(verification.displayName)")
+                } else {
+                    print("❌ Force selection STILL FAILED")
+                    print("❌ This is a bug in AVPlayer or the HLS stream")
+                }
+            }
+        }
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     }
 
