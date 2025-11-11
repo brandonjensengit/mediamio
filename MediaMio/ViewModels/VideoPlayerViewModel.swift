@@ -80,6 +80,12 @@ class VideoPlayerViewModel: ObservableObject {
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print("📺 Item: \(item.name)")
         print("🆔 Item ID: \(item.id)")
+        print("📝 Subtitles: \(item.hasSubtitles ? "YES (\(item.subtitleStreams.count) tracks)" : "NO")")
+        if item.hasSubtitles {
+            for stream in item.subtitleStreams {
+                print("   - Index \(stream.index ?? -1): \(stream.subtitleDisplayName) (\(stream.language ?? "unknown"))")
+            }
+        }
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
         // Prevent duplicate loading
@@ -397,6 +403,12 @@ class VideoPlayerViewModel: ObservableObject {
             URLQueryItem(name: "SubtitleCodec", value: "webvtt")
         ]
 
+        // Add SubtitleStreamIndex if available
+        if let subtitleIndex = item.firstSubtitleIndex {
+            queryItems.append(URLQueryItem(name: "SubtitleStreamIndex", value: "\(subtitleIndex)"))
+            print("📝 DirectPlay: Adding subtitle track index=\(subtitleIndex)")
+        }
+
         components?.queryItems = queryItems
 
         guard let url = components?.url else {
@@ -450,6 +462,12 @@ class VideoPlayerViewModel: ObservableObject {
             URLQueryItem(name: "SubtitleCodec", value: "webvtt")
         ]
 
+        // Add SubtitleStreamIndex if available
+        if let subtitleIndex = item.firstSubtitleIndex {
+            queryItems.append(URLQueryItem(name: "SubtitleStreamIndex", value: "\(subtitleIndex)"))
+            print("📝 DirectStream: Adding subtitle track index=\(subtitleIndex)")
+        }
+
         components?.queryItems = queryItems
 
         let url = components?.url
@@ -492,6 +510,12 @@ class VideoPlayerViewModel: ObservableObject {
             URLQueryItem(name: "SubtitleMethod", value: "Encode"),
             URLQueryItem(name: "SubtitleCodec", value: "webvtt")
         ]
+
+        // Add SubtitleStreamIndex if available
+        if let subtitleIndex = item.firstSubtitleIndex {
+            queryItems.append(URLQueryItem(name: "SubtitleStreamIndex", value: "\(subtitleIndex)"))
+            print("📝 Remux: Adding subtitle track index=\(subtitleIndex)")
+        }
 
         components?.queryItems = queryItems
 
@@ -587,6 +611,14 @@ class VideoPlayerViewModel: ObservableObject {
             URLQueryItem(name: "SubtitleMethod", value: "Encode"),  // Encode subtitles into stream
             URLQueryItem(name: "SubtitleCodec", value: "webvtt")    // Use WebVTT for HLS compatibility
         ]
+
+        // CRITICAL: Add SubtitleStreamIndex to tell Jellyfin which subtitle track to include
+        if let subtitleIndex = item.firstSubtitleIndex {
+            queryItems.append(URLQueryItem(name: "SubtitleStreamIndex", value: "\(subtitleIndex)"))
+            print("📝 Adding subtitle track: index=\(subtitleIndex)")
+        } else {
+            print("⚠️ No subtitle streams found in media item")
+        }
 
         print("✅ High quality transcode configuration:")
         print("   - VideoBitrate: \(String(format: "%.1f", videoMbps)) Mbps (→ produces 1080p output)")
@@ -885,17 +917,36 @@ class VideoPlayerViewModel: ObservableObject {
 
     private func configureSubtitles() {
         guard let player = player, let playerItem = player.currentItem else {
+            print("⚠️ configureSubtitles: No player or player item")
             return
         }
 
-        // Get available subtitle tracks
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("📝 SUBTITLE CONFIGURATION")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+        // Log subtitle information from MediaItem
+        print("📊 MediaItem subtitle info:")
+        print("   - Has subtitles: \(item.hasSubtitles)")
+        print("   - Subtitle streams count: \(item.subtitleStreams.count)")
+        for stream in item.subtitleStreams {
+            print("   - Stream index=\(stream.index ?? -1), lang=\(stream.language ?? "?"), codec=\(stream.codec ?? "?"), external=\(stream.isExternal ?? false)")
+        }
+
+        // Get available subtitle tracks from AVPlayer
         guard let group = playerItem.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) else {
+            print("❌ AVPlayer: No legible media selection group found")
+            print("❌ This means Jellyfin did NOT include subtitles in the HLS stream")
+            print("❌ Check that SubtitleStreamIndex parameter is being added to URL")
             return
         }
+
+        print("✅ AVPlayer detected \(group.options.count) subtitle tracks")
 
         // Populate available subtitles
         availableSubtitles = group.options.enumerated().map { index, option in
-            SubtitleTrack(
+            print("   - Track \(index): \(option.displayName) (\(option.locale?.languageCode ?? "unknown"))")
+            return SubtitleTrack(
                 index: index,
                 displayName: option.displayName,
                 languageCode: option.locale?.languageCode ?? "unknown",

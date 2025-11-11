@@ -128,6 +128,28 @@ struct MediaItem: Codable, Identifiable, Hashable {
         guard imageTags?.thumb != nil else { return nil }
         return "\(baseURL)/Items/\(id)/Images/Thumb?maxWidth=\(maxWidth)&quality=\(quality)"
     }
+
+    // MARK: - Subtitle Helpers
+
+    /// Get all subtitle streams from the media sources
+    var subtitleStreams: [MediaStream] {
+        guard let mediaSources = mediaSources,
+              let firstSource = mediaSources.first,
+              let streams = firstSource.mediaStreams else {
+            return []
+        }
+        return streams.filter { $0.type?.lowercased() == "subtitle" }
+    }
+
+    /// Get the first subtitle stream index (for SubtitleStreamIndex parameter)
+    var firstSubtitleIndex: Int? {
+        return subtitleStreams.first?.index
+    }
+
+    /// Check if this item has any subtitle tracks
+    var hasSubtitles: Bool {
+        return !subtitleStreams.isEmpty
+    }
 }
 
 // MARK: - User Data
@@ -238,20 +260,44 @@ struct MediaSource: Codable, Hashable {
 
 // MARK: - Media Stream
 struct MediaStream: Codable, Hashable {
+    let index: Int?  // Stream index (used for SubtitleStreamIndex)
     let type: String?  // "Video", "Audio", "Subtitle"
     let codec: String?
     let width: Int?
     let height: Int?
     let bitRate: Int?
     let language: String?
+    let displayTitle: String?  // Display name for the stream
+    let title: String?  // Title metadata
+    let isExternal: Bool?  // True if subtitle file is external (SRT, etc)
+    let isDefault: Bool?  // True if this is the default stream
 
     enum CodingKeys: String, CodingKey {
+        case index = "Index"
         case type = "Type"
         case codec = "Codec"
         case width = "Width"
         case height = "Height"
         case bitRate = "BitRate"
         case language = "Language"
+        case displayTitle = "DisplayTitle"
+        case title = "Title"
+        case isExternal = "IsExternal"
+        case isDefault = "IsDefault"
+    }
+
+    // Helper computed property for subtitle display name
+    var subtitleDisplayName: String {
+        if let title = displayTitle, !title.isEmpty {
+            return title
+        }
+        if let title = title, !title.isEmpty {
+            return title
+        }
+        if let lang = language, !lang.isEmpty {
+            return lang.uppercased()
+        }
+        return "Unknown"
     }
 }
 
