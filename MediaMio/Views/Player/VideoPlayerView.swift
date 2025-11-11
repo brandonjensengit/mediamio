@@ -76,6 +76,10 @@ struct VideoPlayerView: View {
     let authService: AuthenticationService
     @EnvironmentObject var navigationManager: NavigationManager
     @StateObject private var viewModel: VideoPlayerViewModel
+    @StateObject private var settingsManager = SettingsManager()
+    @State private var showPauseMenu = false
+    @State private var showSubtitlePicker = false
+    @State private var showBitratePicker = false
 
     init(item: MediaItem, authService: AuthenticationService) {
         self.item = item
@@ -113,6 +117,38 @@ struct VideoPlayerView: View {
                     }
                 }
             }
+
+            // Pause menu overlay - ONLY when paused
+            if showPauseMenu && !viewModel.isPlaying {
+                PauseMenuOverlay(
+                    viewModel: viewModel,
+                    onResume: {
+                        viewModel.togglePlayPause()
+                        showPauseMenu = false
+                    },
+                    onClose: {
+                        navigationManager.closePlayer()
+                    },
+                    onShowSubtitles: {
+                        showSubtitlePicker = true
+                    },
+                    onShowBitrate: {
+                        showBitratePicker = true
+                    }
+                )
+            }
+        }
+        .sheet(isPresented: $showSubtitlePicker) {
+            SubtitlePickerModal(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showBitratePicker) {
+            BitratePickerModal(settingsManager: settingsManager)
+        }
+        .onChange(of: viewModel.isPlaying) { isPlaying in
+            // Show pause menu when paused
+            if !isPlaying {
+                showPauseMenu = true
+            }
         }
         .task {
             await viewModel.loadVideoURL()
@@ -124,6 +160,132 @@ struct VideoPlayerView: View {
             // Clean up when leaving the player
             viewModel.cleanup()
         }
+    }
+}
+
+// MARK: - Pause Menu Overlay
+
+struct PauseMenuOverlay: View {
+    @ObservedObject var viewModel: VideoPlayerViewModel
+    let onResume: () -> Void
+    let onClose: () -> Void
+    let onShowSubtitles: () -> Void
+    let onShowBitrate: () -> Void
+
+    @FocusState private var focusedButton: PauseMenuButton?
+
+    enum PauseMenuButton {
+        case resume
+        case subtitles
+        case bitrate
+        case close
+    }
+
+    var body: some View {
+        ZStack {
+            // Semi-transparent background
+            Color.black.opacity(0.7)
+                .ignoresSafeArea()
+
+            VStack(spacing: 40) {
+                // Title
+                Text(viewModel.item.name)
+                    .font(.system(size: 48, weight: .bold))
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 60)
+
+                // Progress info
+                VStack(spacing: 12) {
+                    Text("\(viewModel.currentTimeFormatted) / \(viewModel.durationFormatted)")
+                        .font(.title2)
+                        .foregroundColor(.white.opacity(0.8))
+
+                    ProgressView(value: viewModel.progress)
+                        .progressViewStyle(.linear)
+                        .tint(.white)
+                        .frame(width: 600)
+                }
+
+                // Menu buttons
+                VStack(spacing: 20) {
+                    // Resume
+                    Button(action: onResume) {
+                        HStack(spacing: 16) {
+                            Image(systemName: "play.fill")
+                                .font(.title)
+                            Text("Resume")
+                                .font(.title)
+                                .fontWeight(.semibold)
+                        }
+                        .frame(width: 400)
+                        .padding(.vertical, 20)
+                        .background(Color.white.opacity(0.2))
+                        .cornerRadius(12)
+                    }
+                    .buttonStyle(.plain)
+                    .focused($focusedButton, equals: .resume)
+
+                    // Subtitles
+                    Button(action: onShowSubtitles) {
+                        HStack(spacing: 16) {
+                            Image(systemName: "captions.bubble")
+                                .font(.title)
+                            Text("Subtitles: \(viewModel.currentSubtitleName)")
+                                .font(.title2)
+                        }
+                        .frame(width: 400)
+                        .padding(.vertical, 20)
+                        .background(Color.white.opacity(0.2))
+                        .cornerRadius(12)
+                    }
+                    .buttonStyle(.plain)
+                    .focused($focusedButton, equals: .subtitles)
+
+                    // Bitrate
+                    Button(action: onShowBitrate) {
+                        HStack(spacing: 16) {
+                            Image(systemName: "gauge.high")
+                                .font(.title)
+                            Text("Quality: \(bitrateDisplay)")
+                                .font(.title2)
+                        }
+                        .frame(width: 400)
+                        .padding(.vertical, 20)
+                        .background(Color.white.opacity(0.2))
+                        .cornerRadius(12)
+                    }
+                    .buttonStyle(.plain)
+                    .focused($focusedButton, equals: .bitrate)
+
+                    // Close
+                    Button(action: onClose) {
+                        HStack(spacing: 16) {
+                            Image(systemName: "xmark")
+                                .font(.title)
+                            Text("Exit")
+                                .font(.title2)
+                        }
+                        .frame(width: 400)
+                        .padding(.vertical, 20)
+                        .background(Color.red.opacity(0.3))
+                        .cornerRadius(12)
+                    }
+                    .buttonStyle(.plain)
+                    .focused($focusedButton, equals: .close)
+                }
+            }
+        }
+        .onAppear {
+            // Default focus to resume button
+            focusedButton = .resume
+        }
+    }
+
+    private var bitrateDisplay: String {
+        let settingsManager = SettingsManager()
+        let mbps = Double(settingsManager.maxBitrate) / 1_000_000
+        return String(format: "%.0f Mbps", mbps)
     }
 }
 
