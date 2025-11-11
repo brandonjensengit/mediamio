@@ -402,9 +402,9 @@ class VideoPlayerViewModel: ObservableObject {
             URLQueryItem(name: "CopyTimestamps", value: "true"),
             URLQueryItem(name: "RequireNonAnamorphic", value: "false"),
 
-            // Subtitle support
-            URLQueryItem(name: "SubtitleMethod", value: "Encode"),
-            URLQueryItem(name: "SubtitleCodec", value: "webvtt")
+            // Subtitle support - External creates separate subtitle file
+            URLQueryItem(name: "SubtitleMethod", value: "External"),
+            URLQueryItem(name: "SubtitleCodec", value: "vtt")
         ]
 
         // Add SubtitleStreamIndex if available
@@ -461,9 +461,9 @@ class VideoPlayerViewModel: ObservableObject {
             URLQueryItem(name: "CopyTimestamps", value: "true"),
             URLQueryItem(name: "RequireNonAnamorphic", value: "false"),
 
-            // Subtitle support
-            URLQueryItem(name: "SubtitleMethod", value: "Encode"),
-            URLQueryItem(name: "SubtitleCodec", value: "webvtt")
+            // Subtitle support - External creates separate subtitle file
+            URLQueryItem(name: "SubtitleMethod", value: "External"),
+            URLQueryItem(name: "SubtitleCodec", value: "vtt")
         ]
 
         // Add SubtitleStreamIndex if available
@@ -510,9 +510,9 @@ class VideoPlayerViewModel: ObservableObject {
             URLQueryItem(name: "CopyTimestamps", value: "true"),
             URLQueryItem(name: "RequireNonAnamorphic", value: "false"),
 
-            // Subtitle support
-            URLQueryItem(name: "SubtitleMethod", value: "Encode"),
-            URLQueryItem(name: "SubtitleCodec", value: "webvtt")
+            // Subtitle support - External creates separate subtitle file
+            URLQueryItem(name: "SubtitleMethod", value: "External"),
+            URLQueryItem(name: "SubtitleCodec", value: "vtt")
         ]
 
         // Add SubtitleStreamIndex if available
@@ -611,9 +611,9 @@ class VideoPlayerViewModel: ObservableObject {
             URLQueryItem(name: "EnableAutoStreamCopy", value: "true"),
 
             // CRITICAL: Subtitle support for HLS
-            // Jellyfin will encode subtitles into the HLS stream
-            URLQueryItem(name: "SubtitleMethod", value: "Encode"),  // Encode subtitles into stream
-            URLQueryItem(name: "SubtitleCodec", value: "webvtt")    // Use WebVTT for HLS compatibility
+            // External method creates separate .vtt subtitle file that AVPlayer can load
+            URLQueryItem(name: "SubtitleMethod", value: "External"),  // External subtitle file
+            URLQueryItem(name: "SubtitleCodec", value: "vtt")    // VTT format for compatibility
         ]
 
         // CRITICAL: Add SubtitleStreamIndex to tell Jellyfin which subtitle track to include
@@ -632,8 +632,8 @@ class VideoPlayerViewModel: ObservableObject {
         print("   - RequireNonAnamorphic: false (allows anamorphic/widescreen)")
         print("   - Profile: high (H.264 high profile)")
         print("   - Level: 4.1 (supports 1080p @ high bitrate)")
-        print("   - SubtitleMethod: Encode (subtitles in HLS stream)")
-        print("   - SubtitleCodec: webvtt (HLS-compatible format)")
+        print("   - SubtitleMethod: External (separate subtitle file)")
+        print("   - SubtitleCodec: vtt (WebVTT format)")
         print("   📝 NOTE: VideoBitrate parameter tells Jellyfin what resolution to produce")
         print("   📝 8-15 Mbps video bitrate = 1080p output, aspect ratio preserved")
         print("   📝 Subtitles will be available via native AVPlayer selector")

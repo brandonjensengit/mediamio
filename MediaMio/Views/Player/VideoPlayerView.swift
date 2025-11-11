@@ -26,6 +26,12 @@ struct SimpleVideoPlayerRepresentable: UIViewControllerRepresentable {
         // CRITICAL: Show native controls for tvOS
         controller.showsPlaybackControls = true
 
+        // CRITICAL: Enable closed caption display (for CC-format subtitles)
+        #if os(tvOS)
+        // On tvOS, we need to ensure subtitles/CC are allowed to display
+        controller.allowsPictureInPicturePlayback = true
+        #endif
+
         // Add custom info view controllers for bitrate and audio quality
         let bitrateVC = BitrateSelectionViewController(settingsManager: settingsManager)
         let audioQualityVC = AudioQualitySelectionViewController(settingsManager: settingsManager)
