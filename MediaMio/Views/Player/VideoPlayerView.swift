@@ -11,37 +11,61 @@ import AVKit
 import MediaPlayer
 import Combine
 
-// MARK: - Custom Player Wrapper
+// MARK: - Simple Player Wrapper
 
-struct CustomVideoPlayerRepresentable: UIViewControllerRepresentable {
-    let viewModel: VideoPlayerViewModel
-    let onClose: () -> Void
-    @Binding var showSubtitlePicker: Bool
-    @Binding var showBitratePicker: Bool
+struct SimpleVideoPlayerRepresentable: UIViewControllerRepresentable {
+    let player: AVPlayer
 
-    func makeUIViewController(context: Context) -> CustomPlayerViewController {
+    func makeUIViewController(context: Context) -> AVPlayerViewController {
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print("🎥 Creating CustomPlayerViewController")
+        print("🎥 Creating AVPlayerViewController (SIMPLE)")
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-        let controller = CustomPlayerViewController()
-        controller.viewModel = viewModel
-        controller.onClose = onClose
-        controller.onShowSubtitlePicker = {
-            showSubtitlePicker = true
-        }
-        controller.onShowBitratePicker = {
-            showBitratePicker = true
+        let controller = AVPlayerViewController()
+        controller.player = player
+
+        // CRITICAL: Show native controls for tvOS
+        controller.showsPlaybackControls = true
+
+        print("   Player: \(player)")
+        print("   Player status: \(player.status.rawValue)")
+        print("   Player rate: \(player.rate)")
+
+        if let item = player.currentItem {
+            print("   Current item: \(item)")
+            print("   Item status: \(item.status.rawValue)")
+            print("   Item duration: \(item.duration.seconds)s")
+
+            if let error = item.error {
+                print("   ❌ ITEM ERROR: \(error)")
+            }
+
+            // Check after 1 second
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                print("📊 Status check after 1s:")
+                print("   Item status: \(item.status.rawValue)")
+                print("   Presentation size: \(item.presentationSize)")
+                print("   Tracks: \(item.tracks.count)")
+
+                if let error = item.error {
+                    print("   ❌ ERROR: \(error)")
+                }
+            }
+        } else {
+            print("   ⚠️ No current item!")
         }
 
-        print("✅ CustomPlayerViewController created")
+        print("✅ AVPlayerViewController created with native controls")
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
         return controller
     }
 
-    func updateUIViewController(_ uiViewController: CustomPlayerViewController, context: Context) {
-        // Controller updates itself via Combine observers
+    func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
+        if uiViewController.player !== player {
+            print("🔄 Updating player")
+            uiViewController.player = player
+        }
     }
 }
 
@@ -52,9 +76,6 @@ struct VideoPlayerView: View {
     let authService: AuthenticationService
     @EnvironmentObject var navigationManager: NavigationManager
     @StateObject private var viewModel: VideoPlayerViewModel
-    @StateObject private var settingsManager = SettingsManager()
-    @State private var showSubtitlePicker = false
-    @State private var showBitratePicker = false
 
     init(item: MediaItem, authService: AuthenticationService) {
         self.item = item
@@ -71,23 +92,18 @@ struct VideoPlayerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            // Custom video player with AVPlayerLayer (full control)
-            if viewModel.player != nil {
-                CustomVideoPlayerRepresentable(
-                    viewModel: viewModel,
-                    onClose: {
-                        navigationManager.closePlayer()
-                    },
-                    showSubtitlePicker: $showSubtitlePicker,
-                    showBitratePicker: $showBitratePicker
-                )
-                .ignoresSafeArea()
-                .onAppear {
-                    viewModel.startPlayback()
-                }
-                .onDisappear {
-                    viewModel.pausePlayback()
-                }
+            // SIMPLE: AVPlayerViewController with native controls
+            if let player = viewModel.player {
+                SimpleVideoPlayerRepresentable(player: player)
+                    .ignoresSafeArea()
+                    .onAppear {
+                        print("▶️ Starting playback")
+                        viewModel.startPlayback()
+                    }
+                    .onDisappear {
+                        print("⏸️ Pausing playback")
+                        viewModel.pausePlayback()
+                    }
             } else if viewModel.isLoading {
                 LoadingView(message: "Loading video...", showLogo: false)
             } else if let error = viewModel.errorMessage {
@@ -97,12 +113,6 @@ struct VideoPlayerView: View {
                     }
                 }
             }
-        }
-        .sheet(isPresented: $showSubtitlePicker) {
-            SubtitlePickerModal(viewModel: viewModel)
-        }
-        .sheet(isPresented: $showBitratePicker) {
-            BitratePickerModal(settingsManager: settingsManager)
         }
         .task {
             await viewModel.loadVideoURL()
