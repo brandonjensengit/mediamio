@@ -144,9 +144,9 @@ struct VideoPlayerView: View {
         .sheet(isPresented: $showBitratePicker) {
             BitratePickerModal(settingsManager: settingsManager)
         }
-        .onChange(of: viewModel.isPlaying) { isPlaying in
+        .onChange(of: viewModel.isPlaying) { oldValue, newValue in
             // Show pause menu when paused
-            if !isPlaying {
+            if !newValue {
                 showPauseMenu = true
             }
         }
@@ -197,7 +197,7 @@ struct PauseMenuOverlay: View {
 
                 // Progress info
                 VStack(spacing: 12) {
-                    Text("\(viewModel.currentTimeFormatted) / \(viewModel.durationFormatted)")
+                    Text("\(viewModel.currentTimeFormatted) / \(formatDuration(viewModel.duration))")
                         .font(.title2)
                         .foregroundColor(.white.opacity(0.8))
 
@@ -286,6 +286,20 @@ struct PauseMenuOverlay: View {
         let settingsManager = SettingsManager()
         let mbps = Double(settingsManager.maxBitrate) / 1_000_000
         return String(format: "%.0f Mbps", mbps)
+    }
+
+    private func formatDuration(_ seconds: Double) -> String {
+        guard seconds.isFinite && seconds >= 0 else { return "0:00" }
+
+        let hours = Int(seconds) / 3600
+        let minutes = (Int(seconds) % 3600) / 60
+        let secs = Int(seconds) % 60
+
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, secs)
+        } else {
+            return String(format: "%d:%02d", minutes, secs)
+        }
     }
 }
 
