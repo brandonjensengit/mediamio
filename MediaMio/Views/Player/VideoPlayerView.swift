@@ -15,6 +15,10 @@ struct SimpleVideoPlayerRepresentable: UIViewControllerRepresentable {
     let player: AVPlayer
     let settingsManager: SettingsManager
 
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print("🎥 Creating AVPlayerViewController (SIMPLE)")
@@ -22,6 +26,7 @@ struct SimpleVideoPlayerRepresentable: UIViewControllerRepresentable {
 
         let controller = AVPlayerViewController()
         controller.player = player
+        controller.delegate = context.coordinator
 
         // CRITICAL: Show native controls for tvOS
         controller.showsPlaybackControls = true
@@ -78,6 +83,34 @@ struct SimpleVideoPlayerRepresentable: UIViewControllerRepresentable {
             print("🔄 Updating player")
             uiViewController.player = player
         }
+    }
+
+    // MARK: - Coordinator for handling AVPlayerViewController delegate
+
+    class Coordinator: NSObject, AVPlayerViewControllerDelegate {
+
+        #if os(tvOS)
+        // This method is called when the menu button is pressed
+        // Return false to prevent dismissal (just hide overlay)
+        // Return true to allow dismissal (exit player)
+        func playerViewController(
+            _ playerViewController: AVPlayerViewController,
+            shouldDismiss dismissalTransition: AVPlayerViewController.DismissalTransition
+        ) -> Bool {
+            // Check if playback controls are currently visible
+            // If visible, first menu press should just hide them (return false)
+            // If hidden, second menu press should exit player (return true)
+
+            // The showsPlaybackControls property doesn't tell us if they're CURRENTLY visible
+            // So we rely on the default behavior which is:
+            // - First press: AVPlayerViewController automatically hides overlay, doesn't call this
+            // - Second press: Calls this method to ask if we should dismiss
+
+            // Always allow dismissal on second press
+            print("🎮 Menu button pressed - allowing player dismissal")
+            return true
+        }
+        #endif
     }
 }
 
