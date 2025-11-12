@@ -278,6 +278,11 @@ struct HomeContentView: View {
     var navigationManager: NavigationManager? = nil
     @State private var hasSetInitialScroll = false
 
+    // MARK: - Focus Management
+    @StateObject private var focusManager = FocusManager()
+    @FocusState private var focusedField: String?
+    @Namespace private var focusNamespace
+
     private func isLibrarySection(_ section: ContentSection) -> Bool {
         if case .library = section.type {
             return true
@@ -311,27 +316,43 @@ struct HomeContentView: View {
                                 .id("top")
 
                             // Hero Banner with auto-rotation (Netflix-style)
+                            // With focus tracking for Netflix-style navigation
                             if viewModel.featuredItems.count > 1 {
                                 HeroBannerRotating(
                                     items: viewModel.featuredItems,
                                     baseURL: viewModel.baseURL,
                                     onPlay: { item in
+                                        focusManager.pushFocusPosition()
                                         viewModel.playItem(item)
                                     },
                                     onInfo: { item in
+                                        focusManager.pushFocusPosition()
                                         viewModel.showItemDetails(item)
+                                    },
+                                    onFocusChange: { hasFocus in
+                                        if hasFocus {
+                                            focusManager.focusedOnHero()
+                                        }
                                     }
                                 )
+                                .id("hero")
+                                .focused($focusedField, equals: "hero")
                             } else if let featured = viewModel.featuredItem {
                                 // Single item fallback
                                 HeroBanner(
                                     item: featured,
-                                    baseURL: viewModel.baseURL
-                                ) {
-                                    viewModel.playItem(featured)
-                                } onInfo: {
-                                    viewModel.showItemDetails(featured)
-                                }
+                                    baseURL: viewModel.baseURL,
+                                    onPlay: {
+                                        focusManager.pushFocusPosition()
+                                        viewModel.playItem(featured)
+                                    },
+                                    onInfo: {
+                                        focusManager.pushFocusPosition()
+                                        viewModel.showItemDetails(featured)
+                                    }
+                                )
+                                .id("hero")
+                                .focused($focusedField, equals: "hero")
                             }
 
                             // Content Sections with Netflix-level focus memory
@@ -344,12 +365,18 @@ struct HomeContentView: View {
                                         baseURL: viewModel.baseURL,
                                         rowIndex: index,
                                         navigationManager: navigationManager,
+                                        focusManager: focusManager,
                                         onItemSelect: { item in
+                                            focusManager.pushFocusPosition()
                                             viewModel.selectItem(item)
                                         },
-                                        onSeeAll: isLibrarySection(section) ? { viewModel.showSeeAll(for: section) } : nil
+                                        onSeeAll: isLibrarySection(section) ? {
+                                            focusManager.pushFocusPosition()
+                                            viewModel.showSeeAll(for: section)
+                                        } : nil
                                     )
                                     .id("section-\(index)")
+                                    .focused($focusedField, equals: "row-\(index)")
                                 }
                             }
                             .padding(.top, 40)

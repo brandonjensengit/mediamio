@@ -13,6 +13,7 @@ struct ContentRow: View {
     let baseURL: String
     let rowIndex: Int
     let navigationManager: NavigationManager?
+    let focusManager: FocusManager?
     let onItemSelect: (MediaItem) -> Void
     let onSeeAll: (() -> Void)?
 
@@ -23,6 +24,7 @@ struct ContentRow: View {
         baseURL: String,
         rowIndex: Int = 0,
         navigationManager: NavigationManager? = nil,
+        focusManager: FocusManager? = nil,
         onItemSelect: @escaping (MediaItem) -> Void,
         onSeeAll: (() -> Void)? = nil
     ) {
@@ -30,6 +32,7 @@ struct ContentRow: View {
         self.baseURL = baseURL
         self.rowIndex = rowIndex
         self.navigationManager = navigationManager
+        self.focusManager = focusManager
         self.onItemSelect = onItemSelect
         self.onSeeAll = onSeeAll
     }
@@ -76,8 +79,9 @@ struct ContentRow: View {
                         .focused($focusedItemId, equals: item.id)
                         .onChange(of: focusedItemId) { newValue in
                             if newValue == item.id {
-                                // This item is now focused, save to navigation manager
+                                // This item is now focused, save to both managers
                                 navigationManager?.rememberFocus(row: rowIndex, itemIndex: index)
+                                focusManager?.focusedOnRow(rowIndex, itemIndex: index)
                             }
                         }
                     }

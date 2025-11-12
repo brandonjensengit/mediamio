@@ -46,6 +46,7 @@ struct HeroBannerRotating: View {
     let baseURL: String
     let onPlay: (MediaItem) -> Void
     let onInfo: (MediaItem) -> Void
+    var onFocusChange: ((Bool) -> Void)? = nil
 
     @State private var currentIndex: Int = 0
     @State private var rotationTimer: Timer?
@@ -67,6 +68,8 @@ struct HeroBannerRotating: View {
                         onInfo: { onInfo(item) },
                         onFocusChange: { focused in
                             isButtonFocused = focused
+                            // Notify parent about focus change
+                            onFocusChange?(focused)
                         }
                     )
                     .opacity(index == currentIndex ? 1 : 0)
