@@ -404,7 +404,8 @@ class VideoPlayerViewModel: ObservableObject {
 
             // Subtitle support - Encode subtitles into video stream
             URLQueryItem(name: "SubtitleMethod", value: "Encode"),
-            URLQueryItem(name: "SubtitleCodec", value: "webvtt")
+            URLQueryItem(name: "SubtitleCodec", value: "webvtt"),
+            URLQueryItem(name: "VerticalTextPosition", value: "90")  // Position at bottom (0-100)
         ]
 
         // Add SubtitleStreamIndex if available
@@ -463,7 +464,8 @@ class VideoPlayerViewModel: ObservableObject {
 
             // Subtitle support - Encode subtitles into video stream
             URLQueryItem(name: "SubtitleMethod", value: "Encode"),
-            URLQueryItem(name: "SubtitleCodec", value: "webvtt")
+            URLQueryItem(name: "SubtitleCodec", value: "webvtt"),
+            URLQueryItem(name: "VerticalTextPosition", value: "90")  // Position at bottom (0-100)
         ]
 
         // Add SubtitleStreamIndex if available
@@ -512,7 +514,8 @@ class VideoPlayerViewModel: ObservableObject {
 
             // Subtitle support - Encode subtitles into video stream
             URLQueryItem(name: "SubtitleMethod", value: "Encode"),
-            URLQueryItem(name: "SubtitleCodec", value: "webvtt")
+            URLQueryItem(name: "SubtitleCodec", value: "webvtt"),
+            URLQueryItem(name: "VerticalTextPosition", value: "90")  // Position at bottom (0-100)
         ]
 
         // Add SubtitleStreamIndex if available
@@ -613,7 +616,8 @@ class VideoPlayerViewModel: ObservableObject {
             // CRITICAL: Subtitle support for HLS
             // Encode subtitles into video stream for proper rendering
             URLQueryItem(name: "SubtitleMethod", value: "Encode"),  // Encode into stream
-            URLQueryItem(name: "SubtitleCodec", value: "webvtt")    // WebVTT format for HLS
+            URLQueryItem(name: "SubtitleCodec", value: "webvtt"),    // WebVTT format for HLS
+            URLQueryItem(name: "VerticalTextPosition", value: "90")  // Position at bottom (0-100)
         ]
 
         // CRITICAL: Add SubtitleStreamIndex to tell Jellyfin which subtitle track to include
