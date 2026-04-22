@@ -112,11 +112,13 @@ struct ItemDetailView: View {
 struct DetailHeaderView: View {
     @ObservedObject var viewModel: ItemDetailViewModel
     @State private var backdropURL: String?
+    @State private var showHandoff: Bool = false
     @FocusState private var focusedButton: FocusableButton?
 
     enum FocusableButton {
         case play
         case favorite
+        case handoff
     }
 
     var body: some View {
@@ -219,6 +221,18 @@ struct DetailHeaderView: View {
                             viewModel.toggleFavorite()
                         }
                         .focused($focusedButton, equals: .favorite)
+
+                        // Handoff to Phone — only if we have a server URL to link to
+                        if !viewModel.handoffURL.isEmpty {
+                            DetailActionButton(
+                                title: "Open on Phone",
+                                icon: "qrcode",
+                                style: .secondary
+                            ) {
+                                showHandoff = true
+                            }
+                            .focused($focusedButton, equals: .handoff)
+                        }
                     }
                     .padding(.bottom, 40)
                 }
@@ -233,6 +247,14 @@ struct DetailHeaderView: View {
         }
         .onChange(of: viewModel.detailedItem) { _ in
             updateBackdropURL()
+        }
+        .sheet(isPresented: $showHandoff) {
+            let displayItem = viewModel.detailedItem ?? viewModel.item
+            QRHandoffView(
+                title: displayItem.name,
+                subtitle: "Scan with your phone to open this title in the Jellyfin web player.",
+                url: viewModel.handoffURL
+            )
         }
     }
 

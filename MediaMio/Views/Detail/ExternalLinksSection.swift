@@ -3,10 +3,9 @@
 //  MediaMio
 //
 //  Renders `MediaItem.externalUrls` as a horizontal row of focusable pills
-//  (IMDb, TMDB, Rotten Tomatoes, TVDB, etc.). On tvOS these are display-only
-//  by default — there is no system browser to deep-link into; focusing the
-//  pill is the interaction. The URL is copied into state so a future
-//  companion-app handoff could read it.
+//  (IMDb, TMDB, Rotten Tomatoes, TVDB, etc.). tvOS has no system browser,
+//  so tapping a pill presents a QR-code handoff sheet — the viewer scans
+//  with their phone to open the link there.
 //
 
 import SwiftUI
@@ -15,6 +14,8 @@ struct ExternalLinksSection: View {
     let links: [ExternalURL]
     let communityRating: Double?
     let criticRating: Double?
+
+    @State private var presentedLink: ExternalURL?
 
     var body: some View {
         if links.isEmpty && communityRating == nil && criticRating == nil {
@@ -30,11 +31,20 @@ struct ExternalLinksSection: View {
                             RatingPill(label: "Critics", value: "\(Int(rating))%", icon: "checkmark.seal.fill")
                         }
                         ForEach(links) { link in
-                            ExternalLinkPill(link: link)
+                            ExternalLinkPill(link: link) {
+                                presentedLink = link
+                            }
                         }
                     }
                     .padding(.horizontal, Constants.UI.defaultPadding)
                 }
+            }
+            .sheet(item: $presentedLink) { link in
+                QRHandoffView(
+                    title: link.name,
+                    subtitle: "Open this link on your phone to view on \(link.name)",
+                    url: link.url
+                )
             }
         }
     }
@@ -73,16 +83,12 @@ private struct RatingPill: View {
 
 private struct ExternalLinkPill: View {
     let link: ExternalURL
+    let onTap: () -> Void
 
     @FocusState private var hasFocus: Bool
 
     var body: some View {
-        Button(action: {
-            // tvOS has no system URL opener; surface the URL in the log for
-            // companion-device handoff. When we add QR/handoff UX, that path
-            // will replace this.
-            print("🔗 External link focused: \(link.name) → \(link.url)")
-        }) {
+        Button(action: onTap) {
             HStack(spacing: 12) {
                 Image(systemName: iconName(for: link.name))
                     .font(.title3)

@@ -35,6 +35,16 @@ class ItemDetailViewModel: ObservableObject {
         authService.currentSession?.serverURL ?? ""
     }
 
+    /// URL to open this item in Jellyfin's web client on another device. Used
+    /// by the QR-handoff sheet on Detail. Empty when we have no session (the
+    /// Detail button is hidden in that case).
+    var handoffURL: String {
+        guard !baseURL.isEmpty else { return "" }
+        let trimmed = baseURL.hasSuffix("/") ? String(baseURL.dropLast()) : baseURL
+        let targetId = (detailedItem ?? item).id
+        return "\(trimmed)/web/index.html#/details?id=\(targetId)"
+    }
+
     private var userId: String? {
         authService.currentSession?.user.id
     }
