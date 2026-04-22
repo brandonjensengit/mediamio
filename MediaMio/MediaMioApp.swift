@@ -10,8 +10,15 @@ import SwiftUI
 
 @main
 struct MediaMioApp: App {
-    @StateObject private var authService = AuthenticationService()
+    @StateObject private var authService: AuthenticationService
+    @StateObject private var appEnv: AppEnvironment
     @StateObject private var appState = AppState()
+
+    init() {
+        let auth = AuthenticationService()
+        _authService = StateObject(wrappedValue: auth)
+        _appEnv = StateObject(wrappedValue: AppEnvironment(authService: auth))
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -19,7 +26,7 @@ struct MediaMioApp: App {
                 // Main app loads in background
                 Group {
                     if authService.isAuthenticated {
-                        MainTabView(authService: authService, appState: appState)
+                        MainTabView(env: appEnv, appState: appState)
                     } else {
                         ServerEntryView()
                     }
@@ -34,6 +41,7 @@ struct MediaMioApp: App {
             }
         }
         .environmentObject(authService)
+        .environmentObject(appEnv)
         .environmentObject(appState)
     }
 }

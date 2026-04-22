@@ -18,32 +18,23 @@ import SwiftUI
 /// reset to `nil` whenever the tab subview was torn down.
 struct MainTabView: View {
     @StateObject private var navigationManager = NavigationManager()
-    @StateObject private var contentService: ContentService
     @StateObject private var homeViewModel: HomeViewModel
     @StateObject private var searchViewModel: SearchViewModel
     @StateObject private var libraryCoordinator = NavigationCoordinator()
 
-    private let authService: AuthenticationService
+    @ObservedObject private var env: AppEnvironment
 
-    init(authService: AuthenticationService, appState: AppState) {
-        self.authService = authService
-
-        let apiClient = JellyfinAPIClient()
-        if let session = authService.currentSession {
-            apiClient.baseURL = session.serverURL
-            apiClient.accessToken = session.accessToken
-        }
-        let cs = ContentService(apiClient: apiClient, authService: authService)
-        _contentService = StateObject(wrappedValue: cs)
+    init(env: AppEnvironment, appState: AppState) {
+        self.env = env
         _homeViewModel = StateObject(wrappedValue: HomeViewModel(
-            contentService: cs,
-            authService: authService,
+            contentService: env.contentService,
+            authService: env.authService,
             navigationManager: nil,
             appState: appState
         ))
         _searchViewModel = StateObject(wrappedValue: SearchViewModel(
-            contentService: cs,
-            authService: authService
+            contentService: env.contentService,
+            authService: env.authService
         ))
     }
 
@@ -61,7 +52,7 @@ struct MainTabView: View {
                 }
                 .tag(Tab.search)
 
-            LibraryTabViewWrapper(contentService: contentService, coordinator: libraryCoordinator)
+            LibraryTabViewWrapper(contentService: env.contentService, coordinator: libraryCoordinator)
                 .tabItem {
                     Label(Tab.library.title, systemImage: Tab.library.icon)
                 }
@@ -85,13 +76,14 @@ struct MainTabView: View {
         // Present detail view as sheet
         .sheet(item: $navigationManager.presentedItem) { item in
             ItemDetailSheetWrapper(item: item)
-                .environmentObject(authService)
+                .environmentObject(env.authService)
+                .environmentObject(env)
                 .environmentObject(navigationManager)
         }
         // Present video player as full screen cover
         .fullScreenCover(isPresented: $navigationManager.showingPlayer) {
             if let item = navigationManager.currentPlayerItem {
-                VideoPlayerView(item: item, authService: authService)
+                VideoPlayerView(item: item, authService: env.authService)
                     .environmentObject(navigationManager)
             }
         }
@@ -173,7 +165,7 @@ struct SettingsTabView: View {
 
 struct ItemDetailSheetWrapper: View {
     let item: MediaItem
-    @EnvironmentObject var authService: AuthenticationService
+    @EnvironmentObject var env: AppEnvironment
     @EnvironmentObject var navigationManager: NavigationManager
     @State private var viewModel: ItemDetailViewModel?
 
@@ -197,16 +189,11 @@ struct ItemDetailSheetWrapper: View {
     }
 
     private func initializeViewModel() {
-        guard viewModel == nil, let session = authService.currentSession else { return }
-
-        let apiClient = JellyfinAPIClient()
-        apiClient.baseURL = session.serverURL
-        apiClient.accessToken = session.accessToken
-
+        guard viewModel == nil, env.authService.currentSession != nil else { return }
         viewModel = ItemDetailViewModel(
             item: item,
-            apiClient: apiClient,
-            authService: authService,
+            apiClient: env.apiClient,
+            authService: env.authService,
             navigationCoordinator: nil,
             navigationManager: navigationManager
         )

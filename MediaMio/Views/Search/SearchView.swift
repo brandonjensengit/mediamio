@@ -12,6 +12,7 @@ struct SearchView: View {
     let authService: AuthenticationService
     let coordinator: NavigationCoordinator
     var navigationManager: NavigationManager? = nil
+    @EnvironmentObject var env: AppEnvironment
     @FocusState private var isSearchFieldFocused: Bool
 
     private let columns = [
@@ -67,7 +68,8 @@ struct SearchView: View {
                                         item: item,
                                         authService: authService,
                                         coordinator: coordinator,
-                                        navigationManager: navigationManager
+                                        navigationManager: navigationManager,
+                                        env: env
                                     )) {
                                         PosterCard(
                                             item: item,

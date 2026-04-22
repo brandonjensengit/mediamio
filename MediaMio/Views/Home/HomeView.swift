@@ -10,6 +10,7 @@ import Combine
 
 struct HomeView: View {
     @EnvironmentObject var authService: AuthenticationService
+    @EnvironmentObject var env: AppEnvironment
     @StateObject private var coordinator = NavigationCoordinator()
     @State private var viewModel: HomeViewModel?
     @State private var isSidebarVisible = false
@@ -52,12 +53,9 @@ struct HomeView: View {
                 }
             }
             .onAppear {
-                if viewModel == nil, let session = authService.currentSession {
-                    // Initialize ViewModel with dependencies
-                    let apiClient = createAPIClient(for: session)
-                    let contentService = ContentService(apiClient: apiClient, authService: authService)
+                if viewModel == nil, authService.currentSession != nil {
                     viewModel = HomeViewModel(
-                        contentService: contentService,
+                        contentService: env.contentService,
                         authService: authService,
                         navigationCoordinator: coordinator
                     )
@@ -68,30 +66,23 @@ struct HomeView: View {
 
     @ViewBuilder
     private func createItemDetailView(for item: MediaItem) -> some View {
-        ItemDetailViewWrapper(item: item, authService: authService, coordinator: coordinator)
+        ItemDetailViewWrapper(item: item, authService: authService, coordinator: coordinator, env: env)
     }
 
     @ViewBuilder
     private func createLibraryView(for section: ContentSection) -> some View {
-        LibraryViewWrapper(section: section, authService: authService, coordinator: coordinator)
+        LibraryViewWrapper(section: section, authService: authService, coordinator: coordinator, env: env)
     }
 
     @ViewBuilder
     private func createSearchView() -> some View {
-        SearchViewWrapper(authService: authService, coordinator: coordinator)
+        SearchViewWrapper(authService: authService, coordinator: coordinator, env: env)
     }
 
     @ViewBuilder
     private func createSettingsView() -> some View {
         SettingsView()
             .environmentObject(authService)
-    }
-
-    private func createAPIClient(for session: UserSession) -> JellyfinAPIClient {
-        let apiClient = JellyfinAPIClient()
-        apiClient.baseURL = session.serverURL
-        apiClient.accessToken = session.accessToken
-        return apiClient
     }
 
     private func handleMenuSelection(_ item: MenuItem) {
@@ -145,21 +136,23 @@ struct ItemDetailViewWrapper: View {
     var navigationManager: NavigationManager? = nil
     @StateObject private var viewModel: ItemDetailViewModel
 
-    init(item: MediaItem, authService: AuthenticationService, coordinator: NavigationCoordinator, navigationManager: NavigationManager? = nil) {
+    init(
+        item: MediaItem,
+        authService: AuthenticationService,
+        coordinator: NavigationCoordinator,
+        navigationManager: NavigationManager? = nil,
+        env: AppEnvironment
+    ) {
         self.item = item
         self.authService = authService
         self.coordinator = coordinator
         self.navigationManager = navigationManager
 
-        // Create ViewModel once and keep it alive
-        let session = authService.currentSession!
-        let apiClient = JellyfinAPIClient()
-        apiClient.baseURL = session.serverURL
-        apiClient.accessToken = session.accessToken
-
+        // `env.apiClient`'s session fields are kept in sync by AppEnvironment;
+        // no more per-site `JellyfinAPIClient` construction.
         _viewModel = StateObject(wrappedValue: ItemDetailViewModel(
             item: item,
-            apiClient: apiClient,
+            apiClient: env.apiClient,
             authService: authService,
             navigationCoordinator: coordinator,
             navigationManager: navigationManager
@@ -179,21 +172,13 @@ struct LibraryViewWrapper: View {
     let coordinator: NavigationCoordinator
     @StateObject private var viewModel: LibraryViewModel
 
-    init(section: ContentSection, authService: AuthenticationService, coordinator: NavigationCoordinator) {
+    init(section: ContentSection, authService: AuthenticationService, coordinator: NavigationCoordinator, env: AppEnvironment) {
         self.section = section
         self.authService = authService
         self.coordinator = coordinator
-
-        // Create ViewModel once and keep it alive
-        let session = authService.currentSession!
-        let apiClient = JellyfinAPIClient()
-        apiClient.baseURL = session.serverURL
-        apiClient.accessToken = session.accessToken
-        let contentService = ContentService(apiClient: apiClient, authService: authService)
-
         _viewModel = StateObject(wrappedValue: LibraryViewModel(
             section: section,
-            contentService: contentService,
+            contentService: env.contentService,
             authService: authService,
             navigationCoordinator: coordinator
         ))
@@ -211,19 +196,11 @@ struct SearchViewWrapper: View {
     let coordinator: NavigationCoordinator
     @StateObject private var viewModel: SearchViewModel
 
-    init(authService: AuthenticationService, coordinator: NavigationCoordinator) {
+    init(authService: AuthenticationService, coordinator: NavigationCoordinator, env: AppEnvironment) {
         self.authService = authService
         self.coordinator = coordinator
-
-        // Create ViewModel once and keep it alive
-        let session = authService.currentSession!
-        let apiClient = JellyfinAPIClient()
-        apiClient.baseURL = session.serverURL
-        apiClient.accessToken = session.accessToken
-        let contentService = ContentService(apiClient: apiClient, authService: authService)
-
         _viewModel = StateObject(wrappedValue: SearchViewModel(
-            contentService: contentService,
+            contentService: env.contentService,
             authService: authService,
             navigationCoordinator: coordinator
         ))
