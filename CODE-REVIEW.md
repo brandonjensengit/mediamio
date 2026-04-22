@@ -3,7 +3,7 @@
 > Senior tvOS engineer + streaming-platform architect perspective
 > Comparing against Netflix, Apple TV+, Disney+, Swiftfin, Infuse, Plex
 > Originally reviewed: `main` branch, 68 Swift files, 13,857 lines
-> **Status (2026-04-22):** Phases A + B + C + partial D landed on `main` (Phase A: `f66c168`; Phase B: `8d467ac`, `b3f90f4`, `8f78f5d`; Phase C: `c3f1d6a`; Phase D first batch: `84d1544` — items #21, #24, #25, #26, #29; Phase D second batch: `b7b2e0b` — item #22 mDNS discovery; Phase D third batch: `16ad4d3` + `eacbcf9` + `d325926` — item #23 saved-servers / multi-user picker with silent re-login; Phase D fourth batch: `b3f59d4` — item #28 parental controls with PIN + content-rating filter; Phase D fifth batch: `<pending>` — item #30 QR-code companion handoff). Phase D item #27 (offline downloads) still open.
+> **Status (2026-04-22):** Phases A + B + C + partial D landed on `main` (Phase A: `f66c168`; Phase B: `8d467ac`, `b3f90f4`, `8f78f5d`; Phase C: `c3f1d6a`; Phase D first batch: `84d1544` — items #21, #24, #25, #26, #29; Phase D second batch: `b7b2e0b` — item #22 mDNS discovery; Phase D third batch: `16ad4d3` + `eacbcf9` + `d325926` — item #23 saved-servers / multi-user picker with silent re-login; Phase D fourth batch: `b3f59d4` — item #28 parental controls with PIN + content-rating filter; Phase D fifth batch: `b87da4d` — item #30 QR-code companion handoff). Phase D item #27 (offline downloads) still open.
 
 ---
 
