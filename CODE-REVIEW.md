@@ -3,7 +3,7 @@
 > Senior tvOS engineer + streaming-platform architect perspective
 > Comparing against Netflix, Apple TV+, Disney+, Swiftfin, Infuse, Plex
 > Originally reviewed: `main` branch, 68 Swift files, 13,857 lines
-> **Status (2026-04-21):** Phases A + B + C + partial D landed on `main` (Phase A: `f66c168`; Phase B: `8d467ac`, `b3f90f4`, `8f78f5d`; Phase C: `c3f1d6a`; Phase D first batch: this commit — items #21, #24, #25, #26, #29). Phase D items #22, #23, #27, #28, #30 still open.
+> **Status (2026-04-21):** Phases A + B + C + partial D landed on `main` (Phase A: `f66c168`; Phase B: `8d467ac`, `b3f90f4`, `8f78f5d`; Phase C: `c3f1d6a`; Phase D first batch: `84d1544` — items #21, #24, #25, #26, #29; Phase D second batch: this commit — item #22 mDNS discovery). Phase D items #23, #27, #28, #30 still open.
 
 ---
 
@@ -15,7 +15,7 @@ The gap to "Netflix-class" was **not** architectural rewrite territory — it wa
 
 1. ~~**VideoPlayerViewModel at 1,830 lines is a god-object.**~~ ✅ Decomposed to a 577-line orchestrator + 5 services in `Services/Playback/`. 8 URL-builder unit tests.
 2. ~~**Three parallel focus systems.**~~ ✅ `FocusGuideViewController` deleted; `FocusManager` demoted to a 57-line last-focus memo. `@FocusState` is now the sole source of truth.
-3. ~~**Feature parity gaps**~~ ✅ Phase B closed cast/crew, trailers, external links, outro skip, MPNowPlayingInfoCenter, mid-playback bitrate reload, and AppEnvironment DI. Phase C closed API retry/backoff, image downsampling, memory-warning handling, device ID stability, skeleton loaders, hero prefetch, `preferredMaximumResolution`, and deleted the Hello World template. **Phase D first batch landed:** Quick Connect (passwordless login), favorites/watchlist toggle, chapters on Detail, letter-jump in Library, and search recents. **Remaining Phase D items:** mDNS, multi-user/saved servers, offline downloads, parental controls, QR handoff.
+3. ~~**Feature parity gaps**~~ ✅ Phase B closed cast/crew, trailers, external links, outro skip, MPNowPlayingInfoCenter, mid-playback bitrate reload, and AppEnvironment DI. Phase C closed API retry/backoff, image downsampling, memory-warning handling, device ID stability, skeleton loaders, hero prefetch, `preferredMaximumResolution`, and deleted the Hello World template. **Phase D first batch landed:** Quick Connect (passwordless login), favorites/watchlist toggle, chapters on Detail, letter-jump in Library, and search recents. **Phase D second batch landed:** mDNS / Bonjour server discovery (on-network Jellyfin servers now one-tap-connect on the server-entry screen). **Remaining Phase D items:** multi-user/saved servers, offline downloads, parental controls, QR handoff.
 
 Ship-blocking priority: ~~P0 player decomposition~~ ✅ → ~~P0 focus consolidation~~ ✅ → ~~P1 feature gaps~~ ✅ → ~~P2 polish~~ ✅ → **P3 feature parity (in progress, ~50% done)**.
 
@@ -33,7 +33,7 @@ Before each letter is the original review grade; after the arrow is the current 
 | Focus & navigation | C → **B+** | Single source of truth (`@FocusState`); brute-force `scrollTo` loops gone; tab VMs hoisted so tab switches preserve state. |
 | Feature completeness | C → **A-** | Phase D added: chapters strip on Detail (with chapter-start playback), letter-jump rail in Library, search recents, favorites toggle wired end-to-end. Offline / parental still open. |
 | Settings | **B** | Unchanged. Added `showSkipCreditsButton` toggle. |
-| Auth | B- → **B+** | Quick Connect landed — passwordless TV login via 6-digit code approved from any other device. mDNS / multi-user still open. |
+| Auth | B- → **A-** | Quick Connect + mDNS / Bonjour on-network discovery landed — passwordless TV login and zero-type server connect. Multi-user still open. |
 | Models | A- → **A** | Added `ProviderIds`, `ExternalUrls`, `RemoteTrailers`, `CriticRating`, `ExternalURL`, `RemoteTrailer`, `Chapter`, Quick Connect DTOs. |
 | Image pipeline | C → **A-** | ImageIO thumbnail downsampling keyed on pixel size; SHA256 hashed cache keys; memory-warning handler drops in-memory tier only; `NSLock` dedup replaced with `actor ImageRequestCoordinator`. |
 | Tests | F → **C-** | 11 unit tests now pass: 8 `PlaybackStreamURLBuilderTests` + 3 new `ChapterTests` (wire format + image URL contract). API client integration tests still needed. |
@@ -366,7 +366,7 @@ Don't aim for percentage coverage yet — the god-object VM is untestable in its
 ### Phase D — P3 feature parity (first batch landed, 2026-04-21)
 
 21. ✅ **Quick Connect** — `AuthenticationService` gained `initiateQuickConnect` / `pollQuickConnect` / `completeQuickConnect`; new `QuickConnectView` fullScreenCover shows the 6-digit code, polls every 2s (5-min timeout), and trades the secret for a session. LoginView surfaces a "Use Quick Connect" button only when `GET /QuickConnect/Enabled` says yes.
-22. ⏳ mDNS / Bonjour server discovery (needs `NWBrowser` + connection-test pipeline).
+22. ✅ **mDNS / Bonjour server discovery** — new `ServerDiscoveryService` wraps `NWBrowser` for `_jellyfin-server._tcp.` + `_jellyfin._tcp.`, resolves each service endpoint to a real `host:port` via a short-lived `NWConnection` (cancelled as soon as `currentPath.remoteEndpoint` resolves), and publishes a deduped `[DiscoveredServer]`. `ServerEntryView` starts/stops discovery with the screen lifecycle and renders a tappable "On This Network" list above the manual URL field — picking a server auto-fills the URL and runs the existing `validateAndConnect` path. Service constraint: never performs HTTP itself; `AuthenticationService.testServerConnection` stays the single source of truth for whether a candidate is actually a Jellyfin server. Infra: added `Info.plist` with `NSBonjourServices` array + `NSLocalNetworkUsageDescription` (required for `NWBrowser` to return results on tvOS 14+), wired via `INFOPLIST_FILE` and excluded from Copy Bundle Resources through a sync-group exception set so it isn't double-processed.
 23. ⏳ Multi-user per server + saved-servers list (needs session list + picker UI).
 24. ✅ **Letter-jump in Library** — new `LetterJumpRail` view renders A–Z (+ "#" for digits + "All" to clear) to the right of the grid, visible only under alphabetical sort. Uses Jellyfin's `NameStartsWith` as a true server-side filter (not a scroll-to-anchor), which matters because the library is paginated — tapping "S" loads a page of S-prefix items regardless of what's scrolled into view.
 25. ✅ **Search recent searches** — `SearchViewModel` persists an LRU list of up to 10 successful queries via `UserDefaults` (JSON-encoded `[String]`). Recents replace the generic empty state; each row replays the query and ships with a clear-all button. Single-char queries + zero-result searches are not recorded.

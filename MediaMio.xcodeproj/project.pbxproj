@@ -76,9 +76,22 @@
 		BD2DF6F22EC15B49001C4B74 /* hardware-decoding-quick-guide.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "hardware-decoding-quick-guide.md"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		BD2DF7A02EC18001001C4B74 /* Exceptions for "MediaMio" folder in "MediaMio" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = BD2DF5752EB51367001C4B74 /* MediaMio */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		BD2DF5782EB51367001C4B74 /* MediaMio */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				BD2DF7A02EC18001001C4B74 /* Exceptions for "MediaMio" folder in "MediaMio" target */,
+			);
 			path = MediaMio;
 			sourceTree = "<group>";
 		};
@@ -491,6 +504,8 @@
 				DEVELOPMENT_TEAM = MW25D9KU2A;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MediaMio/Info.plist;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "MediaMio discovers Jellyfin servers on your local network so you can connect without typing a URL.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIUserInterfaceStyle = Automatic;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -521,6 +536,8 @@
 				DEVELOPMENT_TEAM = MW25D9KU2A;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MediaMio/Info.plist;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "MediaMio discovers Jellyfin servers on your local network so you can connect without typing a URL.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIUserInterfaceStyle = Automatic;
 				LD_RUNPATH_SEARCH_PATHS = (
