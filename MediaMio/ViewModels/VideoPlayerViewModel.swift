@@ -31,6 +31,7 @@ final class VideoPlayerViewModel: ObservableObject {
     /// single observable object (the VM) and not have to learn about the
     /// internal service split.
     @Published var showSkipIntroButton: Bool = false
+    @Published var showSkipCreditsButton: Bool = false
 
     /// Re-published from `SubtitleTrackManager` for the same reason.
     @Published var availableSubtitles: [SubtitleTrack] = []
@@ -62,12 +63,55 @@ final class VideoPlayerViewModel: ObservableObject {
     private var sessionReporter: PlaybackSessionReporter?
     private var introController: IntroCreditsController?
     private var subtitleManager: SubtitleTrackManager?
+    private var nowPlaying: NowPlayingPublisher?
     private let failoverController = PlaybackFailoverController()
 
     init(item: MediaItem, authService: AuthenticationService) {
         self.item = item
         self.authService = authService
+        observeStreamingSettingsChanges()
     }
+
+    /// The bitrate and audio-quality pickers live in UIKit custom-info view
+    /// controllers (`CustomInfoViewControllers.swift`) and post
+    /// notifications on change. Observe them here and reload the current
+    /// stream so the new setting takes effect immediately instead of only
+    /// on next play (the review called the pre-fix behavior a "lying UI").
+    private func observeStreamingSettingsChanges() {
+        let names: [Notification.Name] = [
+            Notification.Name("ReloadVideoWithNewBitrate"),
+            Notification.Name("ReloadVideoWithNewAudioQuality")
+        ]
+        for name in names {
+            NotificationCenter.default.publisher(for: name)
+                .sink { [weak self] _ in
+                    Task { @MainActor [weak self] in
+                        await self?.reloadWithCurrentSettings()
+                    }
+                }
+                .store(in: &cancellables)
+        }
+    }
+
+    /// Tear down the active AVPlayer session and rebuild from
+    /// `PlaybackStreamURLBuilder` — used when the user changes bitrate or
+    /// audio quality mid-playback. Preserves `currentTime` as the resume
+    /// position so the new stream picks up where the old one left off.
+    func reloadWithCurrentSettings() async {
+        print("🔄 Reloading stream with updated settings (position: \(formatTime(currentTime)))")
+        let resumeFromCurrent = currentTime
+        cleanupAVResources()
+        isLoadingVideo = false
+        // `getResumePosition()` reads userData; override by nudging the item's
+        // position via a local variable instead — but since we can't mutate
+        // `self.item` (let), stash the seek target and apply it after load.
+        pendingSeekOnReload = resumeFromCurrent
+        await loadVideoURL()
+    }
+
+    /// Seconds to seek to once the next `startPlayback` settles. Used by
+    /// mid-playback stream reloads (bitrate/audio quality change).
+    private var pendingSeekOnReload: Double?
 
     nonisolated deinit {
         print("🗑️ VideoPlayerViewModel deinit")
@@ -160,6 +204,7 @@ final class VideoPlayerViewModel: ObservableObject {
         )
         bindIntroController()
         bindSubtitleManager()
+        bindNowPlaying()
 
         setupTimeObserver()
         setupPlayerObservers(playerItem: playerItem)
@@ -243,6 +288,10 @@ final class VideoPlayerViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.showSkipIntroButton = $0 }
             .store(in: &introSubscriptions)
+        controller.$showSkipCreditsButton
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.showSkipCreditsButton = $0 }
+            .store(in: &introSubscriptions)
     }
 
     private func bindSubtitleManager() {
@@ -259,10 +308,32 @@ final class VideoPlayerViewModel: ObservableObject {
             .store(in: &subtitleSubscriptions)
     }
 
+    private func bindNowPlaying() {
+        nowPlaying = NowPlayingPublisher(
+            item: item,
+            baseURL: baseURL,
+            handlers: NowPlayingPublisher.Handlers(
+                play: { [weak self] in self?.startPlayback() },
+                pause: { [weak self] in self?.pausePlayback() },
+                togglePlayPause: { [weak self] in self?.togglePlayPause() },
+                seekForward: { [weak self] in self?.seekForward() },
+                seekBackward: { [weak self] in self?.seekBackward() },
+                seek: { [weak self] pos in
+                    guard let self = self, let player = self.player else { return }
+                    player.seek(to: CMTime(seconds: pos, preferredTimescale: 600))
+                }
+            )
+        )
+    }
+
     // MARK: - View-facing actions
 
     func skipIntro() {
         introController?.skip(player: player)
+    }
+
+    func skipCredits() {
+        introController?.skipCredits(player: player)
     }
 
     func selectSubtitle(at index: Int?) {
@@ -312,6 +383,7 @@ final class VideoPlayerViewModel: ObservableObject {
         }
 
         failoverController.cancel()
+        nowPlaying = nil  // deinit clears MPNowPlayingInfoCenter
         cleanupAVResources()
     }
 
@@ -349,6 +421,11 @@ final class VideoPlayerViewModel: ObservableObject {
 
                 self.introController?.tick(currentTime: currentSeconds, player: player)
                 self.updateObservedBitrate()
+                self.nowPlaying?.update(
+                    elapsed: currentSeconds,
+                    duration: durationSeconds,
+                    rate: player.rate
+                )
             }
         }
 
@@ -488,6 +565,10 @@ final class VideoPlayerViewModel: ObservableObject {
     // MARK: - Helpers
 
     private func getResumePosition() -> Double? {
+        if let pending = pendingSeekOnReload {
+            pendingSeekOnReload = nil
+            return pending > 0 ? pending : nil
+        }
         guard let userData = item.userData,
               let position = userData.playbackPositionTicks,
               let total = item.runTimeTicks else {

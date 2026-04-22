@@ -43,6 +43,7 @@ class SettingsManager: ObservableObject {
     @AppStorage("showSkipIntroButton") var showSkipIntroButton = true
     @AppStorage("skipIntroCountdown") var skipIntroCountdown = 5
     @AppStorage("autoSkipCredits") var autoSkipCredits = true
+    @AppStorage("showSkipCreditsButton") var showSkipCreditsButton = true
     @AppStorage("skipCreditsCountdown") var skipCreditsCountdown = 10
     @AppStorage("showNextEpisodeOverlay") var showNextEpisodeOverlay = true
     @AppStorage("autoSkipRecaps") var autoSkipRecaps = false

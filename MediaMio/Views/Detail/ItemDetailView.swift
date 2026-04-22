@@ -48,6 +48,18 @@ struct ItemDetailView: View {
                         // Metadata
                         DetailMetadataView(viewModel: viewModel)
 
+                        // Ratings & External Links
+                        ExternalLinksSection(
+                            links: displayItem.externalUrls ?? [],
+                            communityRating: displayItem.communityRating,
+                            criticRating: displayItem.criticRating
+                        )
+
+                        // Trailers
+                        if let trailers = displayItem.remoteTrailers, !trailers.isEmpty {
+                            TrailersSection(trailers: trailers)
+                        }
+
                         // Cast & Crew
                         if let people = displayItem.people, !people.isEmpty {
                             CastCrewSection(people: people, baseURL: viewModel.baseURL)
@@ -566,7 +578,11 @@ struct EpisodeCard: View {
         ],
         people: nil,
         taglines: nil,
-        mediaSources: nil
+        mediaSources: nil,
+        criticRating: nil,
+        providerIds: nil,
+        externalUrls: nil,
+        remoteTrailers: nil
     )
 
     let authService = AuthenticationService()

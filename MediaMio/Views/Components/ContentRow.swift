@@ -240,7 +240,11 @@ extension View {
             studios: nil,
             people: nil,
             taglines: nil,
-            mediaSources: nil
+            mediaSources: nil,
+            criticRating: nil,
+            providerIds: nil,
+            externalUrls: nil,
+            remoteTrailers: nil
         )
     }
 

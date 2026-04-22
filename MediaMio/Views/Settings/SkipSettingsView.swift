@@ -64,6 +64,10 @@ struct SkipSettingsView: View {
                         .tint(Color(hex: "667eea"))
 
                         .listRowBackground(Color.black.opacity(0.3))
+                    Toggle("Show Skip Credits Button", isOn: $settingsManager.showSkipCreditsButton)
+                        .foregroundColor(.white)
+                        .tint(Color(hex: "667eea"))
+                        .listRowBackground(Color.black.opacity(0.3))
                     Toggle("Show Next Episode Overlay", isOn: $settingsManager.showNextEpisodeOverlay)
                         .foregroundColor(.white)  // ALWAYS white
                         .tint(Color(hex: "667eea"))

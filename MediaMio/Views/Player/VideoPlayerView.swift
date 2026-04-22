@@ -138,6 +138,8 @@ struct VideoPlayerView: View {
                     }
                 }
             }
+
+            SkipMarkerOverlay(viewModel: viewModel)
         }
         .task {
             await viewModel.loadVideoURL()
@@ -149,6 +151,75 @@ struct VideoPlayerView: View {
             // Clean up when leaving the player
             viewModel.cleanup()
         }
+    }
+}
+
+// MARK: - Skip Marker Overlay
+
+/// Bottom-right overlay for Skip Intro / Skip Credits buttons. Sits above
+/// the native `AVPlayerViewController` controls; the focus engine can reach
+/// the buttons when the native controls are dismissed. Both buttons are
+/// driven off `@Published` state on the VM that's re-published from
+/// `IntroCreditsController`.
+struct SkipMarkerOverlay: View {
+    @ObservedObject var viewModel: VideoPlayerViewModel
+
+    var body: some View {
+        VStack {
+            Spacer()
+            HStack {
+                Spacer()
+                VStack(alignment: .trailing, spacing: 16) {
+                    if viewModel.showSkipIntroButton {
+                        SkipButton(title: "Skip Intro", icon: "forward.fill") {
+                            viewModel.skipIntro()
+                        }
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                    }
+                    if viewModel.showSkipCreditsButton {
+                        SkipButton(title: "Skip Credits", icon: "forward.end.fill") {
+                            viewModel.skipCredits()
+                        }
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                    }
+                }
+                .padding(.trailing, 80)
+                .padding(.bottom, 80)
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: viewModel.showSkipIntroButton)
+        .animation(.easeInOut(duration: 0.25), value: viewModel.showSkipCreditsButton)
+        .allowsHitTesting(viewModel.showSkipIntroButton || viewModel.showSkipCreditsButton)
+    }
+}
+
+private struct SkipButton: View {
+    let title: String
+    let icon: String
+    let action: () -> Void
+
+    @FocusState private var hasFocus: Bool
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.title3)
+                Text(title)
+                    .font(.title3)
+                    .fontWeight(.semibold)
+            }
+            .padding(.horizontal, 32)
+            .padding(.vertical, 18)
+            .background(hasFocus ? Color.white : Color.black.opacity(0.7))
+            .foregroundColor(hasFocus ? .black : .white)
+            .cornerRadius(10)
+            .scaleEffect(hasFocus ? 1.05 : 1.0)
+            .shadow(color: .black.opacity(0.4), radius: 8)
+            .animation(.easeInOut(duration: 0.2), value: hasFocus)
+        }
+        .buttonStyle(.plain)
+        .focused($hasFocus)
     }
 }
 
@@ -208,7 +279,11 @@ struct ErrorPlayerView: View {
         studios: nil,
         people: nil,
         taglines: nil,
-        mediaSources: nil
+        mediaSources: nil,
+        criticRating: nil,
+        providerIds: nil,
+        externalUrls: nil,
+        remoteTrailers: nil
     )
 
     VideoPlayerView(

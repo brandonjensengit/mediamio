@@ -38,6 +38,14 @@ struct MediaItem: Codable, Identifiable, Hashable {
     // Media sources (for file info)
     let mediaSources: [MediaSource]?
 
+    // Critic rating + external provider IDs / trailer URLs. These are
+    // populated by the `/Users/{userId}/Items/{itemId}` details endpoint;
+    // list endpoints typically omit them.
+    let criticRating: Double?
+    let providerIds: [String: String]?
+    let externalUrls: [ExternalURL]?
+    let remoteTrailers: [RemoteTrailer]?
+
     enum CodingKeys: String, CodingKey {
         case id = "Id"
         case name = "Name"
@@ -61,6 +69,10 @@ struct MediaItem: Codable, Identifiable, Hashable {
         case people = "People"
         case taglines = "Taglines"
         case mediaSources = "MediaSources"
+        case criticRating = "CriticRating"
+        case providerIds = "ProviderIds"
+        case externalUrls = "ExternalUrls"
+        case remoteTrailers = "RemoteTrailers"
     }
 
     // MARK: - Computed Properties
@@ -219,6 +231,32 @@ struct StudioInfo: Codable, Hashable {
     enum CodingKeys: String, CodingKey {
         case name = "Name"
         case id = "Id"
+    }
+}
+
+// MARK: - External URL (IMDb, TMDB, RT, TVDB, …)
+struct ExternalURL: Codable, Hashable, Identifiable {
+    let name: String
+    let url: String
+
+    var id: String { "\(name)\t\(url)" }
+
+    enum CodingKeys: String, CodingKey {
+        case name = "Name"
+        case url = "Url"
+    }
+}
+
+// MARK: - Remote Trailer
+struct RemoteTrailer: Codable, Hashable, Identifiable {
+    let name: String?
+    let url: String
+
+    var id: String { url }
+
+    enum CodingKeys: String, CodingKey {
+        case name = "Name"
+        case url = "Url"
     }
 }
 

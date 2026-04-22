@@ -16,12 +16,14 @@ import AVFoundation
 import Combine
 import Foundation
 
-/// Manages the "Skip Intro" UX. Holds the fetched marker pair and decides,
-/// each time a `currentTime` tick arrives, whether the skip button should be
-/// shown and whether to auto-skip based on user settings.
+/// Manages the "Skip Intro" and "Skip Credits" UX. Holds the fetched marker
+/// windows and decides, each time a `currentTime` tick arrives, whether
+/// either skip button should be shown and whether to auto-skip based on user
+/// settings.
 @MainActor
 final class IntroCreditsController: ObservableObject {
     @Published private(set) var showSkipIntroButton: Bool = false
+    @Published private(set) var showSkipCreditsButton: Bool = false
 
     private let baseURL: String
     private let accessToken: String
@@ -31,7 +33,10 @@ final class IntroCreditsController: ObservableObject {
 
     private var introStart: Double?
     private var introEnd: Double?
+    private var creditsStart: Double?
+    private var creditsEnd: Double?
     private var hasSkippedIntro: Bool = false
+    private var hasSkippedCredits: Bool = false
 
     init(
         baseURL: String,
@@ -68,12 +73,19 @@ final class IntroCreditsController: ObservableObject {
             case 200:
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let showIntros = json["ShowIntroTimestamps"] as? [String: Any],
-                   let intro = showIntros.values.first as? [String: Any],
-                   let start = intro["IntroStart"] as? Double,
-                   let end = intro["IntroEnd"] as? Double {
-                    introStart = start
-                    introEnd = end
-                    print("✅ Intro detected: \(formatTime(start)) - \(formatTime(end))")
+                   let markers = showIntros.values.first as? [String: Any] {
+                    if let start = markers["IntroStart"] as? Double,
+                       let end = markers["IntroEnd"] as? Double {
+                        introStart = start
+                        introEnd = end
+                        print("✅ Intro detected: \(formatTime(start)) - \(formatTime(end))")
+                    }
+                    if let start = markers["CreditsStart"] as? Double,
+                       let end = markers["CreditsEnd"] as? Double {
+                        creditsStart = start
+                        creditsEnd = end
+                        print("✅ Credits detected: \(formatTime(start)) - \(formatTime(end))")
+                    }
                 }
             case 404:
                 print("ℹ️ No intro markers available for this item")
@@ -86,17 +98,21 @@ final class IntroCreditsController: ObservableObject {
     }
 
     /// Called from the player's periodic time observer. Updates the visible
-    /// button state and triggers auto-skip if the user has it enabled.
+    /// button state for both intro and credits windows, and triggers
+    /// auto-skip if the user has it enabled.
     func tick(currentTime: Double, player: AVPlayer?) {
-        guard let start = introStart, let end = introEnd, !hasSkippedIntro else { return }
+        tickIntro(currentTime: currentTime, player: player)
+        tickCredits(currentTime: currentTime, player: player)
+    }
 
+    private func tickIntro(currentTime: Double, player: AVPlayer?) {
+        guard let start = introStart, let end = introEnd, !hasSkippedIntro else { return }
         let isInIntro = currentTime >= start && currentTime <= end
 
         if isInIntro {
             if settingsManager.showSkipIntroButton {
                 showSkipIntroButton = true
             }
-
             if settingsManager.autoSkipIntros {
                 let countdown = settingsManager.skipIntroCountdown
                 if countdown > 0 {
@@ -116,6 +132,33 @@ final class IntroCreditsController: ObservableObject {
         }
     }
 
+    private func tickCredits(currentTime: Double, player: AVPlayer?) {
+        guard let start = creditsStart, let end = creditsEnd, !hasSkippedCredits else { return }
+        let isInCredits = currentTime >= start && currentTime <= end
+
+        if isInCredits {
+            if settingsManager.showSkipCreditsButton {
+                showSkipCreditsButton = true
+            }
+            if settingsManager.autoSkipCredits {
+                let countdown = settingsManager.skipCreditsCountdown
+                if countdown > 0 {
+                    if abs(currentTime - start) < 1.0 {
+                        print("⏳ Auto-skipping credits in \(countdown) seconds...")
+                        DispatchQueue.main.asyncAfter(deadline: .now() + Double(countdown)) { [weak self] in
+                            guard let self = self, !self.hasSkippedCredits else { return }
+                            self.skipCredits(player: player)
+                        }
+                    }
+                } else {
+                    skipCredits(player: player)
+                }
+            }
+        } else if currentTime > end {
+            showSkipCreditsButton = false
+        }
+    }
+
     /// User-triggered skip (or auto-skip with zero countdown). Seeks the
     /// player to the end of the intro and dismisses the button.
     func skip(player: AVPlayer?) {
@@ -125,6 +168,18 @@ final class IntroCreditsController: ObservableObject {
         player.seek(to: seekTime, toleranceBefore: .zero, toleranceAfter: .zero)
         hasSkippedIntro = true
         showSkipIntroButton = false
+    }
+
+    /// User-triggered credits skip. Seeks to the end of the credits window,
+    /// which for most content equals "end of playback" and causes the
+    /// player's didPlayToEndTime notification to fire.
+    func skipCredits(player: AVPlayer?) {
+        guard let player = player, let end = creditsEnd else { return }
+        print("⏭️ Skipping credits to: \(formatTime(end))")
+        let seekTime = CMTime(seconds: end, preferredTimescale: 600)
+        player.seek(to: seekTime, toleranceBefore: .zero, toleranceAfter: .zero)
+        hasSkippedCredits = true
+        showSkipCreditsButton = false
     }
 
     private func formatTime(_ seconds: Double) -> String {
