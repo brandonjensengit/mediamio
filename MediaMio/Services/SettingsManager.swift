@@ -64,6 +64,14 @@ class SettingsManager: ObservableObject {
     @AppStorage("showAdultContent") var showAdultContent = false
     @AppStorage("spoilerProtection") var spoilerProtection = false
 
+    // MARK: - Parental Controls
+    //
+    // Keys are duplicated as string literals in `ParentalControlsConfig.Keys`
+    // so `ContentService` can read the live config without taking a dep on
+    // this class. Keep the two in lock-step.
+    @AppStorage("parentalControlsEnabled") var parentalControlsEnabled = false
+    @AppStorage("parentalControlsMaxRating") var parentalControlsMaxRating = ContentRatingLevel.teen.rawValue
+
     // MARK: - User Profile (for display only, actual user is in AuthService)
     @Published var currentUserName: String = ""
     @Published var currentUserImageURL: String?
@@ -83,6 +91,12 @@ class SettingsManager: ObservableObject {
     var subtitleSummary: String {
         let lang = defaultSubtitleLanguage == "none" ? "Off" : defaultSubtitleLanguage.uppercased()
         return "Default: \(lang)"
+    }
+
+    var parentalControlsSummary: String {
+        guard parentalControlsEnabled else { return "Off" }
+        let level = ContentRatingLevel(rawValue: parentalControlsMaxRating) ?? .teen
+        return "On • Max: \(level.rawValue)"
     }
 
     var skipSummary: String {

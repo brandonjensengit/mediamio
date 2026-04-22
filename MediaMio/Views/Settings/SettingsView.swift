@@ -17,6 +17,7 @@ struct SettingsView: View {
         case streaming
         case subtitles
         case skip
+        case parental
         case account
         case app
     }
@@ -71,6 +72,17 @@ struct SettingsView: View {
                     .buttonStyle(.plain)
                     .listRowBackground(Color.black.opacity(0.3))
                     .focused($focusedField, equals: .skip)
+
+                    NavigationLink(destination: ParentalControlsSettingsView(settingsManager: settingsManager)) {
+                        SettingsRow(
+                            icon: "lock.shield.fill",
+                            title: "Parental Controls",
+                            subtitle: settingsManager.parentalControlsSummary
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(Color.black.opacity(0.3))
+                    .focused($focusedField, equals: .parental)
                 }
 
                 // Account & App Settings

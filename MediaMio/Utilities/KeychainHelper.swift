@@ -174,3 +174,29 @@ extension KeychainHelper {
         try? delete(for: tokenAccountKey(serverURL: serverURL, userId: userId))
     }
 }
+
+// MARK: - Parental Controls PIN
+//
+// The PIN is the one secret this app holds outside of access tokens. It
+// lives in Keychain for the same reason tokens do — a fresh install
+// shouldn't carry it, and scraping UserDefaults shouldn't reveal it.
+// It's stored as a plain numeric string (4–6 digits); the Keychain
+// itself provides the at-rest encryption.
+
+extension KeychainHelper {
+    func saveParentalPIN(_ pin: String) throws {
+        try save(pin, for: Constants.Keychain.parentalPINKey)
+    }
+
+    func parentalPIN() -> String? {
+        try? retrieveString(for: Constants.Keychain.parentalPINKey)
+    }
+
+    func hasParentalPIN() -> Bool {
+        parentalPIN() != nil
+    }
+
+    func clearParentalPIN() {
+        try? delete(for: Constants.Keychain.parentalPINKey)
+    }
+}

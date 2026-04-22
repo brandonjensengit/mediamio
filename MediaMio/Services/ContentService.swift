@@ -86,11 +86,16 @@ class ContentService: ObservableObject {
             throw APIError.authenticationFailed
         }
 
-        let response = try await apiClient.getContinueWatching(userId: userId, limit: 12)
+        let controls = ParentalControlsConfig.current
+        let response = try await apiClient.getContinueWatching(
+            userId: userId,
+            limit: 12,
+            maxOfficialRating: controls.jellyfinMaxRating
+        )
 
         return ContentSection(
             title: "Continue Watching",
-            items: response.items,
+            items: controls.filter(response.items),
             type: .continueWatching
         )
     }
@@ -101,11 +106,16 @@ class ContentService: ObservableObject {
             throw APIError.authenticationFailed
         }
 
-        let items = try await apiClient.getRecentlyAdded(userId: userId, limit: 16)
+        let controls = ParentalControlsConfig.current
+        let items = try await apiClient.getRecentlyAdded(
+            userId: userId,
+            limit: 16,
+            maxOfficialRating: controls.jellyfinMaxRating
+        )
 
         return ContentSection(
             title: "Recently Added",
-            items: items,
+            items: controls.filter(items),
             type: .recentlyAdded
         )
     }
@@ -125,17 +135,19 @@ class ContentService: ObservableObject {
             itemTypes = []
         }
 
+        let controls = ParentalControlsConfig.current
         let response = try await apiClient.getLibraryItems(
             userId: userId,
             parentId: library.id,
             includeItemTypes: itemTypes,
+            maxOfficialRating: controls.jellyfinMaxRating,
             limit: limit,
             sortBy: "SortName"
         )
 
         return ContentSection(
             title: library.name,
-            items: response.items,
+            items: controls.filter(response.items),
             type: .library(id: library.id, name: library.name)
         )
     }
@@ -197,7 +209,8 @@ class ContentService: ObservableObject {
             }
         }
 
-        return try await apiClient.getLibraryItems(
+        let controls = ParentalControlsConfig.current
+        let response = try await apiClient.getLibraryItems(
             userId: userId,
             parentId: libraryId,
             includeItemTypes: itemTypes,
@@ -206,10 +219,16 @@ class ContentService: ObservableObject {
             minRating: minRating,
             isPlayed: isPlayed,
             nameStartsWith: nameStartsWith,
+            maxOfficialRating: controls.jellyfinMaxRating,
             limit: limit,
             startIndex: startIndex,
             sortBy: sortBy,
             sortOrder: sortOrder
+        )
+        return ItemsResponse(
+            items: controls.filter(response.items),
+            totalRecordCount: response.totalRecordCount,
+            startIndex: response.startIndex
         )
     }
 
@@ -226,12 +245,19 @@ class ContentService: ObservableObject {
             throw APIError.authenticationFailed
         }
 
-        return try await apiClient.searchItems(
+        let controls = ParentalControlsConfig.current
+        let response = try await apiClient.searchItems(
             userId: userId,
             searchTerm: searchTerm,
             includeItemTypes: includeItemTypes,
+            maxOfficialRating: controls.jellyfinMaxRating,
             limit: limit,
             startIndex: startIndex
+        )
+        return ItemsResponse(
+            items: controls.filter(response.items),
+            totalRecordCount: response.totalRecordCount,
+            startIndex: response.startIndex
         )
     }
 

@@ -78,6 +78,10 @@ enum Constants {
         /// sparse map from (server, user) → access token while keeping the
         /// single-blob legacy keys above for back-compat restore.
         static let perUserTokenPrefix = "token:"
+
+        /// Parental controls PIN. Separate slot so rotating the PIN doesn't
+        /// disturb any other credential.
+        static let parentalPINKey = "parentalControlsPIN"
     }
 
     // MARK: - UserDefaults

@@ -332,9 +332,13 @@ class JellyfinAPIClient: ObservableObject {
     }
 
     /// Get continue watching items
-    func getContinueWatching(userId: String, limit: Int = 12) async throws -> ItemsResponse {
+    func getContinueWatching(
+        userId: String,
+        limit: Int = 12,
+        maxOfficialRating: String? = nil
+    ) async throws -> ItemsResponse {
         let endpoint = Constants.API.Endpoints.resumeItems(userId: userId)
-        let queryItems = [
+        var queryItems = [
             URLQueryItem(name: "Limit", value: String(limit)),
             URLQueryItem(name: "Fields", value: "PrimaryImageAspectRatio,BasicSyncInfo"),
             URLQueryItem(name: "ImageTypeLimit", value: "1"),
@@ -342,21 +346,32 @@ class JellyfinAPIClient: ObservableObject {
             URLQueryItem(name: "EnableTotalRecordCount", value: "false"),
             URLQueryItem(name: "MediaTypes", value: "Video")
         ]
+        if let maxRating = maxOfficialRating {
+            queryItems.append(URLQueryItem(name: "MaxOfficialRating", value: maxRating))
+        }
         return try await get(endpoint: endpoint, queryItems: queryItems)
     }
 
     /// Get recently added items
-    func getRecentlyAdded(userId: String, limit: Int = 16, parentId: String? = nil) async throws -> [MediaItem] {
+    func getRecentlyAdded(
+        userId: String,
+        limit: Int = 16,
+        parentId: String? = nil,
+        maxOfficialRating: String? = nil
+    ) async throws -> [MediaItem] {
         let endpoint = Constants.API.Endpoints.latestItems(userId: userId)
         var queryItems = [
             URLQueryItem(name: "Limit", value: String(limit)),
-            URLQueryItem(name: "Fields", value: "PrimaryImageAspectRatio,Path"),
+            URLQueryItem(name: "Fields", value: "PrimaryImageAspectRatio,Path,OfficialRating"),
             URLQueryItem(name: "ImageTypeLimit", value: "1"),
             URLQueryItem(name: "EnableImageTypes", value: "Primary,Backdrop,Thumb")
         ]
 
         if let parentId = parentId {
             queryItems.append(URLQueryItem(name: "ParentId", value: parentId))
+        }
+        if let maxRating = maxOfficialRating {
+            queryItems.append(URLQueryItem(name: "MaxOfficialRating", value: maxRating))
         }
 
         return try await get(endpoint: endpoint, queryItems: queryItems)
@@ -372,6 +387,7 @@ class JellyfinAPIClient: ObservableObject {
         minRating: Double? = nil,
         isPlayed: Bool? = nil,
         nameStartsWith: String? = nil,
+        maxOfficialRating: String? = nil,
         limit: Int = 50,
         startIndex: Int = 0,
         sortBy: String? = "SortName",
@@ -380,7 +396,7 @@ class JellyfinAPIClient: ObservableObject {
         let endpoint = Constants.API.Endpoints.userItems(userId: userId)
 
         var queryItems = [
-            URLQueryItem(name: "Fields", value: "PrimaryImageAspectRatio,Path,Overview"),
+            URLQueryItem(name: "Fields", value: "PrimaryImageAspectRatio,Path,Overview,OfficialRating"),
             URLQueryItem(name: "ImageTypeLimit", value: "1"),
             URLQueryItem(name: "EnableImageTypes", value: "Primary,Backdrop,Thumb"),
             URLQueryItem(name: "StartIndex", value: String(startIndex)),
@@ -421,6 +437,12 @@ class JellyfinAPIClient: ObservableObject {
         // "Spider-Man" and "Stranger Things" but not "Interstellar".
         if let prefix = nameStartsWith, !prefix.isEmpty {
             queryItems.append(URLQueryItem(name: "NameStartsWith", value: prefix))
+        }
+
+        // Filter: parental rating ceiling. Server-side; we also re-apply
+        // a client-side filter in `ContentService` for defense in depth.
+        if let maxRating = maxOfficialRating {
+            queryItems.append(URLQueryItem(name: "MaxOfficialRating", value: maxRating))
         }
 
         if let sortBy = sortBy {
@@ -483,6 +505,7 @@ class JellyfinAPIClient: ObservableObject {
         userId: String,
         searchTerm: String,
         includeItemTypes: [String]? = nil,
+        maxOfficialRating: String? = nil,
         limit: Int = 50,
         startIndex: Int = 0
     ) async throws -> ItemsResponse {
@@ -491,7 +514,7 @@ class JellyfinAPIClient: ObservableObject {
         var queryItems = [
             URLQueryItem(name: "SearchTerm", value: searchTerm),
             URLQueryItem(name: "Recursive", value: "true"),
-            URLQueryItem(name: "Fields", value: "PrimaryImageAspectRatio,Path,Overview"),
+            URLQueryItem(name: "Fields", value: "PrimaryImageAspectRatio,Path,Overview,OfficialRating"),
             URLQueryItem(name: "ImageTypeLimit", value: "1"),
             URLQueryItem(name: "EnableImageTypes", value: "Primary,Backdrop,Thumb"),
             URLQueryItem(name: "Limit", value: String(limit)),
@@ -500,6 +523,10 @@ class JellyfinAPIClient: ObservableObject {
 
         if let types = includeItemTypes {
             queryItems.append(URLQueryItem(name: "IncludeItemTypes", value: types.joined(separator: ",")))
+        }
+
+        if let maxRating = maxOfficialRating {
+            queryItems.append(URLQueryItem(name: "MaxOfficialRating", value: maxRating))
         }
 
         return try await get(endpoint: endpoint, queryItems: queryItems)
