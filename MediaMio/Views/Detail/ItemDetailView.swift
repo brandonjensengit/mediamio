@@ -48,6 +48,11 @@ struct ItemDetailView: View {
                         // Metadata
                         DetailMetadataView(viewModel: viewModel)
 
+                        // Cast & Crew
+                        if let people = displayItem.people, !people.isEmpty {
+                            CastCrewSection(people: people, baseURL: viewModel.baseURL)
+                        }
+
                         // Similar Items
                         if !viewModel.similarItems.isEmpty {
                             DetailSectionView(title: "More Like This") {
