@@ -154,6 +154,48 @@ class AuthenticationService: ObservableObject {
         clearSession()
     }
 
+    // MARK: - Silent re-login
+
+    /// Reuse a stored (server, user) access token to skip the password
+    /// prompt. Called when the user taps an entry in the saved-profiles
+    /// picker — the stored token is validated against `GET /Users/{id}`
+    /// before we flip `isAuthenticated`, so a silently-revoked token can't
+    /// leave the app in a "signed in" state that blows up on every
+    /// subsequent request.
+    ///
+    /// On `APIError.authenticationFailed` (401), the stored token is
+    /// cleared — it's been revoked server-side and would only keep failing.
+    /// Other errors (network, server unreachable) leave the token alone so
+    /// the user can retry without losing their profile.
+    func signInWithSavedToken(server: SavedServer, user: SavedUser) async throws {
+        guard let token = savedServers.token(for: server, user: user) else {
+            throw APIError.authenticationFailed
+        }
+
+        apiClient.configure(baseURL: server.url, accessToken: token)
+
+        do {
+            let freshUser = try await apiClient.getCurrentUser(userId: user.id)
+
+            let session = UserSession(
+                user: freshUser,
+                accessToken: token,
+                serverURL: server.url,
+                serverId: freshUser.serverId
+            )
+
+            // `saveSession` rewrites the legacy single-blob Keychain slot
+            // so a subsequent launch's `restoreSession()` still finds this
+            // user. It also bumps the `lastUsedAt` timestamps in the store.
+            try saveSession(session, rememberMe: true, serverName: server.name)
+        } catch APIError.authenticationFailed {
+            // Token is no longer valid on the server — drop it so the user
+            // gets cleanly bounced to the password prompt next time.
+            savedServers.forget(serverURL: server.url, userId: user.id)
+            throw APIError.authenticationFailed
+        }
+    }
+
     // MARK: - Quick Connect
     // Quick Connect lets the user approve this TV from another device (phone, web)
     // without entering a password on the remote. The VM owns the polling loop;

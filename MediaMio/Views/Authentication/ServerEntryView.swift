@@ -205,18 +205,41 @@ struct ServerEntryView: View {
 
     // MARK: - Saved profile selection
 
-    /// Kick off a login flow for a stored (server, user) pair. Pre-fills the
-    /// username so `LoginView` can pick it up from `UserDefaults` on init,
-    /// then reuses `validateAndConnect` so the existing error-path handling
-    /// (unreachable server, bad URL) stays identical to manual entry.
-    ///
-    /// Note: this only pre-populates. Silent re-login using the stored token
-    /// is wired in a follow-up commit — tapping a saved profile today still
-    /// drops into the password prompt.
+    /// Sign in as a stored (server, user) pair. Tries the saved token
+    /// first — on success, `isAuthenticated` flips and the app jumps
+    /// straight to the home screen. On 401 the token is cleared inside
+    /// `signInWithSavedToken` and we fall through to the password flow
+    /// (pre-filled with username + server URL). On anything else we show
+    /// the error inline and keep the saved token for a retry.
     private func selectSavedProfile(server: SavedServer, user: SavedUser) async {
         UserDefaults.standard.set(user.name, forKey: Constants.UserDefaultsKeys.lastUsername)
         serverURL = server.url
-        await validateAndConnect()
+
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            try await authService.signInWithSavedToken(server: server, user: user)
+            // isAuthenticated is now true; MediaMioApp's root switcher will
+            // swap in MainTabView on the next render — this view dismisses
+            // itself by virtue of being unmounted.
+        } catch APIError.authenticationFailed {
+            // Stored token was rejected — fall through to the password flow.
+            // validateAndConnect will resolve the current ServerInfo so
+            // LoginView can present with the right server name.
+            await validateAndConnect()
+            return
+        } catch {
+            if let apiError = error as? APIError {
+                errorMessage = apiError.localizedDescription
+            } else if let urlError = error as? URLError {
+                errorMessage = "Network error: \(urlError.localizedDescription)"
+            } else {
+                errorMessage = "Sign-in failed: \(error.localizedDescription)"
+            }
+        }
+
+        isLoading = false
     }
 
     // MARK: - Connect
