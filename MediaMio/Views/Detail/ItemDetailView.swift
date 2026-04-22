@@ -110,10 +110,16 @@ struct DetailHeaderView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // Backdrop Image
+            // Backdrop Image — downsample to screen-pixel size to avoid 4K decode cost.
             if let url = backdropURL {
                 GeometryReader { geometry in
-                    AsyncImageView(url: url, contentMode: .fill)
+                    AsyncImageView(
+                        url: url,
+                        contentMode: .fill,
+                        targetPixelSize: ImageSizing.pixelSize(
+                            points: CGSize(width: geometry.size.width, height: 700)
+                        )
+                    )
                         .frame(width: geometry.size.width)
                         .offset(y: -100)  // Shift up slightly to show upper-middle portion
                 }

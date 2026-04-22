@@ -13,6 +13,7 @@
 import AVKit
 import Combine
 import Foundation
+import UIKit
 
 @MainActor
 final class VideoPlayerViewModel: ObservableObject {
@@ -182,6 +183,7 @@ final class VideoPlayerViewModel: ObservableObject {
         ])
         let playerItem = AVPlayerItem(asset: asset)
         playerItem.preferredForwardBufferDuration = 10.0
+        playerItem.preferredMaximumResolution = Self.preferredMaximumResolution()
 
         let avPlayer = AVPlayer(playerItem: playerItem)
         avPlayer.appliesMediaSelectionCriteriaAutomatically = true
@@ -631,6 +633,16 @@ final class VideoPlayerViewModel: ObservableObject {
             subtitleMode: subtitleMode.rawValue,
             bufferProgress: bufferedProgress * 100.0
         )
+    }
+
+    // MARK: - HLS variant ceiling
+
+    /// Cap HLS variant selection to the display's native pixel resolution so 1080p
+    /// Apple TVs don't pull the 4K rendition (wasted bandwidth + wasted decode).
+    /// `nativeBounds` is in pixels and is already in landscape orientation on tvOS.
+    private static func preferredMaximumResolution() -> CGSize {
+        let nativeBounds = UIScreen.main.nativeBounds
+        return CGSize(width: nativeBounds.width, height: nativeBounds.height)
     }
 }
 

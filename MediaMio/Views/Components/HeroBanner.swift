@@ -50,10 +50,12 @@ struct HeroBannerRotating: View {
 
     @State private var currentIndex: Int = 0
     @State private var rotationTimer: Timer?
+    @State private var prefetchTimer: Timer?
     @State private var isButtonFocused: Bool = false
 
     private let rotationInterval: TimeInterval = 8.0
     private let transitionDuration: TimeInterval = 0.8
+    private let prefetchLeadTime: TimeInterval = 2.0
 
     var body: some View {
         ZStack {
@@ -83,6 +85,7 @@ struct HeroBannerRotating: View {
         }
         .frame(height: Constants.UI.heroBannerHeight)
         .onAppear {
+            prefetchBackdrop(forOffset: 1)   // warm the next slide immediately
             startAutoRotation()
         }
         .onDisappear {
@@ -118,11 +121,36 @@ struct HeroBannerRotating: View {
                 currentIndex = (currentIndex + 1) % items.count
             }
         }
+
+        // Schedule a prefetch ~2s before each rotation so the next backdrop is
+        // already in cache when the crossfade starts. Without this, slow networks
+        // produce a visible pop-in during the 0.8s fade.
+        prefetchTimer?.invalidate()
+        prefetchTimer = Timer.scheduledTimer(
+            withTimeInterval: rotationInterval - prefetchLeadTime,
+            repeats: true
+        ) { _ in
+            prefetchBackdrop(forOffset: 1)
+        }
     }
 
     private func stopAutoRotation() {
         rotationTimer?.invalidate()
         rotationTimer = nil
+        prefetchTimer?.invalidate()
+        prefetchTimer = nil
+    }
+
+    private func prefetchBackdrop(forOffset offset: Int) {
+        guard items.count > 1 else { return }
+        let nextIndex = (currentIndex + offset) % items.count
+        let nextItem = items[nextIndex]
+        guard let url = generateBackdropURL(for: nextItem) else { return }
+
+        let size = ImageSizing.pixelSize(
+            points: CGSize(width: UIScreen.main.bounds.width, height: Constants.UI.heroBannerHeight)
+        )
+        ImageLoader.prefetch(urlString: url, targetPixelSize: size)
     }
 }
 
@@ -140,9 +168,15 @@ private struct HeroBannerContent: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            // Backdrop Image
+            // Backdrop Image — downsample to screen-pixel size to avoid 4K decode cost.
             if let url = backdropURL {
-                AsyncImageView(url: url, contentMode: .fill)
+                AsyncImageView(
+                    url: url,
+                    contentMode: .fill,
+                    targetPixelSize: ImageSizing.pixelSize(
+                        points: CGSize(width: UIScreen.main.bounds.width, height: Constants.UI.heroBannerHeight)
+                    )
+                )
                     .frame(height: Constants.UI.heroBannerHeight)
                     .clipped()
             } else {

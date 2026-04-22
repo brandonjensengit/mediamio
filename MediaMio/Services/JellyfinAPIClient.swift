@@ -7,6 +7,7 @@
 
 import Foundation
 import Combine
+import UIKit
 
 @MainActor
 class JellyfinAPIClient: ObservableObject {
@@ -17,8 +18,13 @@ class JellyfinAPIClient: ObservableObject {
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
 
-    // Device ID - should be consistent per device
+    // Device ID — prefer identifierForVendor (stable per-app across installs on the
+    // same vendor). Fall back to a UserDefaults-backed UUID only when IFV is
+    // unavailable (simulator edge cases, pre-auth launch before UIScene attach).
     private var deviceId: String {
+        if let ifv = UIDevice.current.identifierForVendor?.uuidString {
+            return ifv
+        }
         if let saved = UserDefaults.standard.string(forKey: Constants.UserDefaultsKeys.deviceId) {
             return saved
         }
@@ -78,14 +84,8 @@ class JellyfinAPIClient: ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
-        // Add authentication header if token exists
-        if !accessToken.isEmpty {
-            request.setValue("MediaBrowser Token=\"\(accessToken)\"", forHTTPHeaderField: "X-Emby-Authorization")
-        }
-
-        // Add client identification
-        let authHeader = buildAuthorizationHeader()
-        request.setValue(authHeader, forHTTPHeaderField: "X-Emby-Authorization")
+        // Authorization carries token + client identification in one header.
+        request.setValue(buildAuthorizationHeader(), forHTTPHeaderField: "X-Emby-Authorization")
 
         return request
     }
@@ -139,7 +139,30 @@ class JellyfinAPIClient: ObservableObject {
         return try await performRequest(request)
     }
 
+    // MARK: - Retry Policy
+    // Transient failures (timeouts, lost connections, 5xx) get a capped retry with
+    // exponential backoff. Permanent failures (401, 4xx, decoding) surface immediately.
+    private static let retryDelaysMs: [UInt64] = [500, 1500, 4000]
+
     private func performRequest<T: Decodable>(_ request: URLRequest) async throws -> T {
+        var lastError: Error = APIError.unknown
+        for attempt in 0...Self.retryDelaysMs.count {
+            do {
+                return try await performSingleRequest(request)
+            } catch let error {
+                lastError = error
+                guard Self.isTransient(error), attempt < Self.retryDelaysMs.count else {
+                    throw error
+                }
+                let delayMs = Self.retryDelaysMs[attempt]
+                print("🔁 Transient failure on attempt \(attempt + 1)/\(Self.retryDelaysMs.count + 1): \(error.localizedDescription). Retrying in \(delayMs)ms.")
+                try? await Task.sleep(nanoseconds: delayMs * 1_000_000)
+            }
+        }
+        throw lastError
+    }
+
+    private func performSingleRequest<T: Decodable>(_ request: URLRequest) async throws -> T {
         print("🌐 Making request to: \(request.url?.absoluteString ?? "unknown")")
 
         do {
@@ -152,7 +175,6 @@ class JellyfinAPIClient: ObservableObject {
 
             print("📡 Response status code: \(httpResponse.statusCode)")
 
-            // Handle HTTP errors
             switch httpResponse.statusCode {
             case 200...299:
                 break
@@ -164,7 +186,6 @@ class JellyfinAPIClient: ObservableObject {
                 throw APIError.httpError(httpResponse.statusCode)
             }
 
-            // Decode response
             do {
                 let decoded = try decoder.decode(T.self, from: data)
                 print("✅ Successfully decoded response")
@@ -175,13 +196,48 @@ class JellyfinAPIClient: ObservableObject {
                 throw APIError.decodingError(error)
             }
         } catch let error as URLError {
-            print("❌ Network error: \(error.localizedDescription)")
-            print("   Error code: \(error.code.rawValue)")
+            print("❌ Network error: \(error.localizedDescription) (code \(error.code.rawValue))")
             throw APIError.networkError(error)
+        } catch let error as APIError {
+            throw error
         } catch {
             print("❌ Unknown error: \(error)")
             throw error
         }
+    }
+
+    /// A transient failure is one where a retry with the same request has a reasonable
+    /// chance of succeeding — network blips, 5xx, DNS hiccups. 4xx (including 401) is
+    /// not transient; the client sent something the server rejected deterministically.
+    private static func isTransient(_ error: Error) -> Bool {
+        if let apiError = error as? APIError {
+            switch apiError {
+            case .networkError(let underlying):
+                guard let urlError = underlying as? URLError else { return false }
+                switch urlError.code {
+                case .timedOut,
+                     .networkConnectionLost,
+                     .notConnectedToInternet,
+                     .dnsLookupFailed,
+                     .cannotConnectToHost,
+                     .cannotFindHost,
+                     .resourceUnavailable:
+                    return true
+                default:
+                    return false
+                }
+            case .httpError(let code):
+                return (500...599).contains(code)
+            default:
+                return false
+            }
+        }
+        if let urlError = error as? URLError {
+            return urlError.code == .timedOut
+                || urlError.code == .networkConnectionLost
+                || urlError.code == .notConnectedToInternet
+        }
+        return false
     }
 
     // MARK: - Server Info

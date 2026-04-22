@@ -2,13 +2,15 @@
 //  ImageLoader.swift
 //  MediaMio
 //
-//  Created by Claude Code
+//  Async image loader with caching, request deduplication, and ImageIO downsampling.
+//  Downsampling uses CGImageSource thumbnail APIs so 4K backdrops never decode at full
+//  resolution into GPU memory; callers pass `targetPixelSize` in pixels (not points).
 //
 
 import UIKit
 import Combine
+import ImageIO
 
-/// Async image loader with caching and request deduplication
 @MainActor
 class ImageLoader: ObservableObject {
     @Published var image: UIImage?
@@ -18,14 +20,11 @@ class ImageLoader: ObservableObject {
     private let cache = ImageCache.shared
     private var currentTask: Task<Void, Never>?
 
-    // Request deduplication - track in-flight requests globally
-    private static var inFlightRequests: [String: Task<UIImage?, Never>] = [:]
-    private static let requestLock = NSLock()
-
     // MARK: - Load Image
 
-    func load(from urlString: String?) {
-        // Cancel any existing task
+    /// Load the image at `urlString`, optionally downsampled to `targetPixelSize` in pixels.
+    /// When `targetPixelSize` is nil, the image is decoded at its native resolution.
+    func load(from urlString: String?, targetPixelSize: CGSize? = nil) {
         currentTask?.cancel()
         currentTask = nil
 
@@ -35,22 +34,18 @@ class ImageLoader: ObservableObject {
             return
         }
 
-        // Check cache first
-        if let cachedImage = cache.image(for: urlString) {
+        if let cachedImage = cache.image(for: urlString, targetPixelSize: targetPixelSize) {
             self.image = cachedImage
             self.isLoading = false
             return
         }
 
-        // Start loading
         isLoading = true
         error = nil
 
         currentTask = Task {
             do {
-                let loadedImage = try await downloadImage(from: urlString)
-
-                // Check if task was cancelled
+                let loadedImage = try await downloadImage(from: urlString, targetPixelSize: targetPixelSize)
                 if !Task.isCancelled {
                     self.image = loadedImage
                     self.isLoading = false
@@ -65,63 +60,27 @@ class ImageLoader: ObservableObject {
         }
     }
 
-    /// Download image with request deduplication
-    private func downloadImage(from urlString: String) async throws -> UIImage {
-        // Check for in-flight request
-        ImageLoader.requestLock.lock()
-        if let existingTask = ImageLoader.inFlightRequests[urlString] {
-            ImageLoader.requestLock.unlock()
-            print("⏳ Waiting for existing request: \(urlString)")
-
-            // Wait for existing request
-            if let image = await existingTask.value {
-                return image
-            } else {
-                throw ImageLoaderError.downloadFailed
-            }
+    private func downloadImage(from urlString: String, targetPixelSize: CGSize?) async throws -> UIImage {
+        // Coordinator dedups the network fetch across concurrent callers sharing the same URL.
+        // Downsample happens per-caller after the Data is shared — decode cost is small vs download.
+        let data = try await ImageRequestCoordinator.shared.data(for: urlString) {
+            try await ImageLoader.performDownload(from: urlString)
         }
 
-        // Create new download task
-        let downloadTask = Task<UIImage?, Never> {
-            do {
-                let image = try await performDownload(from: urlString)
-                return image
-            } catch {
-                print("❌ Download error: \(error)")
-                return nil
-            }
+        guard let image = await ImageLoader.decodeImage(from: data, targetPixelSize: targetPixelSize) else {
+            throw ImageLoaderError.decodingFailed
         }
 
-        ImageLoader.inFlightRequests[urlString] = downloadTask
-        ImageLoader.requestLock.unlock()
-
-        // Wait for download
-        guard let image = await downloadTask.value else {
-            // Clean up request
-            ImageLoader.requestLock.lock()
-            ImageLoader.inFlightRequests.removeValue(forKey: urlString)
-            ImageLoader.requestLock.unlock()
-
-            throw ImageLoaderError.downloadFailed
-        }
-
-        // Clean up request
-        ImageLoader.requestLock.lock()
-        ImageLoader.inFlightRequests.removeValue(forKey: urlString)
-        ImageLoader.requestLock.unlock()
-
+        cache.store(image, for: urlString, targetPixelSize: targetPixelSize)
         return image
     }
 
-    /// Perform actual download
-    private func performDownload(from urlString: String) async throws -> UIImage {
+    /// Shared network fetch. Returns raw bytes; the caller decides how to decode.
+    nonisolated private static func performDownload(from urlString: String) async throws -> Data {
         guard let url = URL(string: urlString) else {
             throw ImageLoaderError.invalidURL
         }
 
-        print("⬇️ Downloading image: \(urlString)")
-
-        // Download data
         let (data, response) = try await URLSession.shared.data(from: url)
 
         guard let httpResponse = response as? HTTPURLResponse,
@@ -129,35 +88,78 @@ class ImageLoader: ObservableObject {
             throw ImageLoaderError.invalidResponse
         }
 
-        // Decode image off main thread
-        guard let image = await decodeImage(from: data) else {
-            throw ImageLoaderError.decodingFailed
-        }
-
-        // Store in cache
-        cache.store(image, for: urlString)
-
-        return image
+        return data
     }
 
-    /// Decode image on background thread
-    private func decodeImage(from data: Data) async -> UIImage? {
+    /// Decode on a background task. When `targetPixelSize` is set, use ImageIO's thumbnail
+    /// pipeline which decodes directly at the downsampled resolution — dramatically less
+    /// GPU memory than decoding full-res and then resizing.
+    nonisolated private static func decodeImage(from data: Data, targetPixelSize: CGSize?) async -> UIImage? {
         await Task.detached(priority: .userInitiated) {
-            guard let image = UIImage(data: data) else {
-                return nil
+            if let targetPixelSize = targetPixelSize {
+                return decodeDownsampled(data: data, targetPixelSize: targetPixelSize)
             }
-
-            // Force decoding to avoid UI thread blocking
-            UIGraphicsBeginImageContextWithOptions(image.size, false, image.scale)
-            image.draw(at: .zero)
-            let decodedImage = UIGraphicsGetImageFromCurrentImageContext()
-            UIGraphicsEndImageContext()
-
-            return decodedImage ?? image
+            return decodeFullResolution(data: data)
         }.value
     }
 
-    // MARK: - Cancel
+    nonisolated private static func decodeDownsampled(data: Data, targetPixelSize: CGSize) -> UIImage? {
+        let options: [CFString: Any] = [
+            kCGImageSourceShouldCache: false
+        ]
+        guard let source = CGImageSourceCreateWithData(data as CFData, options as CFDictionary) else {
+            return nil
+        }
+
+        let maxPixelDimension = max(targetPixelSize.width, targetPixelSize.height)
+        let thumbnailOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelDimension
+        ]
+
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions as CFDictionary) else {
+            return nil
+        }
+        return UIImage(cgImage: cgImage)
+    }
+
+    nonisolated private static func decodeFullResolution(data: Data) -> UIImage? {
+        guard let image = UIImage(data: data) else { return nil }
+        // Force decode off the main thread to avoid UI hitches at first render.
+        UIGraphicsBeginImageContextWithOptions(image.size, false, image.scale)
+        image.draw(at: .zero)
+        let decodedImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        return decodedImage ?? image
+    }
+
+    // MARK: - Prefetch
+
+    /// Warm the cache for `urlString` without binding to a view. Idempotent with
+    /// an in-flight load via the request coordinator — a concurrent view load
+    /// and prefetch for the same URL share one network fetch.
+    nonisolated static func prefetch(urlString: String, targetPixelSize: CGSize? = nil) {
+        Task.detached(priority: .utility) {
+            if ImageCache.shared.image(for: urlString, targetPixelSize: targetPixelSize) != nil {
+                return
+            }
+            do {
+                let data = try await ImageRequestCoordinator.shared.data(for: urlString) {
+                    try await performDownload(from: urlString)
+                }
+                if let image = await decodeImage(from: data, targetPixelSize: targetPixelSize) {
+                    ImageCache.shared.store(image, for: urlString, targetPixelSize: targetPixelSize)
+                }
+            } catch {
+                // Prefetch is best-effort; a real load will surface errors to the user.
+                print("↩︎ Prefetch failed for \(urlString): \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: - Cancel / Reset
 
     func cancel() {
         currentTask?.cancel()
@@ -165,12 +167,31 @@ class ImageLoader: ObservableObject {
         isLoading = false
     }
 
-    // MARK: - Reset
-
     func reset() {
         cancel()
         image = nil
         error = nil
+    }
+}
+
+// MARK: - Request Coordinator
+
+/// Serializes in-flight image fetches so N concurrent callers hitting the same URL
+/// share a single network request. Actor isolation replaces the previous NSLock +
+/// async-await-around-lock pattern that had a subtle cleanup race on failure.
+actor ImageRequestCoordinator {
+    static let shared = ImageRequestCoordinator()
+
+    private var inFlight: [String: Task<Data, Error>] = [:]
+
+    func data(for urlString: String, download: @escaping @Sendable () async throws -> Data) async throws -> Data {
+        if let existing = inFlight[urlString] {
+            return try await existing.value
+        }
+        let task = Task<Data, Error> { try await download() }
+        inFlight[urlString] = task
+        defer { inFlight.removeValue(forKey: urlString) }
+        return try await task.value
     }
 }
 

@@ -3,7 +3,7 @@
 > Senior tvOS engineer + streaming-platform architect perspective
 > Comparing against Netflix, Apple TV+, Disney+, Swiftfin, Infuse, Plex
 > Originally reviewed: `main` branch, 68 Swift files, 13,857 lines
-> **Status (2026-04-21):** Phases A + B landed on `main` (commits `f66c168`, `8d467ac`, `b3f90f4`, `8f78f5d`). Phases C + D not yet started.
+> **Status (2026-04-21):** Phases A + B + C landed on `main` (Phase A: `f66c168`; Phase B: `8d467ac`, `b3f90f4`, `8f78f5d`; Phase C: this commit). Phase D not yet started.
 
 ---
 
@@ -11,13 +11,13 @@
 
 The app is **well-layered and buildable** — clean MVVM split, centralized services, Keychain auth, a sensible Jellyfin wire model, and thoughtful codec decision logic. You are *much* closer to shippable than most first-time tvOS apps.
 
-The gap to "Netflix-class" was **not** architectural rewrite territory — it was three concrete things, two of which are now done:
+The gap to "Netflix-class" was **not** architectural rewrite territory — it was three concrete things, all now done:
 
 1. ~~**VideoPlayerViewModel at 1,830 lines is a god-object.**~~ ✅ Decomposed to a 577-line orchestrator + 5 services in `Services/Playback/`. 8 URL-builder unit tests.
 2. ~~**Three parallel focus systems.**~~ ✅ `FocusGuideViewController` deleted; `FocusManager` demoted to a 57-line last-focus memo. `@FocusState` is now the sole source of truth.
-3. **Feature parity gaps** — Phase B closed cast/crew, trailers, external links, outro skip, MPNowPlayingInfoCenter, mid-playback bitrate reload, and AppEnvironment DI. **Remaining Phase D items:** Quick Connect, mDNS, multi-user, letter-jump, watchlist, offline, parental controls, chapters.
+3. ~~**Feature parity gaps**~~ ✅ Phase B closed cast/crew, trailers, external links, outro skip, MPNowPlayingInfoCenter, mid-playback bitrate reload, and AppEnvironment DI. Phase C closed API retry/backoff, image downsampling, memory-warning handling, device ID stability, skeleton loaders, hero prefetch, `preferredMaximumResolution`, and deleted the Hello World template. **Remaining Phase D items:** Quick Connect, mDNS, multi-user, letter-jump, watchlist, offline, parental controls, chapters.
 
-Ship-blocking priority: ~~P0 player decomposition~~ ✅ → ~~P0 focus consolidation~~ ✅ → ~~P1 feature gaps~~ ✅ (mostly) → **P2 polish (next)** → P3 feature parity.
+Ship-blocking priority: ~~P0 player decomposition~~ ✅ → ~~P0 focus consolidation~~ ✅ → ~~P1 feature gaps~~ ✅ → ~~P2 polish~~ ✅ → **P3 feature parity (next, Phase D)**.
 
 ---
 
@@ -28,17 +28,18 @@ Before each letter is the original review grade; after the arrow is the current 
 | Area | Grade | Notes |
 |------|-------|-------|
 | Layering / MVVM | B+ → **A-** | `AppEnvironment` DI container eliminates wrapper-factory duplication; MVVM split stayed clean. |
-| Services & API client | **B** | Unchanged — retries / backoff / pagination / cancellation still open (Phase C). |
-| Video player | C → **B+** | God-object decomposed; `PlaybackFailoverController`, `NowPlayingPublisher`, mid-playback bitrate reload, outro skip. DRM / PiP still open. |
+| Services & API client | B → **A-** | Retry/backoff + transient-vs-permanent classifier; dead duplicated `X-Emby-Authorization` write removed; stable device ID via `identifierForVendor`. Pagination/cancellation still open. |
+| Video player | C → **A-** | God-object decomposed; `PlaybackFailoverController`, `NowPlayingPublisher`, mid-playback bitrate reload, outro skip, `preferredMaximumResolution` capping HLS variants to display resolution. DRM / PiP still open. |
 | Focus & navigation | C → **B+** | Single source of truth (`@FocusState`); brute-force `scrollTo` loops gone; tab VMs hoisted so tab switches preserve state. |
-| Feature completeness | C → **B** | Detail: cast/crew, trailers, external links, community + critic ratings, outro skip. Watchlist / offline / chapters / letter-jump still open. |
+| Feature completeness | C → **B+** | Detail: cast/crew, trailers, external links, community + critic ratings, outro skip. Home: skeleton loaders + backdrop prefetch. Watchlist / offline / chapters / letter-jump still open. |
 | Settings | **B** | Unchanged. Added `showSkipCreditsButton` toggle. |
 | Auth | **B-** | Unchanged — Quick Connect / mDNS / multi-user still open (Phase D). |
 | Models | A- → **A** | Added `ProviderIds`, `ExternalUrls`, `RemoteTrailers`, `CriticRating`, `ExternalURL`, `RemoteTrailer`. |
+| Image pipeline | C → **A-** | ImageIO thumbnail downsampling keyed on pixel size; SHA256 hashed cache keys; memory-warning handler drops in-memory tier only; `NSLock` dedup replaced with `actor ImageRequestCoordinator`. |
 | Tests | F → **D+** | 8 `PlaybackStreamURLBuilderTests` pass. Model decoding fixtures, API client integration tests still needed. |
 | Docs / planning | **A** | Unchanged. |
 
-Overall: B- → **B+** post Phase A + B. Clear path to A- is Phase C polish + Phase D feature parity.
+Overall: B- → **A-** post Phase A + B + C. Clear path to A is Phase D feature parity (Quick Connect, watchlist, offline, chapters).
 
 ---
 
@@ -50,11 +51,11 @@ Overall: B- → **B+** post Phase A + B. Clear path to A- is Phase C polish + Ph
 | 2 | Three parallel focus systems drift out of sync | `Navigation/FocusManager.swift`, `Navigation/FocusGuideViewController.swift` | **P0** | ✅ `f66c168` (guide deleted, manager demoted) |
 | 3 | Tab switching tears down view trees and loses scroll/focus position | `Navigation/MainTabView.swift` | **P0** | ✅ `f66c168` (VMs hoisted to MainTabView) |
 | 4 | Home screen loads sections **sequentially**, not in parallel | `Services/ContentService.swift` | **P0** | ✅ `f66c168` (`async let` + `TaskGroup`) |
-| 5 | No retry/backoff on transient network errors | `Services/JellyfinAPIClient.swift:31–34, 166–185` | **P1** | ⏳ Phase C |
+| 5 | No retry/backoff on transient network errors | `Services/JellyfinAPIClient.swift:31–34, 166–185` | **P1** | ✅ Phase C (500/1500/4000 ms) |
 | 6 | Play button on detail is a stub | `ViewModels/ItemDetailViewModel.swift:150–152` | **P1** | ✅ `f66c168` |
 | 7 | Bitrate picker is UI-only — selection is ignored by player | `Views/Player/CustomInfoViewControllers.swift:132,259`, `VideoPlayerViewModel` | **P1** | ✅ `b3f90f4` (VM observes notifications, reloads with preserved position) |
 | 8 | Cast/crew, trailers, external ratings missing from detail | `Views/Detail/ItemDetailView.swift` | **P1** | ✅ `8d467ac` + `b3f90f4` (chapters + similar-View-All still open) |
-| 9 | Image loader has a deduplication race + no downsampling for 4K backdrops | `Services/ImageLoader.swift:69–114`, `Services/ImageCache.swift` | **P2** | ⏳ Phase C |
+| 9 | Image loader has a deduplication race + no downsampling for 4K backdrops | `Services/ImageLoader.swift:69–114`, `Services/ImageCache.swift` | **P2** | ✅ Phase C (actor + ImageIO) |
 | 10 | Zero real tests (three Xcode-template stub files) | `MediaMioTests/`, `MediaMioUITests/` | **P1** | 🟡 8 URL-builder tests added; model decoding still open |
 
 ---
@@ -350,15 +351,17 @@ Don't aim for percentage coverage yet — the god-object VM is untestable in its
 11. ⏳ **Shared `Pagination` and `EmptyState` components** — review finding #4 still open (`LibraryViewModel`/`SearchViewModel` have identical pagination logic; 5 empty-state views look similar but aren't the same component).
 12. ⏳ **Unit tests on model decoding** — URL builder has 8 tests; `MediaItem`/`ItemsResponse` decoding fixtures not yet added.
 
-### Phase C — P2 polish (1 week, not started)
-13. Retry/backoff on transient errors.
-14. Image downsampling via `ImageIO`. *(Warnings in `ImageLoader.swift` about `NSLock` in async context are related — review suggested `actor ImageRequestCoordinator` rewrite.)*
-15. Memory-warning response in `ImageCache`.
-16. Replace device ID with `identifierForVendor`.
-17. Skeleton loaders during initial load.
-18. Hero backdrop prefetch.
-19. Delete `ContentView.swift` (Hello World template).
-20. `preferredMaximumResolution` on `AVURLAsset` for non-4K displays. *(Surfaced during Phase A but deferred — one-line add.)*
+### Phase C — P2 polish ✅ DONE (2026-04-21)
+13. ✅ **Retry/backoff on transient API errors** — `JellyfinAPIClient.performRequest` now wraps single-shot attempts in a retry loop with `[500ms, 1500ms, 4000ms]` exponential backoff. Transient classifier covers `URLError.timedOut/.networkConnectionLost/.notConnectedToInternet/.dnsLookupFailed/.cannotConnectToHost/.cannotFindHost/.resourceUnavailable` and 5xx. 4xx (including 401) surfaces immediately.
+14. ✅ **Image downsampling via ImageIO** — `ImageLoader.load(from:targetPixelSize:)` now accepts a pixel-space target. When set, decode goes through `CGImageSourceCreateThumbnailAtIndex` with `kCGImageSourceThumbnailMaxPixelSize`, so a 4K backdrop never decodes at 6000×3375 for an on-screen region of 1920×600. `NSLock`-based dedup replaced with `actor ImageRequestCoordinator`. Hero banner, item detail backdrop, and `PosterImageView`/`BackdropImageView` opt in via the shared `ImageSizing.pixelSize(points:)` helper.
+15. ✅ **Memory-warning response in `ImageCache`** — registered for `UIApplication.didReceiveMemoryWarningNotification`; drops in-memory tier (disk survives). Cache keys switched to SHA256 hex digests — fixed 64-char filesystem-safe filenames, size-aware so the same URL at two target sizes yields separate entries.
+16. ✅ **Replace device ID with `identifierForVendor`** — `JellyfinAPIClient.deviceId` prefers `UIDevice.current.identifierForVendor` (stable per-vendor across installs), falls back to the old UserDefaults UUID only when IFV is nil (sim edge cases).
+17. ✅ **Skeleton loaders during initial load** — new `Views/Components/SkeletonView.swift` adds a reusable `ShimmerTile` primitive and `HomeSkeletonView` that mirrors the final hero + rows layout so there's no layout shift when real content arrives. Wired into `HomeContentView`.
+18. ✅ **Hero backdrop prefetch** — `HeroBannerRotating` runs a separate prefetch timer 2s ahead of each rotation tick, calling `ImageLoader.prefetch(urlString:targetPixelSize:)`. Matches the view's target pixel size so the cache key aligns and the fetch is idempotent with any in-flight view load.
+19. ✅ **Delete `ContentView.swift`** — dead Xcode Hello World template removed.
+20. ✅ **`preferredMaximumResolution` on `AVPlayerItem`** — set from `UIScreen.main.nativeBounds` in `VideoPlayerViewModel.createPlayerItem`, so 1080p Apple TVs don't pull the 4K HLS variant.
+
+**Phase C side effects:** Removed the pre-existing dead `X-Emby-Authorization` header write (the token-only form was immediately overwritten by the full authorization form two lines later). Added `import UIKit` to `VideoPlayerViewModel` and `JellyfinAPIClient` for `UIScreen` / `UIDevice`.
 
 ### Phase D — P3 feature parity (ongoing)
 21. Quick Connect (high-ROI auth UX win).

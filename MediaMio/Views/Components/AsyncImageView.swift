@@ -7,11 +7,14 @@
 
 import SwiftUI
 
-/// Async image view with caching, loading, and error states
+/// Async image view with caching, loading, and error states.
+/// When `targetPixelSize` is set, ImageLoader decodes via ImageIO at that resolution,
+/// avoiding the multi-tens-of-MB-per-image cost of decoding 4K backdrops at full res.
 struct AsyncImageView: View {
     let url: String?
     let placeholder: Image?
     let contentMode: ContentMode
+    let targetPixelSize: CGSize?
 
     @StateObject private var loader = ImageLoader()
     @State private var showPlaceholder = true
@@ -19,11 +22,13 @@ struct AsyncImageView: View {
     init(
         url: String?,
         placeholder: Image? = Image(systemName: "photo"),
-        contentMode: ContentMode = .fill
+        contentMode: ContentMode = .fill,
+        targetPixelSize: CGSize? = nil
     ) {
         self.url = url
         self.placeholder = placeholder
         self.contentMode = contentMode
+        self.targetPixelSize = targetPixelSize
     }
 
     var body: some View {
@@ -68,10 +73,10 @@ struct AsyncImageView: View {
             }
         }
         .onAppear {
-            loader.load(from: url)
+            loader.load(from: url, targetPixelSize: targetPixelSize)
         }
         .onChange(of: url) { oldValue, newValue in
-            loader.load(from: newValue)
+            loader.load(from: newValue, targetPixelSize: targetPixelSize)
         }
         .onDisappear {
             loader.cancel()
@@ -87,7 +92,11 @@ struct PosterImageView: View {
     let height: CGFloat
 
     var body: some View {
-        AsyncImageView(url: url, contentMode: .fill)
+        AsyncImageView(
+            url: url,
+            contentMode: .fill,
+            targetPixelSize: ImageSizing.pixelSize(points: CGSize(width: width, height: height))
+        )
             .frame(width: width, height: height)
             .clipped()
             .cornerRadius(Constants.UI.cardCornerRadius)
@@ -101,9 +110,28 @@ struct BackdropImageView: View {
     let height: CGFloat
 
     var body: some View {
-        AsyncImageView(url: url, contentMode: .fill)
+        AsyncImageView(
+            url: url,
+            contentMode: .fill,
+            targetPixelSize: ImageSizing.pixelSize(
+                points: CGSize(width: UIScreen.main.bounds.width, height: height)
+            )
+        )
             .frame(height: height)
             .clipped()
+    }
+}
+
+// MARK: - Sizing helper
+
+/// Converts point-space sizes into pixel-space sizes for ImageIO downsampling.
+/// On Apple TV 1080p `nativeScale` is 1.0; on Apple TV 4K it's 2.0. Using pixel
+/// space means 4K displays get crisp images while 1080p displays don't pay the
+/// 4K memory tax.
+enum ImageSizing {
+    static func pixelSize(points: CGSize) -> CGSize {
+        let scale = UIScreen.main.nativeScale
+        return CGSize(width: points.width * scale, height: points.height * scale)
     }
 }
 

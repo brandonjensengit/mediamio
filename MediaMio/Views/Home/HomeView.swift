@@ -270,8 +270,9 @@ struct HomeContentView: View {
     var body: some View {
         ZStack {
             if viewModel.isLoading && !viewModel.hasContent {
-                // Initial loading state
-                Color.black.ignoresSafeArea()
+                // Initial loading state — show the Home shape as skeletons instead
+                // of a black screen so the first-paint perceived latency is lower.
+                HomeSkeletonView()
             } else if let error = viewModel.errorMessage {
                 // Error state
                 ErrorView(message: error) {

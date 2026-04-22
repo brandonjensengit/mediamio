@@ -2,16 +2,18 @@
 //  ImageCache.swift
 //  MediaMio
 //
-//  Created by Claude Code
+//  Two-tier image cache for tvOS.
+//  Memory cache (NSCache) for hot access. Disk cache (FileManager) for persistence.
+//  Keys are SHA256 hashes so filenames stay short and filesystem-safe regardless of URL length.
+//  Cache is size-aware: the same URL requested at different target pixel sizes
+//  produces separate entries so a 200×300 poster decode never aliases a 1920×1080 backdrop.
 //
 
 import UIKit
 import Foundation
+import CryptoKit
 
-/// Two-tier image cache for tvOS
-/// - Memory cache using NSCache for fast access
-/// - Disk cache using FileManager for persistence
-class ImageCache {
+class ImageCache: NSObject {
     static let shared = ImageCache()
 
     // MARK: - Properties
@@ -20,83 +22,85 @@ class ImageCache {
     private let fileManager = FileManager.default
     private let cacheDirectory: URL
 
-    // Cache limits (conservative for tvOS)
     private let maxMemoryCacheSize = 100 * 1024 * 1024  // 100 MB in memory
     private let maxDiskCacheSize = 500 * 1024 * 1024    // 500 MB on disk
     private let maxCacheAge: TimeInterval = 7 * 24 * 60 * 60  // 7 days
 
     // MARK: - Initialization
 
-    private init() {
-        // Set memory cache limits
-        memoryCache.totalCostLimit = maxMemoryCacheSize
-        memoryCache.countLimit = 200  // Max 200 images in memory
-
-        // Create cache directory
+    private override init() {
         let paths = fileManager.urls(for: .cachesDirectory, in: .userDomainMask)
         cacheDirectory = paths[0].appendingPathComponent("ImageCache", isDirectory: true)
+        super.init()
 
-        // Create directory if it doesn't exist
+        memoryCache.totalCostLimit = maxMemoryCacheSize
+        memoryCache.countLimit = 200
+
         try? fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
 
-        // Clean old cache on init
+        // Under memory pressure, drop the in-memory tier only (disk survives).
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleMemoryWarning),
+            name: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil
+        )
+
         Task {
             await cleanOldCache()
         }
     }
 
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
     // MARK: - Cache Key Generation
 
-    private func cacheKey(for url: String) -> String {
-        return url.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? url
+    /// SHA256-of-(url + optional size) → hex. Fixed-length, filesystem-safe, collision-resistant.
+    /// Target size is folded in so the same URL at two different pixel sizes can coexist.
+    private func cacheKey(for url: String, targetPixelSize: CGSize?) -> String {
+        var composite = url
+        if let size = targetPixelSize {
+            composite += "|w\(Int(size.width))h\(Int(size.height))"
+        }
+        let digest = SHA256.hash(data: Data(composite.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 
     private func diskCacheURL(for key: String) -> URL {
-        let filename = key.replacingOccurrences(of: "/", with: "_")
-        return cacheDirectory.appendingPathComponent(filename)
+        return cacheDirectory.appendingPathComponent(key)
     }
 
     // MARK: - Retrieve Image
 
-    /// Get image from cache (memory first, then disk)
-    func image(for url: String) -> UIImage? {
-        let key = cacheKey(for: url)
+    /// Memory first, then disk. `targetPixelSize` must match what was used at store-time.
+    func image(for url: String, targetPixelSize: CGSize? = nil) -> UIImage? {
+        let key = cacheKey(for: url, targetPixelSize: targetPixelSize)
 
-        // Try memory cache first
         if let image = memoryCache.object(forKey: key as NSString) {
-            print("📸 Memory cache hit for: \(url)")
             return image
         }
 
-        // Try disk cache
         let fileURL = diskCacheURL(for: key)
         if let data = try? Data(contentsOf: fileURL),
            let image = UIImage(data: data) {
-            print("💾 Disk cache hit for: \(url)")
-
-            // Store in memory cache for faster future access
             let cost = estimatedMemorySize(for: image)
             memoryCache.setObject(image, forKey: key as NSString, cost: cost)
-
             return image
         }
 
-        print("❌ Cache miss for: \(url)")
         return nil
     }
 
     // MARK: - Store Image
 
-    /// Store image in both memory and disk cache
-    func store(_ image: UIImage, for url: String) {
-        let key = cacheKey(for: url)
+    func store(_ image: UIImage, for url: String, targetPixelSize: CGSize? = nil) {
+        let key = cacheKey(for: url, targetPixelSize: targetPixelSize)
 
-        // Store in memory cache
         let cost = estimatedMemorySize(for: image)
         memoryCache.setObject(image, forKey: key as NSString, cost: cost)
-        print("💾 Stored in memory cache: \(url)")
 
-        // Store in disk cache (async)
         Task {
             await storeToDisk(image, for: key)
         }
@@ -105,48 +109,42 @@ class ImageCache {
     private func storeToDisk(_ image: UIImage, for key: String) async {
         let fileURL = diskCacheURL(for: key)
 
-        // Convert to JPEG for better compression
         guard let data = image.jpegData(compressionQuality: 0.8) else {
             return
         }
 
         do {
             try data.write(to: fileURL)
-            print("💿 Stored in disk cache: \(key)")
-
-            // Check disk cache size and clean if needed
             await checkDiskCacheSize()
         } catch {
-            print("❌ Failed to write to disk cache: \(error)")
+            print("❌ Failed to write image to disk cache: \(error)")
         }
     }
 
     // MARK: - Remove Image
 
-    /// Remove image from both caches
-    func removeImage(for url: String) {
-        let key = cacheKey(for: url)
-
-        // Remove from memory
+    func removeImage(for url: String, targetPixelSize: CGSize? = nil) {
+        let key = cacheKey(for: url, targetPixelSize: targetPixelSize)
         memoryCache.removeObject(forKey: key as NSString)
-
-        // Remove from disk
-        let fileURL = diskCacheURL(for: key)
-        try? fileManager.removeItem(at: fileURL)
+        try? fileManager.removeItem(at: diskCacheURL(for: key))
     }
 
     // MARK: - Clear Cache
 
-    /// Clear all cached images
     func clearAll() {
-        // Clear memory cache
         memoryCache.removeAllObjects()
-        print("🗑️ Cleared memory cache")
-
-        // Clear disk cache
         Task {
             await clearDiskCache()
         }
+    }
+
+    func clearMemoryCache() {
+        memoryCache.removeAllObjects()
+    }
+
+    @objc private func handleMemoryWarning() {
+        print("⚠️ Memory warning — clearing in-memory image cache")
+        clearMemoryCache()
     }
 
     private func clearDiskCache() async {
@@ -155,7 +153,6 @@ class ImageCache {
             for fileURL in contents {
                 try? fileManager.removeItem(at: fileURL)
             }
-            print("🗑️ Cleared disk cache")
         } catch {
             print("❌ Failed to clear disk cache: \(error)")
         }
@@ -163,7 +160,6 @@ class ImageCache {
 
     // MARK: - Cache Management
 
-    /// Check disk cache size and remove oldest files if needed
     private func checkDiskCacheSize() async {
         do {
             let contents = try fileManager.contentsOfDirectory(
@@ -172,7 +168,6 @@ class ImageCache {
                 options: .skipsHiddenFiles
             )
 
-            // Calculate total size
             var totalSize: Int64 = 0
             var files: [(url: URL, size: Int64, date: Date)] = []
 
@@ -186,33 +181,27 @@ class ImageCache {
                 }
             }
 
-            print("💿 Disk cache size: \(totalSize / 1024 / 1024) MB")
-
-            // If over limit, remove oldest files
             if totalSize > Int64(maxDiskCacheSize) {
-                // Sort by date (oldest first)
                 files.sort { $0.date < $1.date }
 
                 var removedSize: Int64 = 0
-                let targetRemovalSize = totalSize - (Int64(maxDiskCacheSize) * 8 / 10)  // Remove down to 80% of max
+                let targetRemovalSize = totalSize - (Int64(maxDiskCacheSize) * 8 / 10)
 
                 for file in files {
                     if removedSize >= targetRemovalSize {
                         break
                     }
-
                     try? fileManager.removeItem(at: file.url)
                     removedSize += file.size
                 }
 
-                print("🗑️ Removed \(removedSize / 1024 / 1024) MB from disk cache")
+                print("🗑️ Pruned \(removedSize / 1024 / 1024) MB from disk cache")
             }
         } catch {
             print("❌ Failed to check disk cache size: \(error)")
         }
     }
 
-    /// Clean cache files older than maxCacheAge
     private func cleanOldCache() async {
         do {
             let contents = try fileManager.contentsOfDirectory(
@@ -246,20 +235,12 @@ class ImageCache {
 
     // MARK: - Helpers
 
-    /// Estimate memory size of an image
     private func estimatedMemorySize(for image: UIImage) -> Int {
-        guard let cgImage = image.cgImage else {
-            return 0
-        }
-
+        guard let cgImage = image.cgImage else { return 0 }
         let bytesPerPixel = cgImage.bitsPerPixel / 8
-        let width = cgImage.width
-        let height = cgImage.height
-
-        return width * height * bytesPerPixel
+        return cgImage.width * cgImage.height * bytesPerPixel
     }
 
-    /// Get cache statistics
     func getCacheStats() async -> (memoryCacheCount: Int, diskCacheSize: Int64, diskCacheCount: Int) {
         var diskSize: Int64 = 0
         var diskCount = 0
@@ -283,9 +264,6 @@ class ImageCache {
             print("❌ Failed to get cache stats: \(error)")
         }
 
-        // NSCache doesn't expose count, estimate based on cost
-        let memoryCount = 0  // Would need custom tracking for exact count
-
-        return (memoryCount, diskSize, diskCount)
+        return (0, diskSize, diskCount)
     }
 }
