@@ -32,8 +32,13 @@ struct SearchView: View {
 
                 // Content
                 if viewModel.isInitialState {
-                    // Initial state - show instructions
-                    SearchEmptyState()
+                    // Initial state — show recents if we have any, else the
+                    // "search your library" hint.
+                    if viewModel.recentSearches.isEmpty {
+                        SearchEmptyState()
+                    } else {
+                        RecentSearchesView(viewModel: viewModel)
+                    }
                 } else if viewModel.isSearching && !viewModel.hasResults {
                     // Searching for first time
                     LoadingView(message: "Searching...")
@@ -220,6 +225,104 @@ struct SearchEmptyState: View {
             }
         }
         .frame(maxHeight: .infinity)
+    }
+}
+
+// MARK: - Recent Searches
+
+/// Shown in place of the "Search Your Library" empty state when the user has
+/// search history. Each row replays the query in the search field; a Clear All
+/// row wipes persisted history.
+struct RecentSearchesView: View {
+    @ObservedObject var viewModel: SearchViewModel
+    @FocusState private var focusedQuery: String?
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 24) {
+                HStack {
+                    Text("Recent Searches")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+
+                    Spacer()
+
+                    Button {
+                        viewModel.clearAllRecentSearches()
+                    } label: {
+                        Text("Clear All")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, Constants.UI.defaultPadding)
+
+                VStack(spacing: 12) {
+                    ForEach(viewModel.recentSearches, id: \.self) { query in
+                        RecentSearchRow(query: query) {
+                            viewModel.runRecentSearch(query)
+                        } onRemove: {
+                            viewModel.removeRecentSearch(query)
+                        }
+                        .focused($focusedQuery, equals: query)
+                    }
+                }
+                .padding(.horizontal, Constants.UI.defaultPadding)
+                .padding(.bottom, 40)
+            }
+            .padding(.top, 20)
+        }
+    }
+}
+
+struct RecentSearchRow: View {
+    let query: String
+    let onTap: () -> Void
+    let onRemove: () -> Void
+
+    @Environment(\.isFocused) private var isFocused
+
+    var body: some View {
+        HStack(spacing: 20) {
+            Button(action: onTap) {
+                HStack(spacing: 20) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+
+                    Text(query)
+                        .font(.title3)
+                        .foregroundColor(.white)
+
+                    Spacer()
+
+                    Image(systemName: "arrow.up.left")
+                        .font(.title3)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 30)
+                .padding(.vertical, 18)
+                .background(isFocused ? Color.white.opacity(0.18) : Color.white.opacity(0.08))
+                .cornerRadius(Constants.UI.cornerRadius)
+                .scaleEffect(isFocused ? 1.02 : 1.0)
+                .animation(.easeInOut(duration: 0.15), value: isFocused)
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                onRemove()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title)
+                    .foregroundColor(.secondary)
+                    .padding(20)
+            }
+            .buttonStyle(.plain)
+        }
     }
 }
 

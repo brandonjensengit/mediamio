@@ -19,6 +19,10 @@ class LibraryViewModel: ObservableObject {
     @Published var availableGenres: [Genre] = []
     @Published var availableYears: [Int] = []
 
+    /// Active letter filter, set by tapping a letter in the A-Z rail. Nil =
+    /// show everything. Only takes effect while sort is alphabetical.
+    @Published var activeLetter: String?
+
     private let section: ContentSection
     private let contentService: ContentService
     private let authService: AuthenticationService
@@ -206,6 +210,7 @@ class LibraryViewModel: ObservableObject {
                 libraryId: libraryId,
                 itemTypes: itemTypes,
                 filters: filters.isActive ? filters : nil,
+                nameStartsWith: letterFilterForCurrentRequest,
                 limit: pageSize,
                 startIndex: currentStartIndex,
                 sortBy: sortOption.sortBy,
@@ -248,6 +253,30 @@ class LibraryViewModel: ObservableObject {
 
         print("🔄 Changing sort to: \(option.displayName)")
         sortOption = option
+        // Letter-jump is only meaningful under alphabetical sort — clear it
+        // when the user switches to a different ordering.
+        if option != .alphabetical {
+            activeLetter = nil
+        }
+        await loadContent()
+    }
+
+    // MARK: - Letter Jump
+
+    /// Returns the prefix to send with the current request, or nil if letter
+    /// filtering should not apply (non-alphabetical sort).
+    private var letterFilterForCurrentRequest: String? {
+        guard sortOption == .alphabetical else { return nil }
+        return activeLetter
+    }
+
+    /// Show only items starting with the given single letter (or nil to clear).
+    /// Special case: pass "#" to request items that start with a non-letter
+    /// (digit or symbol) — Jellyfin's `NameStartsWith=#` matches digits.
+    func jumpToLetter(_ letter: String?) async {
+        guard letter != activeLetter else { return }
+        print("🔤 Letter jump → \(letter ?? "all")")
+        activeLetter = letter
         await loadContent()
     }
 

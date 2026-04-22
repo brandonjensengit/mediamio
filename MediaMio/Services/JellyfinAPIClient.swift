@@ -139,6 +139,15 @@ class JellyfinAPIClient: ObservableObject {
         return try await performRequest(request)
     }
 
+    func delete<T: Decodable>(
+        endpoint: String,
+        queryItems: [URLQueryItem] = []
+    ) async throws -> T {
+        let url = try buildURL(endpoint: endpoint, queryItems: queryItems)
+        let request = buildRequest(url: url, method: "DELETE")
+        return try await performRequest(request)
+    }
+
     // MARK: - Retry Policy
     // Transient failures (timeouts, lost connections, 5xx) get a capped retry with
     // exponential backoff. Permanent failures (401, 4xx, decoding) surface immediately.
@@ -274,6 +283,41 @@ class JellyfinAPIClient: ObservableObject {
         return result
     }
 
+    // MARK: - Quick Connect
+
+    /// Ask the server whether Quick Connect is enabled. Returns false if the
+    /// endpoint is missing (older Jellyfin) or the server has it disabled.
+    func isQuickConnectEnabled() async -> Bool {
+        do {
+            let enabled: Bool = try await get(endpoint: "/QuickConnect/Enabled")
+            return enabled
+        } catch {
+            print("⚠️ Quick Connect enabled-check failed (treating as disabled): \(error)")
+            return false
+        }
+    }
+
+    /// Start a Quick Connect session. The returned `code` is what the user
+    /// types into the Jellyfin web UI; the `secret` is what we poll with.
+    func initiateQuickConnect() async throws -> QuickConnectResult {
+        try await post(endpoint: "/QuickConnect/Initiate")
+    }
+
+    /// Check on a Quick Connect session's status. When `authenticated` flips
+    /// to true, call `authenticateWithQuickConnect(secret:)` to trade the
+    /// secret for a real access token.
+    func checkQuickConnectStatus(secret: String) async throws -> QuickConnectResult {
+        let queryItems = [URLQueryItem(name: "secret", value: secret)]
+        return try await get(endpoint: "/QuickConnect/Connect", queryItems: queryItems)
+    }
+
+    /// Exchange an approved Quick Connect secret for a real `AuthenticationResult`
+    /// (access token + user).
+    func authenticateWithQuickConnect(secret: String) async throws -> AuthenticationResult {
+        let body = QuickConnectAuthenticateRequest(secret: secret)
+        return try await post(endpoint: "/Users/AuthenticateWithQuickConnect", body: body)
+    }
+
     // MARK: - User Methods
     func getCurrentUser(userId: String) async throws -> User {
         try await get(endpoint: "/Users/\(userId)")
@@ -327,6 +371,7 @@ class JellyfinAPIClient: ObservableObject {
         years: [Int]? = nil,
         minRating: Double? = nil,
         isPlayed: Bool? = nil,
+        nameStartsWith: String? = nil,
         limit: Int = 50,
         startIndex: Int = 0,
         sortBy: String? = "SortName",
@@ -371,6 +416,13 @@ class JellyfinAPIClient: ObservableObject {
             queryItems.append(URLQueryItem(name: "IsPlayed", value: String(isPlayed)))
         }
 
+        // Filter: Name starts with (letter-jump). Jellyfin treats this as a
+        // prefix match on SortName, which is what we want — "S" matches
+        // "Spider-Man" and "Stranger Things" but not "Interstellar".
+        if let prefix = nameStartsWith, !prefix.isEmpty {
+            queryItems.append(URLQueryItem(name: "NameStartsWith", value: prefix))
+        }
+
         if let sortBy = sortBy {
             queryItems.append(URLQueryItem(name: "SortBy", value: sortBy))
         }
@@ -386,7 +438,10 @@ class JellyfinAPIClient: ObservableObject {
     func getItemDetails(userId: String, itemId: String) async throws -> MediaItem {
         let endpoint = Constants.API.Endpoints.userItemDetails(userId: userId, itemId: itemId)
         let queryItems = [
-            URLQueryItem(name: "Fields", value: "Path,Genres,Studios,People,Overview,ProviderIds")
+            URLQueryItem(
+                name: "Fields",
+                value: "Path,Genres,Studios,People,Overview,ProviderIds,Chapters"
+            )
         ]
         return try await get(endpoint: endpoint, queryItems: queryItems)
     }
@@ -448,6 +503,21 @@ class JellyfinAPIClient: ObservableObject {
         }
 
         return try await get(endpoint: endpoint, queryItems: queryItems)
+    }
+
+    // MARK: - User Favorites
+
+    /// Mark an item as favorite. Returns the updated UserData as the server
+    /// sees it (use this to refresh local state rather than assuming isFavorite=true).
+    func markFavorite(userId: String, itemId: String) async throws -> UserData {
+        let endpoint = "/Users/\(userId)/FavoriteItems/\(itemId)"
+        return try await post(endpoint: endpoint)
+    }
+
+    /// Remove favorite status from an item. Returns the updated UserData.
+    func unmarkFavorite(userId: String, itemId: String) async throws -> UserData {
+        let endpoint = "/Users/\(userId)/FavoriteItems/\(itemId)"
+        return try await delete(endpoint: endpoint)
     }
 
     /// Build image URL for an item

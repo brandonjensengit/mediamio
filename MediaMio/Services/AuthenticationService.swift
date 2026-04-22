@@ -122,6 +122,45 @@ class AuthenticationService: ObservableObject {
         clearSession()
     }
 
+    // MARK: - Quick Connect
+    // Quick Connect lets the user approve this TV from another device (phone, web)
+    // without entering a password on the remote. The VM owns the polling loop;
+    // this service exposes three primitives the VM calls in sequence:
+    //   1) initiate → get a 6-digit code to show on screen
+    //   2) check    → poll every ~2s until approved
+    //   3) finalize → trade the approved secret for a real session
+
+    func isQuickConnectAvailable(serverURL: String) async -> Bool {
+        apiClient.configure(baseURL: serverURL)
+        return await apiClient.isQuickConnectEnabled()
+    }
+
+    func initiateQuickConnect(serverURL: String) async throws -> QuickConnectResult {
+        apiClient.configure(baseURL: serverURL)
+        return try await apiClient.initiateQuickConnect()
+    }
+
+    func pollQuickConnect(secret: String) async throws -> QuickConnectResult {
+        try await apiClient.checkQuickConnectStatus(secret: secret)
+    }
+
+    func completeQuickConnect(
+        serverURL: String,
+        secret: String,
+        rememberMe: Bool = true
+    ) async throws {
+        apiClient.configure(baseURL: serverURL)
+        let authResult = try await apiClient.authenticateWithQuickConnect(secret: secret)
+
+        let session = UserSession(
+            user: authResult.user,
+            accessToken: authResult.accessToken,
+            serverURL: serverURL,
+            serverId: authResult.serverId
+        )
+        try saveSession(session, rememberMe: rememberMe)
+    }
+
     // MARK: - Validation
     private func isValidURL(_ urlString: String) -> Bool {
         guard let url = URL(string: urlString) else {

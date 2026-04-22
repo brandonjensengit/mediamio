@@ -19,6 +19,8 @@ struct LoginView: View {
     @State private var rememberMe: Bool = true
     @State private var isLoading: Bool = false
     @State private var errorMessage: String? = nil
+    @State private var showQuickConnect: Bool = false
+    @State private var quickConnectAvailable: Bool = false
 
     init(serverURL: String, serverName: String) {
         self.serverURL = serverURL
@@ -130,6 +132,12 @@ struct LoginView: View {
                                 }
                             }
 
+                            if quickConnectAvailable {
+                                FocusableButton(title: "Use Quick Connect", style: .secondary) {
+                                    showQuickConnect = true
+                                }
+                            }
+
                             FocusableButton(title: "Back", style: .secondary) {
                                 dismiss()
                             }
@@ -142,6 +150,16 @@ struct LoginView: View {
                 }
                 .padding(Constants.UI.defaultPadding)
             }
+        }
+        .task {
+            // Hide the Quick Connect button for servers that don't expose it
+            // (older Jellyfin, or admins who turned it off). We don't block
+            // password login on the result — the check is fire-and-forget.
+            quickConnectAvailable = await authService.isQuickConnectAvailable(serverURL: serverURL)
+        }
+        .fullScreenCover(isPresented: $showQuickConnect) {
+            QuickConnectView(serverURL: serverURL, rememberMe: rememberMe)
+                .environmentObject(authService)
         }
     }
 

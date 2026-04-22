@@ -23,6 +23,9 @@ class NavigationManager: ObservableObject {
     // Player state
     @Published var showingPlayer: Bool = false
     @Published var currentPlayerItem: MediaItem?
+    // Start offset override, set when launching playback from a chapter tap
+    // on Detail. Nil = "use the item's resume data, if any".
+    @Published var currentPlayerStartTicks: Int64?
 
     // Focus memory for content rows
     @Published var focusedRowIndex: Int = 0
@@ -41,9 +44,11 @@ class NavigationManager: ObservableObject {
         print("📱 Showing detail for: \(item.name)")
     }
 
-    /// Start playing a media item
-    func playItem(_ item: MediaItem) {
+    /// Start playing a media item. Pass `startPositionTicks` to jump to a
+    /// specific offset (chapter tap); omit it to use the item's resume data.
+    func playItem(_ item: MediaItem, startPositionTicks: Int64? = nil) {
         currentPlayerItem = item
+        currentPlayerStartTicks = startPositionTicks
 
         // If detail sheet is open, dismiss it first before showing player
         if presentedItem != nil {
@@ -69,6 +74,7 @@ class NavigationManager: ObservableObject {
     func closePlayer() {
         showingPlayer = false
         currentPlayerItem = nil
+        currentPlayerStartTicks = nil
         print("⏹️ Closed player")
     }
 

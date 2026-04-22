@@ -67,7 +67,8 @@ struct PlaybackStreamURLBuilderTests {
             premiereDate: nil, genres: nil, studios: nil, people: nil,
             taglines: nil, mediaSources: [mediaSource],
             criticRating: nil, providerIds: nil,
-            externalUrls: nil, remoteTrailers: nil
+            externalUrls: nil, remoteTrailers: nil,
+            chapters: nil
         )
     }
 

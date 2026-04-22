@@ -83,8 +83,12 @@ struct MainTabView: View {
         // Present video player as full screen cover
         .fullScreenCover(isPresented: $navigationManager.showingPlayer) {
             if let item = navigationManager.currentPlayerItem {
-                VideoPlayerView(item: item, authService: env.authService)
-                    .environmentObject(navigationManager)
+                VideoPlayerView(
+                    item: item,
+                    authService: env.authService,
+                    startPositionTicks: navigationManager.currentPlayerStartTicks
+                )
+                .environmentObject(navigationManager)
             }
         }
     }

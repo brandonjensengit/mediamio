@@ -16,6 +16,7 @@ class SearchViewModel: ObservableObject {
     @Published var isLoadingMore: Bool = false
     @Published var errorMessage: String?
     @Published var filterType: FilterType = .all
+    @Published var recentSearches: [String] = []
 
     private let contentService: ContentService
     private let authService: AuthenticationService
@@ -28,6 +29,15 @@ class SearchViewModel: ObservableObject {
     private let pageSize: Int = 50
     private var hasMoreContent: Bool = true
     private var totalItemCount: Int?
+
+    // Hard cap so the recents list doesn't grow unbounded in UserDefaults.
+    // 10 is the sweet spot seen in Netflix / Apple TV / YouTube recents.
+    private let maxRecentSearches: Int = 10
+
+    // A search is only worth recording once the user has committed to it —
+    // i.e. it returned results and they chose something OR typed for a few
+    // seconds. We commit on successful search completion to avoid recording
+    // every keystroke of the debounce buffer.
 
     var baseURL: String {
         authService.currentSession?.serverURL ?? ""
@@ -42,6 +52,7 @@ class SearchViewModel: ObservableObject {
         self.authService = authService
         self.navigationCoordinator = navigationCoordinator
 
+        loadRecentSearches()
         setupSearchDebouncing()
     }
 
@@ -145,6 +156,12 @@ class SearchViewModel: ObservableObject {
 
             print("✅ Found \(response.items.count) results (total: \(results.count), hasMore: \(hasMoreContent))")
 
+            // Record the query once we know it matched something. Queries
+            // that return zero results aren't worth re-offering.
+            if currentStartIndex == response.items.count, !response.items.isEmpty {
+                commitRecent(query: query)
+            }
+
         } catch {
             if Task.isCancelled { return }
 
@@ -188,6 +205,52 @@ class SearchViewModel: ObservableObject {
     func selectItem(_ item: MediaItem) {
         print("📺 Selected search result: \(item.name)")
         navigationCoordinator?.navigate(to: item)
+    }
+
+    // MARK: - Recent Searches
+
+    /// Run a previously-recorded search by filling the text field, which
+    /// re-triggers the debounced search pipeline.
+    func runRecentSearch(_ query: String) {
+        searchQuery = query
+    }
+
+    func removeRecentSearch(_ query: String) {
+        recentSearches.removeAll { $0.caseInsensitiveCompare(query) == .orderedSame }
+        persistRecentSearches()
+    }
+
+    func clearAllRecentSearches() {
+        recentSearches = []
+        persistRecentSearches()
+    }
+
+    private func commitRecent(query: String) {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard trimmed.count >= 2 else { return }  // Single-char searches aren't useful recents.
+
+        // Move-to-front LRU: remove any case-insensitive duplicate, then
+        // prepend. Keeping originals lets us preserve the user's capitalization.
+        recentSearches.removeAll { $0.caseInsensitiveCompare(trimmed) == .orderedSame }
+        recentSearches.insert(trimmed, at: 0)
+        if recentSearches.count > maxRecentSearches {
+            recentSearches = Array(recentSearches.prefix(maxRecentSearches))
+        }
+        persistRecentSearches()
+    }
+
+    private func loadRecentSearches() {
+        guard let data = UserDefaults.standard.data(forKey: Constants.UserDefaultsKeys.recentSearches),
+              let decoded = try? JSONDecoder().decode([String].self, from: data) else {
+            return
+        }
+        recentSearches = decoded
+    }
+
+    private func persistRecentSearches() {
+        if let data = try? JSONEncoder().encode(recentSearches) {
+            UserDefaults.standard.set(data, forKey: Constants.UserDefaultsKeys.recentSearches)
+        }
     }
 
     // MARK: - Computed Properties

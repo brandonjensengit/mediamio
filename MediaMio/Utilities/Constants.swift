@@ -80,6 +80,7 @@ enum Constants {
         static let lastServerURL = "lastServerURL"
         static let lastUsername = "lastUsername"
         static let deviceId = "deviceId"
+        static let recentSearches = "recentSearches"
     }
 
     // MARK: - UI Constants

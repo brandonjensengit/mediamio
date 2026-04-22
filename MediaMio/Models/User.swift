@@ -55,3 +55,43 @@ struct UserSession {
         !accessToken.isEmpty && !serverURL.isEmpty
     }
 }
+
+// MARK: - Quick Connect
+
+/// Server response from the Quick Connect endpoints.
+///
+/// The flow: the TV `POST`s to `/QuickConnect/Initiate` and gets back a
+/// `Secret` + human-readable `Code`. It shows the code on screen; the user
+/// types the code into the Jellyfin web UI on any other device and approves.
+/// The TV polls `GET /QuickConnect/Connect?secret=...` until `Authenticated == true`,
+/// then trades the secret for a normal access token via
+/// `POST /Users/AuthenticateWithQuickConnect`.
+struct QuickConnectResult: Codable {
+    let secret: String
+    let code: String
+    let authenticated: Bool
+    let deviceId: String?
+    let deviceName: String?
+    let appName: String?
+    let appVersion: String?
+    let dateAdded: String?
+
+    enum CodingKeys: String, CodingKey {
+        case secret = "Secret"
+        case code = "Code"
+        case authenticated = "Authenticated"
+        case deviceId = "DeviceId"
+        case deviceName = "DeviceName"
+        case appName = "AppName"
+        case appVersion = "AppVersion"
+        case dateAdded = "DateAdded"
+    }
+}
+
+struct QuickConnectAuthenticateRequest: Codable {
+    let secret: String
+
+    enum CodingKeys: String, CodingKey {
+        case secret = "Secret"
+    }
+}

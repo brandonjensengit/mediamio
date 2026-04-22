@@ -67,9 +67,21 @@ final class VideoPlayerViewModel: ObservableObject {
     private var nowPlaying: NowPlayingPublisher?
     private let failoverController = PlaybackFailoverController()
 
-    init(item: MediaItem, authService: AuthenticationService) {
+    init(
+        item: MediaItem,
+        authService: AuthenticationService,
+        initialStartPositionTicks: Int64? = nil
+    ) {
         self.item = item
         self.authService = authService
+        // Chapter jumps seed the resume-position via the same pending-seek
+        // slot already used for bitrate reloads. `getResumePosition()` drains
+        // this first, so it takes precedence over any server-provided resume
+        // point — which is the expected behavior: the user explicitly asked
+        // to start at this chapter.
+        if let ticks = initialStartPositionTicks, ticks > 0 {
+            self.pendingSeekOnReload = Double(ticks) / 10_000_000.0
+        }
         observeStreamingSettingsChanges()
     }
 

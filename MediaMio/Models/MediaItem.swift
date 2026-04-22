@@ -46,6 +46,11 @@ struct MediaItem: Codable, Identifiable, Hashable {
     let externalUrls: [ExternalURL]?
     let remoteTrailers: [RemoteTrailer]?
 
+    // Chapter markers. Populated only when the details request includes
+    // `Fields=Chapters`. Each chapter carries a tick-based start offset +
+    // optional image tag (rendered as a thumbnail scrubber on Detail).
+    let chapters: [Chapter]?
+
     enum CodingKeys: String, CodingKey {
         case id = "Id"
         case name = "Name"
@@ -73,6 +78,7 @@ struct MediaItem: Codable, Identifiable, Hashable {
         case providerIds = "ProviderIds"
         case externalUrls = "ExternalUrls"
         case remoteTrailers = "RemoteTrailers"
+        case chapters = "Chapters"
     }
 
     // MARK: - Computed Properties
@@ -139,6 +145,17 @@ struct MediaItem: Codable, Identifiable, Hashable {
     func thumbImageURL(baseURL: String, maxWidth: Int = 600, quality: Int = 90) -> String? {
         guard imageTags?.thumb != nil else { return nil }
         return "\(baseURL)/Items/\(id)/Images/Thumb?maxWidth=\(maxWidth)&quality=\(quality)"
+    }
+
+    /// Jellyfin chapter thumbnails are addressable by chapter index, not by
+    /// `imageTag` — the tag just signals that an image exists.
+    func chapterImageURL(
+        baseURL: String,
+        chapterIndex: Int,
+        maxWidth: Int = 400,
+        quality: Int = 85
+    ) -> String {
+        "\(baseURL)/Items/\(id)/Images/Chapter/\(chapterIndex)?maxWidth=\(maxWidth)&quality=\(quality)"
     }
 
     // MARK: - Subtitle Helpers
@@ -244,6 +261,46 @@ struct ExternalURL: Codable, Hashable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case name = "Name"
         case url = "Url"
+    }
+}
+
+// MARK: - Chapter
+struct Chapter: Codable, Hashable, Identifiable {
+    let name: String?
+    let startPositionTicks: Int64
+    let imageTag: String?
+    let imageDateModified: String?
+
+    // Chapters don't have a natural ID in the Jellyfin response; the start
+    // tick is unique within an item so it doubles as a stable identifier.
+    var id: Int64 { startPositionTicks }
+
+    enum CodingKeys: String, CodingKey {
+        case name = "Name"
+        case startPositionTicks = "StartPositionTicks"
+        case imageTag = "ImageTag"
+        case imageDateModified = "ImageDateModified"
+    }
+
+    var startSeconds: Double {
+        Double(startPositionTicks) / 10_000_000.0
+    }
+
+    /// Format as MM:SS or H:MM:SS for display in the chapter strip.
+    var formattedStart: String {
+        let total = Int(startSeconds)
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        let seconds = total % 60
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
+        }
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+
+    var displayName: String {
+        if let name = name, !name.isEmpty { return name }
+        return formattedStart
     }
 }
 

@@ -244,7 +244,8 @@ extension View {
             criticRating: nil,
             providerIds: nil,
             externalUrls: nil,
-            remoteTrailers: nil
+            remoteTrailers: nil,
+            chapters: nil
         )
     }
 

@@ -44,67 +44,76 @@ struct LibraryView: View {
                 EmptyLibraryView(libraryName: viewModel.title)
             } else {
                 // Content
-                ScrollView(.vertical, showsIndicators: true) {
-                    VStack(spacing: 0) {
-                        // Toolbar with title, sort, and search
-                        LibraryToolbar(
-                            viewModel: viewModel,
-                            showSearch: $showSearch,
-                            focusedField: $toolbarFocus
-                        )
-                        .padding(.top, 40)
+                HStack(spacing: 0) {
+                    ScrollView(.vertical, showsIndicators: true) {
+                        VStack(spacing: 0) {
+                            // Toolbar with title, sort, and search
+                            LibraryToolbar(
+                                viewModel: viewModel,
+                                showSearch: $showSearch,
+                                focusedField: $toolbarFocus
+                            )
+                            .padding(.top, 40)
 
-                        // Filter bar
-                        LibraryFilterBar(
-                            viewModel: viewModel,
-                            focusedField: $filterFocus
-                        )
-                        .padding(.bottom, 20)
-                        .onChange(of: filterFocus) { _, newValue in
-                            handleFilterFocusChange(newValue)
-                        }
+                            // Filter bar
+                            LibraryFilterBar(
+                                viewModel: viewModel,
+                                focusedField: $filterFocus
+                            )
+                            .padding(.bottom, 20)
+                            .onChange(of: filterFocus) { _, newValue in
+                                handleFilterFocusChange(newValue)
+                            }
 
-                        // Grid of items
-                        LazyVGrid(columns: columns, spacing: 60) {
-                            ForEach(viewModel.items) { item in
-                                PosterCard(
-                                    item: item,
-                                    baseURL: viewModel.baseURL
-                                ) {
-                                    viewModel.selectItem(item)
-                                }
-                                .padding(.vertical, 20)
-                                .onAppear {
-                                    // Load more when approaching end
-                                    if item == viewModel.items.last {
-                                        Task {
-                                            await viewModel.loadMore()
+                            // Grid of items
+                            LazyVGrid(columns: columns, spacing: 60) {
+                                ForEach(viewModel.items) { item in
+                                    PosterCard(
+                                        item: item,
+                                        baseURL: viewModel.baseURL
+                                    ) {
+                                        viewModel.selectItem(item)
+                                    }
+                                    .padding(.vertical, 20)
+                                    .onAppear {
+                                        // Load more when approaching end
+                                        if item == viewModel.items.last {
+                                            Task {
+                                                await viewModel.loadMore()
+                                            }
                                         }
                                     }
                                 }
-                            }
 
-                            // Loading more indicator
-                            if viewModel.isLoadingMore {
-                                VStack(spacing: 20) {
-                                    ProgressView()
-                                        .scaleEffect(1.5)
+                                // Loading more indicator
+                                if viewModel.isLoadingMore {
+                                    VStack(spacing: 20) {
+                                        ProgressView()
+                                            .scaleEffect(1.5)
 
-                                    Text("Loading more...")
-                                        .font(.title3)
-                                        .foregroundColor(.secondary)
+                                        Text("Loading more...")
+                                            .font(.title3)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 40)
+                                    .gridCellColumns(columns.count)
                                 }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 40)
-                                .gridCellColumns(columns.count)
                             }
+                            .padding(.horizontal, Constants.UI.defaultPadding)
+                            .padding(.bottom, 80)
                         }
-                        .padding(.horizontal, Constants.UI.defaultPadding)
-                        .padding(.bottom, 80)
                     }
-                }
-                .refreshable {
-                    await viewModel.refresh()
+                    .refreshable {
+                        await viewModel.refresh()
+                    }
+
+                    // A-Z rail — only meaningful under alphabetical sort.
+                    if viewModel.sortOption == .alphabetical {
+                        LetterJumpRail(viewModel: viewModel)
+                            .frame(width: 70)
+                            .padding(.trailing, 20)
+                    }
                 }
             }
         }
@@ -211,6 +220,78 @@ struct LibraryHeader: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Letter Jump Rail
+
+/// Vertical A-Z strip that filters the library by SortName prefix. On tvOS
+/// focus, the active letter highlights; on tap, the VM reloads the library
+/// restricted to that letter — this is true filtering, not scroll-to-anchor,
+/// because the library is paginated and later letters may not be loaded yet.
+/// "#" maps to Jellyfin's digit/symbol bucket. "All" clears the filter.
+private struct LetterJumpRail: View {
+    @ObservedObject var viewModel: LibraryViewModel
+
+    private static let letters: [String] =
+        ["All", "#"] + (65...90).map { String(UnicodeScalar($0)!) }
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 4) {
+                ForEach(Self.letters, id: \.self) { letter in
+                    LetterButton(
+                        letter: letter,
+                        isActive: isActive(letter)
+                    ) {
+                        let target: String? = (letter == "All") ? nil : letter
+                        Task { await viewModel.jumpToLetter(target) }
+                    }
+                }
+            }
+            .padding(.vertical, 40)
+        }
+        .focusSection()
+    }
+
+    private func isActive(_ letter: String) -> Bool {
+        if letter == "All" { return viewModel.activeLetter == nil }
+        return viewModel.activeLetter == letter
+    }
+}
+
+private struct LetterButton: View {
+    let letter: String
+    let isActive: Bool
+    let action: () -> Void
+
+    @Environment(\.isFocused) private var isFocused
+
+    var body: some View {
+        Button(action: action) {
+            Text(letter == "All" ? "•" : letter)
+                .font(letter == "All" ? .title : .headline)
+                .fontWeight(isActive ? .bold : .regular)
+                .foregroundColor(foreground)
+                .frame(width: 50, height: letter == "All" ? 44 : 36)
+                .background(background)
+                .cornerRadius(8)
+                .scaleEffect(isFocused ? 1.15 : 1.0)
+                .animation(.easeInOut(duration: 0.15), value: isFocused)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var foreground: Color {
+        if isActive { return .black }
+        if isFocused { return .white }
+        return .white.opacity(0.6)
+    }
+
+    private var background: Color {
+        if isActive { return .white }
+        if isFocused { return .white.opacity(0.25) }
+        return .clear
     }
 }
 

@@ -3,7 +3,7 @@
 > Senior tvOS engineer + streaming-platform architect perspective
 > Comparing against Netflix, Apple TV+, Disney+, Swiftfin, Infuse, Plex
 > Originally reviewed: `main` branch, 68 Swift files, 13,857 lines
-> **Status (2026-04-21):** Phases A + B + C landed on `main` (Phase A: `f66c168`; Phase B: `8d467ac`, `b3f90f4`, `8f78f5d`; Phase C: this commit). Phase D not yet started.
+> **Status (2026-04-21):** Phases A + B + C + partial D landed on `main` (Phase A: `f66c168`; Phase B: `8d467ac`, `b3f90f4`, `8f78f5d`; Phase C: `c3f1d6a`; Phase D first batch: this commit — items #21, #24, #25, #26, #29). Phase D items #22, #23, #27, #28, #30 still open.
 
 ---
 
@@ -15,9 +15,9 @@ The gap to "Netflix-class" was **not** architectural rewrite territory — it wa
 
 1. ~~**VideoPlayerViewModel at 1,830 lines is a god-object.**~~ ✅ Decomposed to a 577-line orchestrator + 5 services in `Services/Playback/`. 8 URL-builder unit tests.
 2. ~~**Three parallel focus systems.**~~ ✅ `FocusGuideViewController` deleted; `FocusManager` demoted to a 57-line last-focus memo. `@FocusState` is now the sole source of truth.
-3. ~~**Feature parity gaps**~~ ✅ Phase B closed cast/crew, trailers, external links, outro skip, MPNowPlayingInfoCenter, mid-playback bitrate reload, and AppEnvironment DI. Phase C closed API retry/backoff, image downsampling, memory-warning handling, device ID stability, skeleton loaders, hero prefetch, `preferredMaximumResolution`, and deleted the Hello World template. **Remaining Phase D items:** Quick Connect, mDNS, multi-user, letter-jump, watchlist, offline, parental controls, chapters.
+3. ~~**Feature parity gaps**~~ ✅ Phase B closed cast/crew, trailers, external links, outro skip, MPNowPlayingInfoCenter, mid-playback bitrate reload, and AppEnvironment DI. Phase C closed API retry/backoff, image downsampling, memory-warning handling, device ID stability, skeleton loaders, hero prefetch, `preferredMaximumResolution`, and deleted the Hello World template. **Phase D first batch landed:** Quick Connect (passwordless login), favorites/watchlist toggle, chapters on Detail, letter-jump in Library, and search recents. **Remaining Phase D items:** mDNS, multi-user/saved servers, offline downloads, parental controls, QR handoff.
 
-Ship-blocking priority: ~~P0 player decomposition~~ ✅ → ~~P0 focus consolidation~~ ✅ → ~~P1 feature gaps~~ ✅ → ~~P2 polish~~ ✅ → **P3 feature parity (next, Phase D)**.
+Ship-blocking priority: ~~P0 player decomposition~~ ✅ → ~~P0 focus consolidation~~ ✅ → ~~P1 feature gaps~~ ✅ → ~~P2 polish~~ ✅ → **P3 feature parity (in progress, ~50% done)**.
 
 ---
 
@@ -31,15 +31,15 @@ Before each letter is the original review grade; after the arrow is the current 
 | Services & API client | B → **A-** | Retry/backoff + transient-vs-permanent classifier; dead duplicated `X-Emby-Authorization` write removed; stable device ID via `identifierForVendor`. Pagination/cancellation still open. |
 | Video player | C → **A-** | God-object decomposed; `PlaybackFailoverController`, `NowPlayingPublisher`, mid-playback bitrate reload, outro skip, `preferredMaximumResolution` capping HLS variants to display resolution. DRM / PiP still open. |
 | Focus & navigation | C → **B+** | Single source of truth (`@FocusState`); brute-force `scrollTo` loops gone; tab VMs hoisted so tab switches preserve state. |
-| Feature completeness | C → **B+** | Detail: cast/crew, trailers, external links, community + critic ratings, outro skip. Home: skeleton loaders + backdrop prefetch. Watchlist / offline / chapters / letter-jump still open. |
+| Feature completeness | C → **A-** | Phase D added: chapters strip on Detail (with chapter-start playback), letter-jump rail in Library, search recents, favorites toggle wired end-to-end. Offline / parental still open. |
 | Settings | **B** | Unchanged. Added `showSkipCreditsButton` toggle. |
-| Auth | **B-** | Unchanged — Quick Connect / mDNS / multi-user still open (Phase D). |
-| Models | A- → **A** | Added `ProviderIds`, `ExternalUrls`, `RemoteTrailers`, `CriticRating`, `ExternalURL`, `RemoteTrailer`. |
+| Auth | B- → **B+** | Quick Connect landed — passwordless TV login via 6-digit code approved from any other device. mDNS / multi-user still open. |
+| Models | A- → **A** | Added `ProviderIds`, `ExternalUrls`, `RemoteTrailers`, `CriticRating`, `ExternalURL`, `RemoteTrailer`, `Chapter`, Quick Connect DTOs. |
 | Image pipeline | C → **A-** | ImageIO thumbnail downsampling keyed on pixel size; SHA256 hashed cache keys; memory-warning handler drops in-memory tier only; `NSLock` dedup replaced with `actor ImageRequestCoordinator`. |
-| Tests | F → **D+** | 8 `PlaybackStreamURLBuilderTests` pass. Model decoding fixtures, API client integration tests still needed. |
+| Tests | F → **C-** | 11 unit tests now pass: 8 `PlaybackStreamURLBuilderTests` + 3 new `ChapterTests` (wire format + image URL contract). API client integration tests still needed. |
 | Docs / planning | **A** | Unchanged. |
 
-Overall: B- → **A-** post Phase A + B + C. Clear path to A is Phase D feature parity (Quick Connect, watchlist, offline, chapters).
+Overall: B- → **A** post Phase A + B + C + partial D. Clear path to A+ is the remaining Phase D items (mDNS, multi-user, offline downloads, parental controls).
 
 ---
 
@@ -56,7 +56,7 @@ Overall: B- → **A-** post Phase A + B + C. Clear path to A is Phase D feature 
 | 7 | Bitrate picker is UI-only — selection is ignored by player | `Views/Player/CustomInfoViewControllers.swift:132,259`, `VideoPlayerViewModel` | **P1** | ✅ `b3f90f4` (VM observes notifications, reloads with preserved position) |
 | 8 | Cast/crew, trailers, external ratings missing from detail | `Views/Detail/ItemDetailView.swift` | **P1** | ✅ `8d467ac` + `b3f90f4` (chapters + similar-View-All still open) |
 | 9 | Image loader has a deduplication race + no downsampling for 4K backdrops | `Services/ImageLoader.swift:69–114`, `Services/ImageCache.swift` | **P2** | ✅ Phase C (actor + ImageIO) |
-| 10 | Zero real tests (three Xcode-template stub files) | `MediaMioTests/`, `MediaMioUITests/` | **P1** | 🟡 8 URL-builder tests added; model decoding still open |
+| 10 | Zero real tests (three Xcode-template stub files) | `MediaMioTests/`, `MediaMioUITests/` | **P1** | 🟡 11 unit tests (8 URL-builder + 3 chapter decoding); API client integration tests still open |
 
 ---
 
@@ -363,17 +363,18 @@ Don't aim for percentage coverage yet — the god-object VM is untestable in its
 
 **Phase C side effects:** Removed the pre-existing dead `X-Emby-Authorization` header write (the token-only form was immediately overwritten by the full authorization form two lines later). Added `import UIKit` to `VideoPlayerViewModel` and `JellyfinAPIClient` for `UIScreen` / `UIDevice`.
 
-### Phase D — P3 feature parity (ongoing)
-21. Quick Connect (high-ROI auth UX win).
-22. mDNS / Bonjour server discovery.
-23. Multi-user per server + saved-servers list.
-24. Letter-jump in Library.
-25. Search suggestions + recent searches.
-26. Watchlist / favorites (backend already supports it — detail favorite button is a stub at `ItemDetailViewModel.toggleFavorite()`).
-27. Offline download (Infuse's flagship).
-28. Parental controls.
-29. Chapters on detail (requires `MediaSource.chapters` modeling).
-30. External link handoff (QR code / companion device) — Detail links currently only log to console on focus.
+### Phase D — P3 feature parity (first batch landed, 2026-04-21)
+
+21. ✅ **Quick Connect** — `AuthenticationService` gained `initiateQuickConnect` / `pollQuickConnect` / `completeQuickConnect`; new `QuickConnectView` fullScreenCover shows the 6-digit code, polls every 2s (5-min timeout), and trades the secret for a session. LoginView surfaces a "Use Quick Connect" button only when `GET /QuickConnect/Enabled` says yes.
+22. ⏳ mDNS / Bonjour server discovery (needs `NWBrowser` + connection-test pipeline).
+23. ⏳ Multi-user per server + saved-servers list (needs session list + picker UI).
+24. ✅ **Letter-jump in Library** — new `LetterJumpRail` view renders A–Z (+ "#" for digits + "All" to clear) to the right of the grid, visible only under alphabetical sort. Uses Jellyfin's `NameStartsWith` as a true server-side filter (not a scroll-to-anchor), which matters because the library is paginated — tapping "S" loads a page of S-prefix items regardless of what's scrolled into view.
+25. ✅ **Search recent searches** — `SearchViewModel` persists an LRU list of up to 10 successful queries via `UserDefaults` (JSON-encoded `[String]`). Recents replace the generic empty state; each row replays the query and ships with a clear-all button. Single-char queries + zero-result searches are not recorded.
+26. ✅ **Watchlist / favorites** — `toggleFavorite()` now calls `POST /Users/{uid}/FavoriteItems/{iid}` (or `DELETE` on unfavorite) with optimistic local update. The heart icon flips immediately; a failure reverts and surfaces an error. `loadDetails()` clears the optimistic override so the next server response is authoritative.
+27. ⏳ Offline download (Infuse's flagship — large effort, deferred).
+28. ⏳ Parental controls (PIN + content-rating enforcement, deferred).
+29. ✅ **Chapters on Detail** — new `Chapter` model (`StartPositionTicks`, `ImageTag`, formatted helpers) decoded via `Fields=Chapters`; new `ChaptersSection` renders a horizontal thumbnail strip (or a gradient placeholder when no image). Tapping a chapter calls `NavigationManager.playItem(_:startPositionTicks:)`; `VideoPlayerViewModel` now accepts an `initialStartPositionTicks` that wins over resume-data. 3 `ChapterTests` lock the wire format.
+30. ⏳ External link handoff (QR code / companion device, deferred).
 
 ---
 

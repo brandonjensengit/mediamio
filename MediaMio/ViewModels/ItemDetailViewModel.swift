@@ -19,6 +19,13 @@ class ItemDetailViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
 
+    // Optimistic favorite state. `MediaItem` is a struct with `let` fields
+    // so we cannot mutate UserData.isFavorite in place. Instead, we shadow
+    // the server-decoded value until the next `loadDetails()` round-trips
+    // the fresh UserData. Nil = "no pending override, use the server value".
+    @Published private var isFavoriteOverride: Bool?
+    @Published var isFavoriteBusy: Bool = false
+
     private let apiClient: JellyfinAPIClient
     private let authService: AuthenticationService
     weak var navigationCoordinator: NavigationCoordinator?
@@ -71,6 +78,8 @@ class ItemDetailViewModel: ObservableObject {
             print("   - Has backdrop: \(details.imageTags?.backdrop != nil)")
 
             self.detailedItem = details
+            // Fresh UserData from server — discard any pending optimistic flip.
+            self.isFavoriteOverride = nil
 
             // Load seasons if this is a Series
             if details.type == "Series" {
@@ -140,6 +149,15 @@ class ItemDetailViewModel: ObservableObject {
         navigationManager?.playItem(episode)
     }
 
+    func playChapter(_ chapter: Chapter) {
+        print("📖 Play chapter '\(chapter.displayName)' at \(chapter.formattedStart)")
+        guard let navManager = navigationManager else {
+            errorMessage = "Cannot start playback (navigation not configured)"
+            return
+        }
+        navManager.playItem(displayItem, startPositionTicks: chapter.startPositionTicks)
+    }
+
     // MARK: - Actions
 
     func playItem() {
@@ -154,8 +172,38 @@ class ItemDetailViewModel: ObservableObject {
     }
 
     func toggleFavorite() {
-        print("❤️ Toggle favorite: \(item.name)")
-        // Will be implemented in future phase
+        Task { await toggleFavoriteAsync() }
+    }
+
+    private func toggleFavoriteAsync() async {
+        guard let userId = userId else {
+            errorMessage = "Not authenticated"
+            return
+        }
+        guard !isFavoriteBusy else { return }
+
+        let currentValue = isFavorite
+        let newValue = !currentValue
+
+        print("❤️ Toggle favorite: \(displayItem.name) → \(newValue)")
+
+        // Optimistic flip: the UI (heart icon + button label) re-renders now.
+        isFavoriteOverride = newValue
+        isFavoriteBusy = true
+        defer { isFavoriteBusy = false }
+
+        do {
+            let itemId = displayItem.id
+            _ = newValue
+                ? try await apiClient.markFavorite(userId: userId, itemId: itemId)
+                : try await apiClient.unmarkFavorite(userId: userId, itemId: itemId)
+            // Success — leave the override in place until next loadDetails()
+            // naturally refreshes the underlying UserData.
+        } catch {
+            print("❌ Favorite toggle failed: \(error)")
+            isFavoriteOverride = currentValue
+            errorMessage = "Couldn't update favorite: \(error.localizedDescription)"
+        }
     }
 
     func selectSimilarItem(_ item: MediaItem) {
@@ -201,7 +249,9 @@ class ItemDetailViewModel: ObservableObject {
     }
 
     var isFavorite: Bool {
-        displayItem.userData?.isFavorite ?? false
+        // Pending optimistic flip wins over the (stale) decoded server value.
+        if let override = isFavoriteOverride { return override }
+        return displayItem.userData?.isFavorite ?? false
     }
 
     var genresText: String? {

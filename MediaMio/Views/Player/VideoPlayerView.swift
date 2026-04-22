@@ -98,18 +98,21 @@ struct SimpleVideoPlayerRepresentable: UIViewControllerRepresentable {
 struct VideoPlayerView: View {
     let item: MediaItem
     let authService: AuthenticationService
+    let startPositionTicks: Int64?
     @EnvironmentObject var navigationManager: NavigationManager
     @StateObject private var viewModel: VideoPlayerViewModel
     @StateObject private var settingsManager = SettingsManager()
 
-    init(item: MediaItem, authService: AuthenticationService) {
+    init(item: MediaItem, authService: AuthenticationService, startPositionTicks: Int64? = nil) {
         self.item = item
         self.authService = authService
+        self.startPositionTicks = startPositionTicks
 
         // Initialize ViewModel
         _viewModel = StateObject(wrappedValue: VideoPlayerViewModel(
             item: item,
-            authService: authService
+            authService: authService,
+            initialStartPositionTicks: startPositionTicks
         ))
     }
 
@@ -283,7 +286,8 @@ struct ErrorPlayerView: View {
         criticRating: nil,
         providerIds: nil,
         externalUrls: nil,
-        remoteTrailers: nil
+        remoteTrailers: nil,
+        chapters: nil
     )
 
     VideoPlayerView(

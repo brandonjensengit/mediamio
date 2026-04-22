@@ -55,6 +55,17 @@ struct ItemDetailView: View {
                             criticRating: displayItem.criticRating
                         )
 
+                        // Chapters (movies only — series/episode chapters live
+                        // on the playback side, not worth showing on Detail)
+                        if displayItem.type != "Series" {
+                            ChaptersSection(
+                                item: displayItem,
+                                baseURL: viewModel.baseURL
+                            ) { chapter in
+                                viewModel.playChapter(chapter)
+                            }
+                        }
+
                         // Trailers
                         if let trailers = displayItem.remoteTrailers, !trailers.isEmpty {
                             TrailersSection(trailers: trailers)
@@ -588,7 +599,8 @@ struct EpisodeCard: View {
         criticRating: nil,
         providerIds: nil,
         externalUrls: nil,
-        remoteTrailers: nil
+        remoteTrailers: nil,
+        chapters: nil
     )
 
     let authService = AuthenticationService()
