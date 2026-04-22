@@ -12,11 +12,16 @@ import SwiftUI
 struct MediaMioApp: App {
     @StateObject private var authService: AuthenticationService
     @StateObject private var appEnv: AppEnvironment
+    @StateObject private var savedServers: SavedServersStore
     @StateObject private var appState = AppState()
 
     init() {
-        let auth = AuthenticationService()
+        // Shared store passed into AuthenticationService so both the auth
+        // flow and the server-entry picker observe the same instance.
+        let store = SavedServersStore()
+        let auth = AuthenticationService(savedServers: store)
         _authService = StateObject(wrappedValue: auth)
+        _savedServers = StateObject(wrappedValue: store)
         _appEnv = StateObject(wrappedValue: AppEnvironment(authService: auth))
     }
 
@@ -42,6 +47,7 @@ struct MediaMioApp: App {
         }
         .environmentObject(authService)
         .environmentObject(appEnv)
+        .environmentObject(savedServers)
         .environmentObject(appState)
     }
 }

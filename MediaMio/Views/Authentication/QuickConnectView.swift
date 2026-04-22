@@ -21,6 +21,16 @@ struct QuickConnectView: View {
 
     let serverURL: String
     let rememberMe: Bool
+    /// Human-readable name of the server, passed through to the saved-
+    /// servers store so the picker shows "My Jellyfin" instead of the raw
+    /// URL. Optional for back-compat with older preview callers.
+    let serverName: String?
+
+    init(serverURL: String, rememberMe: Bool, serverName: String? = nil) {
+        self.serverURL = serverURL
+        self.rememberMe = rememberMe
+        self.serverName = serverName
+    }
 
     @State private var state: FlowState = .initiating
     @State private var secret: String?
@@ -224,7 +234,8 @@ struct QuickConnectView: View {
             try await authService.completeQuickConnect(
                 serverURL: serverURL,
                 secret: secret,
-                rememberMe: rememberMe
+                rememberMe: rememberMe,
+                serverName: serverName
             )
             state = .succeeded
             // Give the checkmark a brief moment to register, then dismiss.

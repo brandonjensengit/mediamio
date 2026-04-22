@@ -15,10 +15,17 @@ class AuthenticationService: ObservableObject {
 
     private let apiClient: JellyfinAPIClient
     private let keychain = KeychainHelper.shared
+    let savedServers: SavedServersStore
 
-    init() {
+    init(savedServers: SavedServersStore = SavedServersStore()) {
+        self.savedServers = savedServers
+
         // Initialize API client
         self.apiClient = JellyfinAPIClient()
+
+        // Seed the saved-servers store from the legacy single-blob slot on
+        // first launch after the upgrade, so users don't get signed out.
+        savedServers.migrateLegacySingleBlobIfNeeded()
 
         // Try to restore session from keychain
         restoreSession()
@@ -52,7 +59,11 @@ class AuthenticationService: ObservableObject {
         isAuthenticated = true
     }
 
-    func saveSession(_ session: UserSession, rememberMe: Bool = true) throws {
+    func saveSession(
+        _ session: UserSession,
+        rememberMe: Bool = true,
+        serverName: String? = nil
+    ) throws {
         currentSession = session
         isAuthenticated = true
 
@@ -60,16 +71,36 @@ class AuthenticationService: ObservableObject {
         UserDefaults.standard.set(rememberMe, forKey: Constants.UserDefaultsKeys.rememberMe)
 
         if rememberMe {
-            // Save to keychain
+            // Save to keychain (legacy single-blob slot — kept so a downgrade
+            // of the app doesn't lose the current session)
             try keychain.saveCredentials(
                 serverURL: session.serverURL,
                 username: session.user.name,
                 accessToken: session.accessToken,
                 userId: session.user.id
             )
+
+            // And save to the saved-servers store — the source of truth for
+            // the multi-user picker. `serverName` comes from `ServerInfo`
+            // when available; otherwise we reuse the current server's saved
+            // name or fall back to the host.
+            let name = serverName
+                ?? savedServers.servers.first(where: { $0.url == session.serverURL })?.name
+                ?? URL(string: session.serverURL)?.host
+                ?? session.serverURL
+            savedServers.remember(
+                serverURL: session.serverURL,
+                serverName: name,
+                user: session.user,
+                accessToken: session.accessToken
+            )
         }
     }
 
+    /// Clear the active in-memory session but leave the saved-servers list
+    /// alone — matches the "sign out" UX where you drop back to the profile
+    /// picker and can tap yourself to sign in again. Use `forget` on the
+    /// store to actually purge a saved profile.
     func clearSession() {
         currentSession = nil
         isAuthenticated = false
@@ -98,7 +129,8 @@ class AuthenticationService: ObservableObject {
         serverURL: String,
         username: String,
         password: String,
-        rememberMe: Bool = true
+        rememberMe: Bool = true,
+        serverName: String? = nil
     ) async throws {
         // Configure API client with server URL
         apiClient.configure(baseURL: serverURL)
@@ -115,7 +147,7 @@ class AuthenticationService: ObservableObject {
         )
 
         // Save session
-        try saveSession(session, rememberMe: rememberMe)
+        try saveSession(session, rememberMe: rememberMe, serverName: serverName)
     }
 
     func logout() {
@@ -147,7 +179,8 @@ class AuthenticationService: ObservableObject {
     func completeQuickConnect(
         serverURL: String,
         secret: String,
-        rememberMe: Bool = true
+        rememberMe: Bool = true,
+        serverName: String? = nil
     ) async throws {
         apiClient.configure(baseURL: serverURL)
         let authResult = try await apiClient.authenticateWithQuickConnect(secret: secret)
@@ -158,7 +191,7 @@ class AuthenticationService: ObservableObject {
             serverURL: serverURL,
             serverId: authResult.serverId
         )
-        try saveSession(session, rememberMe: rememberMe)
+        try saveSession(session, rememberMe: rememberMe, serverName: serverName)
     }
 
     // MARK: - Validation

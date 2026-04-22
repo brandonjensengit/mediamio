@@ -72,6 +72,12 @@ enum Constants {
         static let usernameKey = "username"
         static let accessTokenKey = "accessToken"
         static let userIdKey = "userId"
+
+        /// Per-user token account-key prefix. Composite key format is
+        /// `"token:\(serverURL):\(userId)"`, which turns Keychain into a
+        /// sparse map from (server, user) → access token while keeping the
+        /// single-blob legacy keys above for back-compat restore.
+        static let perUserTokenPrefix = "token:"
     }
 
     // MARK: - UserDefaults
@@ -81,6 +87,7 @@ enum Constants {
         static let lastUsername = "lastUsername"
         static let deviceId = "deviceId"
         static let recentSearches = "recentSearches"
+        static let savedServers = "savedServers"
     }
 
     // MARK: - UI Constants

@@ -141,3 +141,33 @@ extension KeychainHelper {
         try? delete(for: Constants.Keychain.userIdKey)
     }
 }
+
+// MARK: - Per-user Tokens
+//
+// The single-blob `saveCredentials(...)` API above only remembers the most
+// recent (server, user, token). To support multi-user / saved-servers, the
+// new code path composes the account key from `(serverURL, userId)` and
+// stores one token per combination.
+//
+// Why a prefix + a list-scan? Keychain doesn't support wildcard queries on
+// custom account keys, so we store the list of (serverURL, userId) pairs
+// in UserDefaults (see `SavedServersStore`) and look up tokens by composed
+// key. Keychain remains the sole home for the secret.
+
+extension KeychainHelper {
+    private func tokenAccountKey(serverURL: String, userId: String) -> String {
+        "\(Constants.Keychain.perUserTokenPrefix)\(serverURL):\(userId)"
+    }
+
+    func saveToken(_ token: String, serverURL: String, userId: String) throws {
+        try save(token, for: tokenAccountKey(serverURL: serverURL, userId: userId))
+    }
+
+    func token(serverURL: String, userId: String) -> String? {
+        try? retrieveString(for: tokenAccountKey(serverURL: serverURL, userId: userId))
+    }
+
+    func deleteToken(serverURL: String, userId: String) {
+        try? delete(for: tokenAccountKey(serverURL: serverURL, userId: userId))
+    }
+}

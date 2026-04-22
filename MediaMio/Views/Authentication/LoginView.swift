@@ -158,7 +158,7 @@ struct LoginView: View {
             quickConnectAvailable = await authService.isQuickConnectAvailable(serverURL: serverURL)
         }
         .fullScreenCover(isPresented: $showQuickConnect) {
-            QuickConnectView(serverURL: serverURL, rememberMe: rememberMe)
+            QuickConnectView(serverURL: serverURL, rememberMe: rememberMe, serverName: serverName)
                 .environmentObject(authService)
         }
     }
@@ -182,7 +182,8 @@ struct LoginView: View {
                 serverURL: serverURL,
                 username: username,
                 password: password,
-                rememberMe: rememberMe
+                rememberMe: rememberMe,
+                serverName: serverName
             )
 
             // Save username for next time
