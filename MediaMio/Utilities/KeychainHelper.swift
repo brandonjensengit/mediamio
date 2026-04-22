@@ -16,7 +16,10 @@ enum KeychainError: Error {
 }
 
 class KeychainHelper {
-    static let shared = KeychainHelper()
+    // The underlying `SecItem*` APIs are thread-safe per Apple's Security
+    // framework docs, so the singleton can be referenced from any
+    // isolation domain — including as a default-argument expression.
+    nonisolated(unsafe) static let shared = KeychainHelper()
 
     private init() {}
 

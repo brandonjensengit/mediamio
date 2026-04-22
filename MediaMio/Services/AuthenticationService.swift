@@ -17,15 +17,20 @@ class AuthenticationService: ObservableObject {
     private let keychain = KeychainHelper.shared
     let savedServers: SavedServersStore
 
-    init(savedServers: SavedServersStore = SavedServersStore()) {
-        self.savedServers = savedServers
+    // Takes `SavedServersStore?` rather than a direct default so Swift 6's
+    // strict concurrency doesn't try to evaluate `SavedServersStore()` in
+    // the caller's nonisolated context. The nil fallback happens inside
+    // this init's MainActor-isolated body, which is always legal.
+    init(savedServers: SavedServersStore? = nil) {
+        let store = savedServers ?? SavedServersStore()
+        self.savedServers = store
 
         // Initialize API client
         self.apiClient = JellyfinAPIClient()
 
         // Seed the saved-servers store from the legacy single-blob slot on
         // first launch after the upgrade, so users don't get signed out.
-        savedServers.migrateLegacySingleBlobIfNeeded()
+        store.migrateLegacySingleBlobIfNeeded()
 
         // Try to restore session from keychain
         restoreSession()
