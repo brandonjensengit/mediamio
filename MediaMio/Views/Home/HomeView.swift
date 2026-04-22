@@ -321,19 +321,8 @@ struct HomeContentView: View {
                                 HeroBannerRotating(
                                     items: viewModel.featuredItems,
                                     baseURL: viewModel.baseURL,
-                                    onPlay: { item in
-                                        focusManager.pushFocusPosition()
-                                        viewModel.playItem(item)
-                                    },
-                                    onInfo: { item in
-                                        focusManager.pushFocusPosition()
-                                        viewModel.showItemDetails(item)
-                                    },
-                                    onFocusChange: { hasFocus in
-                                        if hasFocus {
-                                            focusManager.focusedOnHero()
-                                        }
-                                    }
+                                    onPlay: { viewModel.playItem($0) },
+                                    onInfo: { viewModel.showItemDetails($0) }
                                 )
                                 .id("hero")
                                 .focused($focusedField, equals: "hero")
@@ -342,14 +331,8 @@ struct HomeContentView: View {
                                 HeroBanner(
                                     item: featured,
                                     baseURL: viewModel.baseURL,
-                                    onPlay: {
-                                        focusManager.pushFocusPosition()
-                                        viewModel.playItem(featured)
-                                    },
-                                    onInfo: {
-                                        focusManager.pushFocusPosition()
-                                        viewModel.showItemDetails(featured)
-                                    }
+                                    onPlay: { viewModel.playItem(featured) },
+                                    onInfo: { viewModel.showItemDetails(featured) }
                                 )
                                 .id("hero")
                                 .focused($focusedField, equals: "hero")
@@ -366,14 +349,10 @@ struct HomeContentView: View {
                                         rowIndex: index,
                                         navigationManager: navigationManager,
                                         focusManager: focusManager,
-                                        onItemSelect: { item in
-                                            focusManager.pushFocusPosition()
-                                            viewModel.selectItem(item)
-                                        },
-                                        onSeeAll: isLibrarySection(section) ? {
-                                            focusManager.pushFocusPosition()
-                                            viewModel.showSeeAll(for: section)
-                                        } : nil
+                                        onItemSelect: { viewModel.selectItem($0) },
+                                        onSeeAll: isLibrarySection(section)
+                                            ? { viewModel.showSeeAll(for: section) }
+                                            : nil
                                     )
                                     .id("section-\(index)")
                                     .focused($focusedField, equals: "row-\(index)")
@@ -383,24 +362,17 @@ struct HomeContentView: View {
                             .padding(.bottom, 60)
                         }
                         .onAppear {
-                            // Only scroll to top once on initial load
-                            guard !hasSetInitialScroll else {
-                                print("📍 HomeView: Already scrolled to top, skipping")
-                                return
-                            }
-                            print("📍 HomeView: VStack appeared, forcing scroll to top")
+                            // Scroll to the hero once on initial appearance.
+                            // The previous implementation fired six `scrollTo`
+                            // calls on a 0.1s–1.8s ramp to "fight the focus
+                            // system" while three parallel focus trackers
+                            // raced. With FocusManager demoted and
+                            // FocusGuideViewController gone, a single
+                            // deterministic scroll is enough — the focus
+                            // engine then takes over and lands on the hero.
+                            guard !hasSetInitialScroll else { return }
                             hasSetInitialScroll = true
-
-                            // Fight the focus system with multiple scroll attempts
-                            // tvOS focus scrolls asynchronously, so we need to be persistent
-                            for delay in [0.1, 0.3, 0.5, 0.8, 1.2, 1.8] {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                                    proxy.scrollTo("top", anchor: .top)
-                                    if delay == 1.8 {
-                                        print("✅ HomeView: Final scroll to top complete")
-                                    }
-                                }
-                            }
+                            proxy.scrollTo("top", anchor: .top)
                         }
                     }
                 }

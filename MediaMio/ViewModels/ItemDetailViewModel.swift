@@ -143,13 +143,14 @@ class ItemDetailViewModel: ObservableObject {
     // MARK: - Actions
 
     func playItem() {
-        print("▶️ Play: \(item.name)")
+        print("▶️ Play: \(displayItem.name)")
 
-        // Use NavigationManager if available (new tab-based navigation)
-        if let navManager = navigationManager {
-            navManager.playItem(displayItem)
+        guard let navManager = navigationManager else {
+            print("❌ playItem failed: NavigationManager is nil — Play button is unwired")
+            errorMessage = "Cannot start playback (navigation not configured)"
+            return
         }
-        // Will be fully implemented in Phase 5 (Video Player)
+        navManager.playItem(displayItem)
     }
 
     func toggleFavorite() {

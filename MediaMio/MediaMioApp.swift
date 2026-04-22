@@ -19,7 +19,7 @@ struct MediaMioApp: App {
                 // Main app loads in background
                 Group {
                     if authService.isAuthenticated {
-                        MainTabView()
+                        MainTabView(authService: authService, appState: appState)
                     } else {
                         ServerEntryView()
                     }

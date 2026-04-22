@@ -4,39 +4,69 @@
 //
 //  Created by Claude Code
 //  Phase 1: Core Navigation Structure
+//  Phase A refactor: hoist tab view-models so they survive tab switches.
 //
 
 import SwiftUI
 
+/// Top-level tab container.
+///
+/// All shared services and per-tab view models live here as `@StateObject`s so
+/// that switching tabs (or briefly destroying inner tab views) cannot lose
+/// scroll, focus, or in-flight load state. The previous implementation
+/// re-built each VM lazily inside its tab via `@State viewModel: VM?`, which
+/// reset to `nil` whenever the tab subview was torn down.
 struct MainTabView: View {
-    @EnvironmentObject var authService: AuthenticationService
-    @EnvironmentObject var appState: AppState
     @StateObject private var navigationManager = NavigationManager()
+    @StateObject private var contentService: ContentService
+    @StateObject private var homeViewModel: HomeViewModel
+    @StateObject private var searchViewModel: SearchViewModel
+    @StateObject private var libraryCoordinator = NavigationCoordinator()
+
+    private let authService: AuthenticationService
+
+    init(authService: AuthenticationService, appState: AppState) {
+        self.authService = authService
+
+        let apiClient = JellyfinAPIClient()
+        if let session = authService.currentSession {
+            apiClient.baseURL = session.serverURL
+            apiClient.accessToken = session.accessToken
+        }
+        let cs = ContentService(apiClient: apiClient, authService: authService)
+        _contentService = StateObject(wrappedValue: cs)
+        _homeViewModel = StateObject(wrappedValue: HomeViewModel(
+            contentService: cs,
+            authService: authService,
+            navigationManager: nil,
+            appState: appState
+        ))
+        _searchViewModel = StateObject(wrappedValue: SearchViewModel(
+            contentService: cs,
+            authService: authService
+        ))
+    }
 
     var body: some View {
         TabView(selection: $navigationManager.selectedTab) {
-            // Home Tab
-            HomeTabView()
+            HomeTabView(viewModel: homeViewModel)
                 .tabItem {
                     Label(Tab.home.title, systemImage: Tab.home.icon)
                 }
                 .tag(Tab.home)
 
-            // Search Tab
-            SearchTabView()
+            SearchTabView(viewModel: searchViewModel)
                 .tabItem {
                     Label(Tab.search.title, systemImage: Tab.search.icon)
                 }
                 .tag(Tab.search)
 
-            // Library Tab
-            LibraryTabViewWrapper()
+            LibraryTabViewWrapper(contentService: contentService, coordinator: libraryCoordinator)
                 .tabItem {
                     Label(Tab.library.title, systemImage: Tab.library.icon)
                 }
                 .tag(Tab.library)
 
-            // Settings Tab
             SettingsTabView()
                 .tabItem {
                     Label(Tab.settings.title, systemImage: Tab.settings.icon)
@@ -46,6 +76,12 @@ struct MainTabView: View {
         .environmentObject(navigationManager)
         .accentColor(Color(hex: "667eea")) // MediaMio brand color
         .preferredColorScheme(.dark)
+        .onAppear {
+            // Wire navigationManager into VMs that need it. Done here (not in
+            // init) because both objects are @StateObjects on this view and
+            // can't reference each other at init time.
+            homeViewModel.navigationManager = navigationManager
+        }
         // Present detail view as sheet
         .sheet(item: $navigationManager.presentedItem) { item in
             ItemDetailSheetWrapper(item: item)
@@ -65,123 +101,58 @@ struct MainTabView: View {
 // MARK: - Home Tab Wrapper
 
 struct HomeTabView: View {
-    @EnvironmentObject var authService: AuthenticationService
-    @EnvironmentObject var appState: AppState
+    @ObservedObject var viewModel: HomeViewModel
     @EnvironmentObject var navigationManager: NavigationManager
-    @State private var viewModel: HomeViewModel?
 
     var body: some View {
         NavigationStack {
-            if let vm = viewModel {
-                HomeContentView(
-                    viewModel: vm,
-                    isSidebarVisible: .constant(false),
-                    navigationManager: navigationManager
-                )
-                .navigationBarHidden(true)
-            } else {
-                Color.black.ignoresSafeArea()
-                    .onAppear {
-                        initializeViewModel()
-                    }
-            }
+            HomeContentView(
+                viewModel: viewModel,
+                isSidebarVisible: .constant(false),
+                navigationManager: navigationManager
+            )
+            .navigationBarHidden(true)
         }
-    }
-
-    private func initializeViewModel() {
-        guard viewModel == nil, let session = authService.currentSession else { return }
-
-        let apiClient = JellyfinAPIClient()
-        apiClient.baseURL = session.serverURL
-        apiClient.accessToken = session.accessToken
-        let contentService = ContentService(apiClient: apiClient, authService: authService)
-
-        viewModel = HomeViewModel(
-            contentService: contentService,
-            authService: authService,
-            navigationCoordinator: nil,
-            navigationManager: navigationManager,
-            appState: appState
-        )
     }
 }
 
 // MARK: - Search Tab Wrapper
 
 struct SearchTabView: View {
+    @ObservedObject var viewModel: SearchViewModel
     @EnvironmentObject var authService: AuthenticationService
     @EnvironmentObject var navigationManager: NavigationManager
     @StateObject private var coordinator = NavigationCoordinator()
-    @State private var viewModel: SearchViewModel?
 
     var body: some View {
         NavigationStack {
-            if let vm = viewModel {
-                SearchView(
-                    viewModel: vm,
-                    authService: authService,
-                    coordinator: coordinator,
-                    navigationManager: navigationManager
-                )
-                .navigationBarHidden(true)
-            } else {
-                Color.black.ignoresSafeArea()
-                    .onAppear {
-                        initializeViewModel()
-                    }
-            }
+            SearchView(
+                viewModel: viewModel,
+                authService: authService,
+                coordinator: coordinator,
+                navigationManager: navigationManager
+            )
+            .navigationBarHidden(true)
         }
-    }
-
-    private func initializeViewModel() {
-        guard viewModel == nil, let session = authService.currentSession else { return }
-
-        let apiClient = JellyfinAPIClient()
-        apiClient.baseURL = session.serverURL
-        apiClient.accessToken = session.accessToken
-        let contentService = ContentService(apiClient: apiClient, authService: authService)
-
-        viewModel = SearchViewModel(
-            contentService: contentService,
-            authService: authService,
-            navigationCoordinator: coordinator
-        )
     }
 }
 
 // MARK: - Library Tab Wrapper
 
 struct LibraryTabViewWrapper: View {
+    @ObservedObject var contentService: ContentService
+    @ObservedObject var coordinator: NavigationCoordinator
     @EnvironmentObject var authService: AuthenticationService
-    @EnvironmentObject var navigationManager: NavigationManager
-    @StateObject private var coordinator = NavigationCoordinator()
-    @State private var contentService: ContentService?
 
     var body: some View {
         NavigationStack {
-            if let service = contentService {
-                LibraryTabView(
-                    contentService: service,
-                    authService: authService,
-                    navigationCoordinator: coordinator
-                )
-                .navigationBarHidden(true)
-            } else {
-                Color.black.ignoresSafeArea()
-                    .onAppear {
-                        initializeServices()
-                    }
-            }
+            LibraryTabView(
+                contentService: contentService,
+                authService: authService,
+                navigationCoordinator: coordinator
+            )
+            .navigationBarHidden(true)
         }
-    }
-
-    private func initializeServices() {
-        guard contentService == nil, let session = authService.currentSession else { return }
-
-        let apiClient = JellyfinAPIClient()
-        apiClient.baseURL = session.serverURL
-        apiClient.accessToken = session.accessToken
-        contentService = ContentService(apiClient: apiClient, authService: authService)
     }
 }
 
@@ -269,11 +240,4 @@ extension Color {
             opacity: Double(a) / 255
         )
     }
-}
-
-// MARK: - Preview
-
-#Preview {
-    MainTabView()
-        .environmentObject(AuthenticationService())
 }

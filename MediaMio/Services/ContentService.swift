@@ -30,37 +30,53 @@ class ContentService: ObservableObject {
 
     // MARK: - Home Screen Content
 
-    /// Load all sections for the home screen
+    /// Load all sections for the home screen.
+    ///
+    /// Continue Watching, Recently Added, and the libraries list are fetched in parallel.
+    /// Once libraries arrive, each library's first-page fetch also runs in parallel.
+    /// The returned section order is stable: Continue Watching, Recently Added, then libraries
+    /// in server order.
     func loadHomeContent() async throws -> [ContentSection] {
-        guard let userId = userId else {
+        guard userId != nil else {
             throw APIError.authenticationFailed
         }
 
-        var sections: [ContentSection] = []
+        async let continueWatchingTask = try? await loadContinueWatching()
+        async let recentlyAddedTask = try? await loadRecentlyAdded()
+        async let librariesTask = try await getLibraries()
 
-        // Load continue watching
-        if let continueWatching = try? await loadContinueWatching(),
-           !continueWatching.items.isEmpty {
-            sections.append(continueWatching)
-        }
+        let continueWatching = await continueWatchingTask
+        let recentlyAdded = await recentlyAddedTask
+        let libraries = try await librariesTask
 
-        // Load recently added
-        if let recentlyAdded = try? await loadRecentlyAdded(),
-           !recentlyAdded.items.isEmpty {
-            sections.append(recentlyAdded)
-        }
+        let homeLibraries = libraries.filter { $0.isMovieLibrary || $0.isTVLibrary }
 
-        // Load library sections
-        let libraries = try await apiClient.getLibraries(userId: userId)
-        for library in libraries.items {
-            // Only show movie and TV libraries on home screen
-            if library.isMovieLibrary || library.isTVLibrary {
-                if let librarySection = try? await loadLibrarySection(library: library) {
-                    sections.append(librarySection)
+        // Fan out per-library section loads in parallel, preserving server order.
+        let librarySections: [ContentSection] = await withTaskGroup(of: (Int, ContentSection?).self) { group in
+            for (index, library) in homeLibraries.enumerated() {
+                group.addTask { [weak self] in
+                    guard let self = self else { return (index, nil) }
+                    let section = try? await self.loadLibrarySection(library: library)
+                    return (index, section)
                 }
             }
+            var indexed: [(Int, ContentSection)] = []
+            for await (index, section) in group {
+                if let section = section {
+                    indexed.append((index, section))
+                }
+            }
+            return indexed.sorted { $0.0 < $1.0 }.map { $0.1 }
         }
 
+        var sections: [ContentSection] = []
+        if let cw = continueWatching, !cw.items.isEmpty {
+            sections.append(cw)
+        }
+        if let ra = recentlyAdded, !ra.items.isEmpty {
+            sections.append(ra)
+        }
+        sections.append(contentsOf: librarySections)
         return sections
     }
 
