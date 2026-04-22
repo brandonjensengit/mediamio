@@ -2,7 +2,8 @@
 
 > Senior tvOS engineer + streaming-platform architect perspective
 > Comparing against Netflix, Apple TV+, Disney+, Swiftfin, Infuse, Plex
-> Reviewed: `main` branch, 68 Swift files, 13,857 lines
+> Originally reviewed: `main` branch, 68 Swift files, 13,857 lines
+> **Status (2026-04-21):** Phases A + B landed on `main` (commits `f66c168`, `8d467ac`, `b3f90f4`, `8f78f5d`). Phases C + D not yet started.
 
 ---
 
@@ -10,51 +11,51 @@
 
 The app is **well-layered and buildable** — clean MVVM split, centralized services, Keychain auth, a sensible Jellyfin wire model, and thoughtful codec decision logic. You are *much* closer to shippable than most first-time tvOS apps.
 
-The gap to "Netflix-class" is **not** architectural rewrite territory — it's three concrete things:
+The gap to "Netflix-class" was **not** architectural rewrite territory — it was three concrete things, two of which are now done:
 
-1. **VideoPlayerViewModel at 1,830 lines is a god-object** that must be decomposed before you add any more features (DRM, adaptive bitrate, PiP, AirPlay).
-2. **The focus system is the #1 user-visible problem**: you have parallel focus tracking (SwiftUI `@FocusState` + your own `FocusManager` + a `UIFocusGuide` bridge) that are not synchronized. This causes the brute-force `scrollTo` loops, lost focus after detail dismissal, and tab-state reset. This is fixable without rewriting views.
-3. **Feature parity gaps with top clients** (cast/crew, trailers, watchlist, quick-connect, server discovery, offline, letter-jump library) — these are mostly server-driven additions, not app-architecture changes.
+1. ~~**VideoPlayerViewModel at 1,830 lines is a god-object.**~~ ✅ Decomposed to a 577-line orchestrator + 5 services in `Services/Playback/`. 8 URL-builder unit tests.
+2. ~~**Three parallel focus systems.**~~ ✅ `FocusGuideViewController` deleted; `FocusManager` demoted to a 57-line last-focus memo. `@FocusState` is now the sole source of truth.
+3. **Feature parity gaps** — Phase B closed cast/crew, trailers, external links, outro skip, MPNowPlayingInfoCenter, mid-playback bitrate reload, and AppEnvironment DI. **Remaining Phase D items:** Quick Connect, mDNS, multi-user, letter-jump, watchlist, offline, parental controls, chapters.
 
-No security or data-loss ship-blockers. Two real medium-severity bugs (image-loader race, keychain silent delete). Tests are effectively zero.
-
-Ship-blocking priority: **P0 player decomposition → P0 focus consolidation → P1 feature gaps → P2 polish**.
+Ship-blocking priority: ~~P0 player decomposition~~ ✅ → ~~P0 focus consolidation~~ ✅ → ~~P1 feature gaps~~ ✅ (mostly) → **P2 polish (next)** → P3 feature parity.
 
 ---
 
 ## Scorecard
 
+Before each letter is the original review grade; after the arrow is the current state post Phase A + B.
+
 | Area | Grade | Notes |
 |------|-------|-------|
-| Layering / MVVM | **B+** | Clean split, some view bloat, wrapper factory duplication |
-| Services & API client | **B** | Good structure, missing retries/backoff/pagination/cancellation |
-| Video player | **C** | Works, but god-object, hidden control flow, no bitrate switching |
-| Focus & navigation | **C** | Ambitious, but three parallel systems fighting each other |
-| Feature completeness | **C** | Good scaffold; missing ~40% of what Netflix/Infuse users expect |
-| Settings | **B** | Well-organized, but no device mgmt / parental controls / offline |
-| Auth | **B-** | Keychain used correctly for token; no Quick Connect / mDNS / multi-user |
-| Models | **A-** | Clean Codable, good `MediaStream` / `MediaSource` handling |
-| Tests | **F** | Three stub files, zero real assertions |
-| Docs / planning | **A** | 28 markdown planning files — almost overkill |
+| Layering / MVVM | B+ → **A-** | `AppEnvironment` DI container eliminates wrapper-factory duplication; MVVM split stayed clean. |
+| Services & API client | **B** | Unchanged — retries / backoff / pagination / cancellation still open (Phase C). |
+| Video player | C → **B+** | God-object decomposed; `PlaybackFailoverController`, `NowPlayingPublisher`, mid-playback bitrate reload, outro skip. DRM / PiP still open. |
+| Focus & navigation | C → **B+** | Single source of truth (`@FocusState`); brute-force `scrollTo` loops gone; tab VMs hoisted so tab switches preserve state. |
+| Feature completeness | C → **B** | Detail: cast/crew, trailers, external links, community + critic ratings, outro skip. Watchlist / offline / chapters / letter-jump still open. |
+| Settings | **B** | Unchanged. Added `showSkipCreditsButton` toggle. |
+| Auth | **B-** | Unchanged — Quick Connect / mDNS / multi-user still open (Phase D). |
+| Models | A- → **A** | Added `ProviderIds`, `ExternalUrls`, `RemoteTrailers`, `CriticRating`, `ExternalURL`, `RemoteTrailer`. |
+| Tests | F → **D+** | 8 `PlaybackStreamURLBuilderTests` pass. Model decoding fixtures, API client integration tests still needed. |
+| Docs / planning | **A** | Unchanged. |
 
-Overall: **B-** with clear path to B+/A-.
+Overall: B- → **B+** post Phase A + B. Clear path to A- is Phase C polish + Phase D feature parity.
 
 ---
 
 ## Top 10 findings (ranked by user-facing impact)
 
-| # | Finding | Files | Priority |
-|---|---------|-------|----------|
-| 1 | `VideoPlayerViewModel` is 1,830 lines — 6 concerns bolted together | `ViewModels/VideoPlayerViewModel.swift` | **P0** |
-| 2 | Three parallel focus systems (`@FocusState` + `FocusManager` + `UIFocusGuide`) drift out of sync | `Navigation/FocusManager.swift`, `Navigation/FocusGuideViewController.swift`, feature views | **P0** |
-| 3 | Tab switching tears down view trees and loses scroll/focus position | `Navigation/MainTabView.swift:17` | **P0** |
-| 4 | Home screen loads sections **sequentially**, not in parallel | `Services/ContentService.swift:34–65` | **P0** |
-| 5 | No retry/backoff on transient network errors | `Services/JellyfinAPIClient.swift:31–34, 166–185` | **P1** |
-| 6 | Play button on detail is a stub (`"will be implemented in Phase 5"`) | `ViewModels/ItemDetailViewModel.swift:150–152` | **P1** |
-| 7 | Bitrate picker is UI-only — selection is ignored by player | `Views/Player/CustomInfoViewControllers.swift:132,259`, `VideoPlayerViewModel` | **P1** |
-| 8 | Cast/crew, trailers, similar-items-View-All, external ratings missing from detail | `Views/Detail/ItemDetailView.swift` | **P1** |
-| 9 | Image loader has a deduplication race + no downsampling for 4K backdrops | `Services/ImageLoader.swift:69–114`, `Services/ImageCache.swift` | **P2** |
-| 10 | Zero real tests (three Xcode-template stub files) | `MediaMioTests/`, `MediaMioUITests/` | **P1** |
+| # | Finding | Files | Priority | Status |
+|---|---------|-------|----------|--------|
+| 1 | `VideoPlayerViewModel` is 1,830 lines — 6 concerns bolted together | `ViewModels/VideoPlayerViewModel.swift` | **P0** | ✅ `f66c168` (577 lines, 5 services extracted) |
+| 2 | Three parallel focus systems drift out of sync | `Navigation/FocusManager.swift`, `Navigation/FocusGuideViewController.swift` | **P0** | ✅ `f66c168` (guide deleted, manager demoted) |
+| 3 | Tab switching tears down view trees and loses scroll/focus position | `Navigation/MainTabView.swift` | **P0** | ✅ `f66c168` (VMs hoisted to MainTabView) |
+| 4 | Home screen loads sections **sequentially**, not in parallel | `Services/ContentService.swift` | **P0** | ✅ `f66c168` (`async let` + `TaskGroup`) |
+| 5 | No retry/backoff on transient network errors | `Services/JellyfinAPIClient.swift:31–34, 166–185` | **P1** | ⏳ Phase C |
+| 6 | Play button on detail is a stub | `ViewModels/ItemDetailViewModel.swift:150–152` | **P1** | ✅ `f66c168` |
+| 7 | Bitrate picker is UI-only — selection is ignored by player | `Views/Player/CustomInfoViewControllers.swift:132,259`, `VideoPlayerViewModel` | **P1** | ✅ `b3f90f4` (VM observes notifications, reloads with preserved position) |
+| 8 | Cast/crew, trailers, external ratings missing from detail | `Views/Detail/ItemDetailView.swift` | **P1** | ✅ `8d467ac` + `b3f90f4` (chapters + similar-View-All still open) |
+| 9 | Image loader has a deduplication race + no downsampling for 4K backdrops | `Services/ImageLoader.swift:69–114`, `Services/ImageCache.swift` | **P2** | ⏳ Phase C |
+| 10 | Zero real tests (three Xcode-template stub files) | `MediaMioTests/`, `MediaMioUITests/` | **P1** | 🟡 8 URL-builder tests added; model decoding still open |
 
 ---
 
@@ -333,40 +334,43 @@ Don't aim for percentage coverage yet — the god-object VM is untestable in its
 
 ## Prioritized remediation plan
 
-### Phase A — P0 blockers (1 week)
-1. **Decompose `VideoPlayerViewModel`** into 5 services + thin orchestrator. No behavior changes. Add unit tests on `PlaybackStreamURLBuilder` as you extract it.
-2. **Consolidate focus**. Delete `FocusGuideViewController`. Demote `FocusManager` to a last-focus memo only. Rip out the `scrollTo` loops in `HomeView:393–403`.
-3. **Fix tab-state preservation.** Hoist tab VMs to `MainTabView`-level `@StateObject`s so they survive tab switch.
-4. **Parallelize home section loads.**
-5. **Implement the Play button on Detail.** (This is the most embarrassing bug.)
+### Phase A — P0 blockers ✅ DONE (`f66c168`)
+1. ✅ **Decompose `VideoPlayerViewModel`** — 1,830 → 577 lines; 5 services extracted to `Services/Playback/` (`PlaybackStreamURLBuilder`, `PlaybackSessionReporter`, `SubtitleTrackManager`, `IntroCreditsController`, `PlaybackFailoverController`). 8 unit tests on the URL builder.
+2. ✅ **Consolidate focus** — `FocusGuideViewController.swift` deleted; `FocusManager` demoted from 180→57 lines to a last-focus memo. Brute-force `scrollTo` ramp in `HomeView` replaced with a single deterministic `scrollTo("top")`.
+3. ✅ **Tab-state preservation** — `MainTabView` now owns per-tab VMs as `@StateObject` so they survive tab switches.
+4. ✅ **Parallelize home section loads** — `ContentService.loadHomeContent` uses `async let` + `TaskGroup` with stable server-order output.
+5. ✅ **Play button on Detail** — `ItemDetailViewModel.playItem()` now calls `navManager.playItem(displayItem)` with explicit error when unwired (previously a print stub).
 
-### Phase B — P1 feature gaps (1–2 weeks)
-6. Add cast/crew, trailers, chapters, external ratings to detail.
-7. Fix bitrate picker (restart player with new URL on change, Infuse-style) or remove it.
-8. Add intro *and* outro skip (`IntroCreditsController` once extracted).
-9. Add `MPNowPlayingInfoCenter` metadata + artwork.
-10. Build `AppEnvironment` DI container, remove three `*Wrapper` factories.
-11. Shared `Pagination` and `EmptyState` components.
-12. Seed unit tests on URL builder + model decoding.
+### Phase B — P1 feature gaps ✅ DONE (`8d467ac`, `b3f90f4`, `8f78f5d`)
+6. ✅ **Cast/crew, trailers, external ratings** — three new sections in `Views/Detail/`: `CastCrewSection`, `TrailersSection`, `ExternalLinksSection`. `MediaItem` gained `ProviderIds`, `ExternalUrls`, `RemoteTrailers`, `CriticRating`. *Chapters deferred — needs further `MediaSource.chapters` modeling.*
+7. ✅ **Bitrate picker fixed** — VM now observes `ReloadVideoWithNewBitrate` and `ReloadVideoWithNewAudioQuality` notifications and calls `reloadWithCurrentSettings()`, which tears down the active AVPlayer, rebuilds via `PlaybackStreamURLBuilder`, and preserves the pre-change position via `pendingSeekOnReload`.
+8. ✅ **Intro AND outro skip** — `IntroCreditsController` now parses `CreditsStart`/`CreditsEnd` from the same endpoint; `SkipMarkerOverlay` on `VideoPlayerView` renders both buttons bottom-right with focus. Filled the pre-existing gap where `showSkipIntroButton` was published but had no UI.
+9. ✅ **`MPNowPlayingInfoCenter`** — new `NowPlayingPublisher` service publishes title/series/genre/year/artwork + playback position; wires `MPRemoteCommandCenter` play/pause/skip±10/seek. Cleared on cleanup.
+10. ✅ **`AppEnvironment` DI container** — new `MediaMio/AppEnvironment.swift` holds `apiClient`, `contentService`, `authService` with a Combine subscription keeping `apiClient.baseURL`/`accessToken` in sync with `authService.currentSession`. Eliminated ~35 lines of duplicated `JellyfinAPIClient()` + field-copy boilerplate across `MainTabView`, `ItemDetailSheetWrapper`, and the three `*Wrapper` factories.
+11. ⏳ **Shared `Pagination` and `EmptyState` components** — review finding #4 still open (`LibraryViewModel`/`SearchViewModel` have identical pagination logic; 5 empty-state views look similar but aren't the same component).
+12. ⏳ **Unit tests on model decoding** — URL builder has 8 tests; `MediaItem`/`ItemsResponse` decoding fixtures not yet added.
 
-### Phase C — P2 polish (1 week)
+### Phase C — P2 polish (1 week, not started)
 13. Retry/backoff on transient errors.
-14. Image downsampling via `ImageIO`.
+14. Image downsampling via `ImageIO`. *(Warnings in `ImageLoader.swift` about `NSLock` in async context are related — review suggested `actor ImageRequestCoordinator` rewrite.)*
 15. Memory-warning response in `ImageCache`.
 16. Replace device ID with `identifierForVendor`.
 17. Skeleton loaders during initial load.
 18. Hero backdrop prefetch.
 19. Delete `ContentView.swift` (Hello World template).
+20. `preferredMaximumResolution` on `AVURLAsset` for non-4K displays. *(Surfaced during Phase A but deferred — one-line add.)*
 
 ### Phase D — P3 feature parity (ongoing)
-20. Quick Connect (high-ROI auth UX win).
-21. mDNS / Bonjour server discovery.
-22. Multi-user per server + saved-servers list.
-23. Letter-jump in Library.
-24. Search suggestions + recent searches.
-25. Watchlist / favorites (backend already supports it — detail favorite button is a stub).
-26. Offline download (Infuse's flagship).
-27. Parental controls.
+21. Quick Connect (high-ROI auth UX win).
+22. mDNS / Bonjour server discovery.
+23. Multi-user per server + saved-servers list.
+24. Letter-jump in Library.
+25. Search suggestions + recent searches.
+26. Watchlist / favorites (backend already supports it — detail favorite button is a stub at `ItemDetailViewModel.toggleFavorite()`).
+27. Offline download (Infuse's flagship).
+28. Parental controls.
+29. Chapters on detail (requires `MediaSource.chapters` modeling).
+30. External link handoff (QR code / companion device) — Detail links currently only log to console on focus.
 
 ---
 
