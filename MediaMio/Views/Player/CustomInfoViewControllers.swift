@@ -263,3 +263,107 @@ extension AudioQualitySelectionViewController: UITableViewDelegate, UITableViewD
         return "Select audio quality. Changes will apply to next video."
     }
 }
+
+// MARK: - Playback Info View Controller
+
+/// Read-only Netflix/Infuse-style "Playback Info" pane presented as the
+/// third tab inside AVPlayerViewController's info panel (slide-down on
+/// the remote during playback). Sections: General / Video / Audio /
+/// Subtitle. The value-rendering lives in `PlaybackInfoBuilder` so this
+/// view controller is just a renderer — refresh by assigning a new
+/// `PlaybackInfo` via `update(info:)`, which re-reads the table.
+///
+/// Why UIKit instead of SwiftUI: AVPlayerViewController.customInfoViewControllers
+/// demands UIViewControllers, and the two sibling selection VCs are UIKit,
+/// so matching their pattern keeps the player info panel consistent.
+class PlaybackInfoViewController: UIViewController, AVPlayerViewControllerDelegate {
+
+    private let tableView = UITableView(frame: .zero, style: .grouped)
+    private var info: PlaybackInfo
+
+    init(info: PlaybackInfo) {
+        self.info = info
+        super.init(nibName: nil, bundle: nil)
+        preferredContentSize = CGSize(width: 700, height: 600)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+
+        title = "Playback Info"
+        view.backgroundColor = .clear
+
+        tableView.delegate = self
+        tableView.dataSource = self
+        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "PlaybackInfoCell")
+        tableView.backgroundColor = .clear
+        tableView.allowsSelection = false
+        tableView.allowsFocus = false  // cells are read-only, no need to focus each row
+
+        view.addSubview(tableView)
+        tableView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            tableView.topAnchor.constraint(equalTo: view.topAnchor),
+            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+        ])
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        tableView.reloadData()  // picks up any mid-playback mode flips
+    }
+
+    /// Push fresh info into the pane. Called by the player when the
+    /// PlaybackMode flips (e.g. failover to transcode) or on bitrate
+    /// reload. Safe to call even when the view isn't loaded yet.
+    func update(info: PlaybackInfo) {
+        self.info = info
+        if isViewLoaded {
+            tableView.reloadData()
+        }
+    }
+}
+
+// MARK: - UITableView Delegate & DataSource
+
+extension PlaybackInfoViewController: UITableViewDelegate, UITableViewDataSource {
+
+    func numberOfSections(in tableView: UITableView) -> Int {
+        return info.sections.count
+    }
+
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        return info.sections[section].rows.count
+    }
+
+    func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
+        return info.sections[section].title
+    }
+
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        // `.value1` = left-aligned label + right-aligned detail. Matches
+        // Infuse / iOS Settings-style info panels; no manual layout needed.
+        let cell = UITableViewCell(style: .value1, reuseIdentifier: "PlaybackInfoCell")
+        let row = info.sections[indexPath.section].rows[indexPath.row]
+
+        cell.textLabel?.text = row.label
+        cell.textLabel?.textColor = .white
+        cell.textLabel?.font = UIFont.systemFont(ofSize: 26, weight: .regular)
+
+        cell.detailTextLabel?.text = row.value
+        cell.detailTextLabel?.textColor = UIColor(white: 1.0, alpha: 0.7)
+        cell.detailTextLabel?.font = UIFont.systemFont(ofSize: 26, weight: .medium)
+
+        cell.backgroundColor = .clear
+        cell.contentView.backgroundColor = .clear
+        cell.selectionStyle = .none
+
+        return cell
+    }
+}

@@ -358,6 +358,7 @@ struct MediaStream: Codable, Hashable {
     let index: Int?  // Stream index (used for SubtitleStreamIndex)
     let type: String?  // "Video", "Audio", "Subtitle"
     let codec: String?
+    let profile: String?  // "High", "Main 10" — codec profile (video)
     let width: Int?
     let height: Int?
     let bitRate: Int?
@@ -366,11 +367,19 @@ struct MediaStream: Codable, Hashable {
     let title: String?  // Title metadata
     let isExternal: Bool?  // True if subtitle file is external (SRT, etc)
     let isDefault: Bool?  // True if this is the default stream
+    // Audio-specific
+    let channels: Int?  // Channel count (2, 6, 8)
+    let channelLayout: String?  // "stereo", "5.1", "7.1"
+    let sampleRate: Int?  // Audio sample rate in Hz
+    // Video-specific — HDR / color range
+    let videoRange: String?  // "SDR" | "HDR" (legacy Jellyfin field)
+    let videoRangeType: String?  // "SDR" | "HDR10" | "HDR10Plus" | "DOVI" | "DOVIWithHDR10"
 
     enum CodingKeys: String, CodingKey {
         case index = "Index"
         case type = "Type"
         case codec = "Codec"
+        case profile = "Profile"
         case width = "Width"
         case height = "Height"
         case bitRate = "BitRate"
@@ -379,6 +388,11 @@ struct MediaStream: Codable, Hashable {
         case title = "Title"
         case isExternal = "IsExternal"
         case isDefault = "IsDefault"
+        case channels = "Channels"
+        case channelLayout = "ChannelLayout"
+        case sampleRate = "SampleRate"
+        case videoRange = "VideoRange"
+        case videoRangeType = "VideoRangeType"
     }
 
     // Helper computed property for subtitle display name

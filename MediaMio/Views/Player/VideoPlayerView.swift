@@ -14,6 +14,9 @@ import AVKit
 struct SimpleVideoPlayerRepresentable: UIViewControllerRepresentable {
     let player: AVPlayer
     let settingsManager: SettingsManager
+    let item: MediaItem
+    let playbackMode: PlaybackMode
+    let subtitleDisplay: String?
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -37,11 +40,22 @@ struct SimpleVideoPlayerRepresentable: UIViewControllerRepresentable {
         controller.allowsPictureInPicturePlayback = true
         #endif
 
-        // Add custom info view controllers for bitrate and audio quality
+        // Add custom info view controllers for bitrate, audio quality, and
+        // the read-only "Playback Info" pane (codec / container / range /
+        // play method). Order here is the order they appear as tabs inside
+        // the slide-down info panel — put Playback Info first so it's the
+        // first thing a debugging user sees.
+        let info = PlaybackInfoBuilder.build(
+            item: item,
+            mode: playbackMode,
+            subtitleDisplay: subtitleDisplay
+        )
+        let playbackInfoVC = PlaybackInfoViewController(info: info)
         let bitrateVC = BitrateSelectionViewController(settingsManager: settingsManager)
         let audioQualityVC = AudioQualitySelectionViewController(settingsManager: settingsManager)
 
-        controller.customInfoViewControllers = [bitrateVC, audioQualityVC]
+        controller.customInfoViewControllers = [playbackInfoVC, bitrateVC, audioQualityVC]
+        context.coordinator.playbackInfoVC = playbackInfoVC
 
         print("   Player: \(player)")
         print("   Player status: \(player.status.rawValue)")
@@ -83,14 +97,27 @@ struct SimpleVideoPlayerRepresentable: UIViewControllerRepresentable {
             print("🔄 Updating player")
             uiViewController.player = player
         }
+        // Refresh the Playback Info pane so failover-to-transcode or a
+        // subtitle change shows up the next time the user slides down the
+        // info panel (or immediately if they have it open).
+        let info = PlaybackInfoBuilder.build(
+            item: item,
+            mode: playbackMode,
+            subtitleDisplay: subtitleDisplay
+        )
+        context.coordinator.playbackInfoVC?.update(info: info)
     }
 
     // MARK: - Coordinator for handling AVPlayerViewController delegate
 
-    /// Placeholder delegate. tvOS auto-dismisses on menu press by default;
-    /// add real delegate methods (e.g. `playerViewControllerWillBeginDismissalTransition`)
-    /// here if you need to react to player lifecycle events.
-    class Coordinator: NSObject, AVPlayerViewControllerDelegate {}
+    /// Delegate + side-channel for mutating the read-only Playback Info
+    /// pane after the player is created. tvOS auto-dismisses on menu press
+    /// by default; add real delegate methods (e.g. `playerViewController
+    /// WillBeginDismissalTransition`) here if you need to react to player
+    /// lifecycle events.
+    class Coordinator: NSObject, AVPlayerViewControllerDelegate {
+        weak var playbackInfoVC: PlaybackInfoViewController?
+    }
 }
 
 // MARK: - Video Player View
@@ -122,7 +149,13 @@ struct VideoPlayerView: View {
 
             // CLEAN: Native AVPlayerViewController with custom info view controllers
             if let player = viewModel.player {
-                SimpleVideoPlayerRepresentable(player: player, settingsManager: settingsManager)
+                SimpleVideoPlayerRepresentable(
+                    player: player,
+                    settingsManager: settingsManager,
+                    item: viewModel.item,
+                    playbackMode: viewModel.currentPlaybackMode,
+                    subtitleDisplay: viewModel.currentSubtitleDisplay
+                )
                     .ignoresSafeArea()
                     // Auto-play is the VM's responsibility — its `.readyToPlay`
                     // status sink runs after the resume-position seek lands and

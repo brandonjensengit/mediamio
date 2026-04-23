@@ -31,24 +31,30 @@ struct PlaybackStreamURLBuilderTests {
     ) -> MediaItem {
         var streams: [MediaStream] = [
             MediaStream(
-                index: 0, type: "Video", codec: videoCodec,
+                index: 0, type: "Video", codec: videoCodec, profile: nil,
                 width: width, height: height, bitRate: 50_000_000,
                 language: nil, displayTitle: nil, title: nil,
-                isExternal: false, isDefault: true
+                isExternal: false, isDefault: true,
+                channels: nil, channelLayout: nil, sampleRate: nil,
+                videoRange: nil, videoRangeType: nil
             ),
             MediaStream(
-                index: 1, type: "Audio", codec: audioCodec,
+                index: 1, type: "Audio", codec: audioCodec, profile: nil,
                 width: nil, height: nil, bitRate: 640_000,
                 language: "eng", displayTitle: nil, title: nil,
-                isExternal: false, isDefault: true
+                isExternal: false, isDefault: true,
+                channels: nil, channelLayout: nil, sampleRate: nil,
+                videoRange: nil, videoRangeType: nil
             )
         ]
         for sub in subtitleStreams {
             streams.append(MediaStream(
-                index: sub.index, type: "Subtitle", codec: sub.codec,
+                index: sub.index, type: "Subtitle", codec: sub.codec, profile: nil,
                 width: nil, height: nil, bitRate: nil,
                 language: sub.lang, displayTitle: nil, title: nil,
-                isExternal: sub.codec == "srt", isDefault: false
+                isExternal: sub.codec == "srt", isDefault: false,
+                channels: nil, channelLayout: nil, sampleRate: nil,
+                videoRange: nil, videoRangeType: nil
             ))
         }
 

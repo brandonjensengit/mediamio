@@ -51,6 +51,25 @@ final class VideoPlayerViewModel: ObservableObject {
     var accessToken: String { authService.currentSession?.accessToken ?? "" }
     var userId: String { authService.currentSession?.user.id ?? "" }
 
+    /// The playback mode that actually won the codec-decision fight for the
+    /// active stream. Read by the "Playback Info" panel. Falls back to
+    /// `.directPlay` only during the narrow window before `startPlayback`
+    /// has told the failover controller which mode won.
+    var currentPlaybackMode: PlaybackMode {
+        failoverController.currentMode ?? .directPlay
+    }
+
+    /// Human label for the currently-selected subtitle track, or nil when
+    /// subtitles are off. Matches `SubtitleTrack.displayName` so the info
+    /// panel reads the same label the subtitle picker shows.
+    var currentSubtitleDisplay: String? {
+        guard let index = selectedSubtitleIndex,
+              let track = availableSubtitles.first(where: { $0.index == index }) else {
+            return nil
+        }
+        return track.displayName
+    }
+
     // MARK: - Private state
 
     private var timeObserver: Any?
