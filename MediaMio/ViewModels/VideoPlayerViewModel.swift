@@ -112,20 +112,29 @@ final class VideoPlayerViewModel: ObservableObject {
     /// audio quality mid-playback. Preserves `currentTime` as the resume
     /// position so the new stream picks up where the old one left off.
     func reloadWithCurrentSettings() async {
-        print("🔄 Reloading stream with updated settings (position: \(formatTime(currentTime)))")
+        print("🔄 Reloading stream with updated settings (position: \(formatTime(currentTime)), wasPlaying: \(isPlaying))")
         let resumeFromCurrent = currentTime
+        let wasPlaying = isPlaying
         cleanupAVResources()
         isLoadingVideo = false
         // `getResumePosition()` reads userData; override by nudging the item's
         // position via a local variable instead — but since we can't mutate
         // `self.item` (let), stash the seek target and apply it after load.
         pendingSeekOnReload = resumeFromCurrent
+        // Preserve pause state across the reload — without this, a user who
+        // paused before changing bitrate would silently get unpaused.
+        autoPlayPolicy.captureForReload(wasPlaying: wasPlaying)
         await loadVideoURL()
     }
 
     /// Seconds to seek to once the next `startPlayback` settles. Used by
     /// mid-playback stream reloads (bitrate/audio quality change).
     private var pendingSeekOnReload: Double?
+
+    /// Decides whether the next `.readyToPlay` transition should auto-play.
+    /// Defaults to play; the reload path captures the user's current
+    /// play/pause state so a paused user isn't unpaused by a bitrate change.
+    private var autoPlayPolicy = AutoPlayPolicy()
 
     nonisolated deinit {
         print("🗑️ VideoPlayerViewModel deinit")
@@ -495,7 +504,9 @@ final class VideoPlayerViewModel: ObservableObject {
                                 }
                             }
                         }
-                        player.play()
+                        if self.autoPlayPolicy.consume() {
+                            player.play()
+                        }
                         let mode = self.failoverController.currentMode ?? .directPlay
                         await self.sessionReporter?.reportStart(positionSeconds: self.currentTime, mode: mode)
                         await self.introController?.fetchMarkers()

@@ -124,10 +124,12 @@ struct VideoPlayerView: View {
             if let player = viewModel.player {
                 SimpleVideoPlayerRepresentable(player: player, settingsManager: settingsManager)
                     .ignoresSafeArea()
-                    .onAppear {
-                        print("▶️ Starting playback")
-                        viewModel.startPlayback()
-                    }
+                    // Auto-play is the VM's responsibility — its `.readyToPlay`
+                    // status sink runs after the resume-position seek lands and
+                    // honors the `shouldAutoPlayOnReady` flag (so a paused user
+                    // who changes bitrate stays paused). Calling
+                    // `startPlayback()` here would re-trigger play on every
+                    // mid-playback reload, defeating that policy.
                     .onDisappear {
                         print("⏸️ Pausing playback")
                         viewModel.pausePlayback()
