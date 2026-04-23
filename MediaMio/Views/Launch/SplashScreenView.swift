@@ -10,6 +10,7 @@ import SwiftUI
 struct SplashScreenView: View {
     @Binding var isActive: Bool
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var authService: AuthenticationService
     @State private var scale: CGFloat = 0.5
     @State private var opacity: Double = 0
     @State private var minimumTimeElapsed = false
@@ -93,8 +94,15 @@ struct SplashScreenView: View {
     }
 
     private func checkIfReadyToTransition() {
-        // Only transition when both conditions are met
-        guard minimumTimeElapsed && appState.contentLoaded else {
+        // On the authenticated branch, wait for HomeViewModel to signal its
+        // first content load has completed. On the unauthenticated branch
+        // (fresh install, logged out, saved-token invalidated), no one is
+        // going to flip `contentLoaded` — we're routing to ServerEntryView,
+        // which has no "content" to load — so dismissing after the minimum
+        // time is the correct terminal state. Without this branch, the
+        // splash overlay hangs forever on a new sim / new user.
+        let contentReady = appState.contentLoaded || !authService.isAuthenticated
+        guard minimumTimeElapsed && contentReady else {
             return
         }
 
