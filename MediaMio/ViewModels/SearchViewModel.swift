@@ -25,10 +25,7 @@ class SearchViewModel: ObservableObject {
     private var searchTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
 
-    private var currentStartIndex: Int = 0
-    private let pageSize: Int = 50
-    private var hasMoreContent: Bool = true
-    private var totalItemCount: Int?
+    private let paginator = Paginator<MediaItem>(pageSize: 50)
 
     // Hard cap so the recents list doesn't grow unbounded in UserDefaults.
     // 10 is the sweet spot seen in Netflix / Apple TV / YouTube recents.
@@ -101,6 +98,7 @@ class SearchViewModel: ObservableObject {
 
         // Clear results if query is empty
         guard !query.trimmingCharacters(in: .whitespaces).isEmpty else {
+            paginator.reset()
             results = []
             errorMessage = nil
             isSearching = false
@@ -108,20 +106,24 @@ class SearchViewModel: ObservableObject {
         }
 
         print("🔍 Searching for: '\(query)' (filter: \(filterType.rawValue))")
-        isSearching = true
         errorMessage = nil
-        currentStartIndex = 0
-        hasMoreContent = true
+        paginator.beginReload()
+        isSearching = true
 
         searchTask = Task {
-            await loadSearchResults()
+            await loadSearchResults(isFirstPage: true)
         }
 
         await searchTask?.value
+        paginator.endReload()
         isSearching = false
     }
 
-    private func loadSearchResults() async {
+    /// `isFirstPage` is needed only for the "record recent query" decision
+    /// below — after `paginator.apply(...)`, the start index has already
+    /// advanced, so we can't infer "was this the first page" from the
+    /// paginator's state post-apply.
+    private func loadSearchResults(isFirstPage: Bool) async {
         let query = searchQuery.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else { return }
 
@@ -129,36 +131,22 @@ class SearchViewModel: ObservableObject {
             let response = try await contentService.searchItems(
                 searchTerm: query,
                 includeItemTypes: filterType.itemTypes,
-                limit: pageSize,
-                startIndex: currentStartIndex
+                limit: paginator.pageSize,
+                startIndex: paginator.currentStartIndex
             )
 
             if Task.isCancelled { return }
 
-            if currentStartIndex == 0 {
-                // First load - replace all results
-                results = response.items
-            } else {
-                // Pagination - append results
-                results.append(contentsOf: response.items)
-            }
+            paginator.apply(response)
+            results = paginator.items
 
-            // Update pagination state
-            totalItemCount = response.totalRecordCount
-            currentStartIndex += response.items.count
-
-            // Check if there's more content
-            if let total = totalItemCount {
-                hasMoreContent = currentStartIndex < total
-            } else {
-                hasMoreContent = response.items.count >= pageSize
-            }
-
-            print("✅ Found \(response.items.count) results (total: \(results.count), hasMore: \(hasMoreContent))")
+            print("✅ Found \(response.items.count) results (total: \(results.count), hasMore: \(paginator.hasMore))")
 
             // Record the query once we know it matched something. Queries
-            // that return zero results aren't worth re-offering.
-            if currentStartIndex == response.items.count, !response.items.isEmpty {
+            // that return zero results aren't worth re-offering. Only the
+            // first page of a successful search counts — pagination
+            // appends don't re-record.
+            if isFirstPage, !response.items.isEmpty {
                 commitRecent(query: query)
             }
 
@@ -171,14 +159,16 @@ class SearchViewModel: ObservableObject {
     }
 
     func loadMore() async {
-        guard !isLoadingMore, !isSearching, hasMoreContent else { return }
+        guard paginator.canLoadMore else { return }
         guard !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty else { return }
 
-        print("🔍 Loading more results (startIndex: \(currentStartIndex))")
+        print("🔍 Loading more results (startIndex: \(paginator.currentStartIndex))")
+        paginator.beginLoadMore()
         isLoadingMore = true
 
-        await loadSearchResults()
+        await loadSearchResults(isFirstPage: false)
 
+        paginator.endLoadMore()
         isLoadingMore = false
     }
 
@@ -196,6 +186,7 @@ class SearchViewModel: ObservableObject {
 
     func clearSearch() {
         searchQuery = ""
+        paginator.reset()
         results = []
         errorMessage = nil
     }
@@ -268,12 +259,6 @@ class SearchViewModel: ObservableObject {
     }
 
     var statusText: String {
-        if let total = totalItemCount {
-            return "\(results.count) of \(total) results"
-        } else if !results.isEmpty {
-            return "\(results.count) results"
-        } else {
-            return ""
-        }
+        paginator.statusText(itemNoun: "results")
     }
 }

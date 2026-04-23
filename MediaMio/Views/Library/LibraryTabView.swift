@@ -50,8 +50,11 @@ struct LibraryTabView: View {
                     if let currentViewModel = viewModel.currentViewModel {
                         LibraryView(viewModel: currentViewModel)
                     } else {
-                        // No library found for this category
-                        EmptyLibraryView(libraryName: viewModel.selectedCategory.displayName)
+                        EmptyStateView(
+                            systemImage: "film.stack",
+                            title: "No Content in \(viewModel.selectedCategory.displayName)",
+                            message: "Add some media to this library in Jellyfin"
+                        )
                     }
                 }
             }

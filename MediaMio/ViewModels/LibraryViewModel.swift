@@ -28,10 +28,7 @@ class LibraryViewModel: ObservableObject {
     private let authService: AuthenticationService
     weak var navigationCoordinator: NavigationCoordinator?
 
-    private var currentStartIndex: Int = 0
-    private let pageSize: Int = 50
-    private var hasMoreContent: Bool = true
-    private var totalItemCount: Int?
+    private let paginator = Paginator<MediaItem>(pageSize: 50)
     private var filterPersistenceKey: String {
         "filters_\(libraryId ?? "unknown")"
     }
@@ -175,27 +172,29 @@ class LibraryViewModel: ObservableObject {
     // MARK: - Load Content
 
     func loadContent() async {
-        guard !isLoading else { return }
+        guard paginator.canReload else { return }
 
         print("📚 Loading library content: \(title)")
-        isLoading = true
         errorMessage = nil
-        currentStartIndex = 0
-        hasMoreContent = true
+        paginator.beginReload()
+        isLoading = true
 
         await loadItems()
 
+        paginator.endReload()
         isLoading = false
     }
 
     func loadMore() async {
-        guard !isLoadingMore, !isLoading, hasMoreContent else { return }
+        guard paginator.canLoadMore else { return }
 
-        print("📚 Loading more items (startIndex: \(currentStartIndex))")
+        print("📚 Loading more items (startIndex: \(paginator.currentStartIndex))")
+        paginator.beginLoadMore()
         isLoadingMore = true
 
         await loadItems()
 
+        paginator.endLoadMore()
         isLoadingMore = false
     }
 
@@ -211,32 +210,16 @@ class LibraryViewModel: ObservableObject {
                 itemTypes: itemTypes,
                 filters: filters.isActive ? filters : nil,
                 nameStartsWith: letterFilterForCurrentRequest,
-                limit: pageSize,
-                startIndex: currentStartIndex,
+                limit: paginator.pageSize,
+                startIndex: paginator.currentStartIndex,
                 sortBy: sortOption.sortBy,
                 sortOrder: sortOption.sortOrder
             )
 
-            if currentStartIndex == 0 {
-                // First load - replace all items
-                items = response.items
-            } else {
-                // Pagination - append items
-                items.append(contentsOf: response.items)
-            }
+            paginator.apply(response)
+            items = paginator.items
 
-            // Update pagination state
-            totalItemCount = response.totalRecordCount
-            currentStartIndex += response.items.count
-
-            // Check if there's more content
-            if let total = totalItemCount {
-                hasMoreContent = currentStartIndex < total
-            } else {
-                hasMoreContent = response.items.count >= pageSize
-            }
-
-            print("✅ Loaded \(response.items.count) items (total: \(items.count), hasMore: \(hasMoreContent))")
+            print("✅ Loaded \(response.items.count) items (total: \(items.count), hasMore: \(paginator.hasMore))")
 
         } catch {
             print("❌ Failed to load library content: \(error)")
@@ -316,7 +299,7 @@ class LibraryViewModel: ObservableObject {
     }
 
     var statusText: String {
-        if let total = totalItemCount {
+        if let total = paginator.totalRecordCount {
             return "\(items.count) of \(total) items"
         } else {
             return "\(items.count) items"

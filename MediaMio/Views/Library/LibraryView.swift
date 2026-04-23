@@ -40,8 +40,11 @@ struct LibraryView: View {
                     }
                 }
             } else if viewModel.isEmpty {
-                // Empty state
-                EmptyLibraryView(libraryName: viewModel.title)
+                EmptyStateView(
+                    systemImage: "film.stack",
+                    title: "No Content in \(viewModel.title)",
+                    message: "Add some media to this library in Jellyfin"
+                )
             } else {
                 // Content
                 HStack(spacing: 0) {
@@ -296,31 +299,6 @@ private struct LetterButton: View {
 }
 
 // MARK: - Empty State
-
-struct EmptyLibraryView: View {
-    let libraryName: String
-
-    var body: some View {
-        VStack(spacing: 30) {
-            Image(systemName: "film.stack")
-                .font(.system(size: 80))
-                .foregroundColor(.gray.opacity(0.5))
-
-            VStack(spacing: 12) {
-                Text("No Content in \(libraryName)")
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-
-                Text("Add some media to this library in Jellyfin")
-                    .font(.title3)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 600)
-            }
-        }
-    }
-}
 
 // MARK: - Preview
 

@@ -35,7 +35,11 @@ struct SearchView: View {
                     // Initial state — show recents if we have any, else the
                     // "search your library" hint.
                     if viewModel.recentSearches.isEmpty {
-                        SearchEmptyState()
+                        EmptyStateView(
+                            systemImage: "magnifyingglass",
+                            title: "Search Your Library",
+                            message: "Find movies, TV shows, and more"
+                        )
                     } else {
                         RecentSearchesView(viewModel: viewModel)
                     }
@@ -48,8 +52,11 @@ struct SearchView: View {
                         // Retry not needed - search will retry automatically
                     }
                 } else if viewModel.isEmpty {
-                    // No results
-                    NoResultsView(query: viewModel.searchQuery)
+                    EmptyStateView(
+                        systemImage: "magnifyingglass",
+                        title: "No Results Found",
+                        message: "No results for \"\(viewModel.searchQuery)\". Try different keywords."
+                    )
                 } else {
                     // Results
                     ScrollView(.vertical, showsIndicators: true) {
@@ -202,32 +209,6 @@ struct SearchHeader: View {
     }
 }
 
-// MARK: - Empty States
-
-struct SearchEmptyState: View {
-    var body: some View {
-        VStack(spacing: 30) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 80))
-                .foregroundColor(.gray.opacity(0.5))
-
-            VStack(spacing: 12) {
-                Text("Search Your Library")
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-
-                Text("Find movies, TV shows, and more")
-                    .font(.title3)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 600)
-            }
-        }
-        .frame(maxHeight: .infinity)
-    }
-}
-
 // MARK: - Recent Searches
 
 /// Shown in place of the "Search Your Library" empty state when the user has
@@ -323,38 +304,6 @@ struct RecentSearchRow: View {
             }
             .buttonStyle(.plain)
         }
-    }
-}
-
-struct NoResultsView: View {
-    let query: String
-
-    var body: some View {
-        VStack(spacing: 30) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 80))
-                .foregroundColor(.gray.opacity(0.5))
-
-            VStack(spacing: 12) {
-                Text("No Results Found")
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-
-                Text("No results for \"\(query)\"")
-                    .font(.title3)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 600)
-
-                Text("Try searching with different keywords")
-                    .font(.title3)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 600)
-            }
-        }
-        .frame(maxHeight: .infinity)
     }
 }
 

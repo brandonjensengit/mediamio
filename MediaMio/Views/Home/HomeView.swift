@@ -281,8 +281,11 @@ struct HomeContentView: View {
                     }
                 }
             } else if viewModel.isEmpty {
-                // Empty state
-                EmptyHomeView()
+                EmptyStateView(
+                    systemImage: "film.stack",
+                    title: "No Content Yet",
+                    message: "Add some media to your Jellyfin libraries to get started"
+                )
             } else {
                 // Content
                 ScrollViewReader { proxy in
@@ -367,29 +370,6 @@ struct HomeContentView: View {
 }
 
 // MARK: - Empty State
-
-struct EmptyHomeView: View {
-    var body: some View {
-        VStack(spacing: 30) {
-            Image(systemName: "film.stack")
-                .font(.system(size: 80))
-                .foregroundColor(.gray.opacity(0.5))
-
-            VStack(spacing: 12) {
-                Text("No Content Yet")
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-
-                Text("Add some media to your Jellyfin libraries to get started")
-                    .font(.title3)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 600)
-            }
-        }
-    }
-}
 
 // MARK: - Error View
 

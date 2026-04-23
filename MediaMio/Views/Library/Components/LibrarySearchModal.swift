@@ -54,11 +54,19 @@ struct LibrarySearchModal: View {
                         }
                     }
                 } else if searchQuery.isEmpty {
-                    // Empty state - no search query
-                    emptySearchView
+                    EmptyStateView(
+                        systemImage: "magnifyingglass",
+                        title: "Search \(viewModel.title)",
+                        message: "Enter a title to search within this library",
+                        iconOpacity: 0.3
+                    )
                 } else if searchResults.isEmpty {
-                    // No results
-                    noResultsView
+                    EmptyStateView(
+                        systemImage: "film.stack",
+                        title: "No Results Found",
+                        message: "Try a different search term",
+                        iconOpacity: 0.3
+                    )
                 } else {
                     // Results
                     ScrollView {
@@ -137,49 +145,6 @@ struct LibrarySearchModal: View {
             }
             .buttonStyle(.borderedProminent)
         }
-    }
-
-    // MARK: - Empty States
-
-    private var emptySearchView: some View {
-        VStack(spacing: 30) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 80))
-                .foregroundColor(.white.opacity(0.3))
-
-            VStack(spacing: 12) {
-                Text("Search \(viewModel.title)")
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-
-                Text("Enter a title to search within this library")
-                    .font(.title3)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-        }
-        .frame(maxHeight: .infinity)
-    }
-
-    private var noResultsView: some View {
-        VStack(spacing: 30) {
-            Image(systemName: "film.stack")
-                .font(.system(size: 80))
-                .foregroundColor(.white.opacity(0.3))
-
-            VStack(spacing: 12) {
-                Text("No Results Found")
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-
-                Text("Try a different search term")
-                    .font(.title3)
-                    .foregroundColor(.secondary)
-            }
-        }
-        .frame(maxHeight: .infinity)
     }
 
     // MARK: - Search
