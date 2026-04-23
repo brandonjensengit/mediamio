@@ -18,20 +18,7 @@ class JellyfinAPIClient: ObservableObject {
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
 
-    // Device ID — prefer identifierForVendor (stable per-app across installs on the
-    // same vendor). Fall back to a UserDefaults-backed UUID only when IFV is
-    // unavailable (simulator edge cases, pre-auth launch before UIScene attach).
-    private var deviceId: String {
-        if let ifv = UIDevice.current.identifierForVendor?.uuidString {
-            return ifv
-        }
-        if let saved = UserDefaults.standard.string(forKey: Constants.UserDefaultsKeys.deviceId) {
-            return saved
-        }
-        let newId = UUID().uuidString
-        UserDefaults.standard.set(newId, forKey: Constants.UserDefaultsKeys.deviceId)
-        return newId
-    }
+    private var deviceId: String { DeviceIdentifier.current() }
 
     init() {
         let config = URLSessionConfiguration.default

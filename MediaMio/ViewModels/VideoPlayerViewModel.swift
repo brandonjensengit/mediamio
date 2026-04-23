@@ -612,14 +612,7 @@ final class VideoPlayerViewModel: ObservableObject {
         return (progress > 1.0 && progress < 95.0) ? seconds : nil
     }
 
-    private func getDeviceId() -> String {
-        if let deviceId = UserDefaults.standard.string(forKey: "JellyfinDeviceId") {
-            return deviceId
-        }
-        let newDeviceId = UUID().uuidString
-        UserDefaults.standard.set(newDeviceId, forKey: "JellyfinDeviceId")
-        return newDeviceId
-    }
+    private func getDeviceId() -> String { DeviceIdentifier.current() }
 
     private func updateObservedBitrate() {
         if let event = player?.currentItem?.accessLog()?.events.last {

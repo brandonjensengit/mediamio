@@ -14,7 +14,6 @@ enum Constants {
         static let clientName = "MediaMio"
         static let clientVersion = "1.0.0"
         static let deviceName = "Apple TV"
-        static let deviceId = UUID().uuidString // Should be persisted per device
 
         // API Endpoints
         enum Endpoints {
