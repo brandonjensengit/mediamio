@@ -66,6 +66,7 @@ final class VideoPlayerViewModel: ObservableObject {
     private var subtitleManager: SubtitleTrackManager?
     private var nowPlaying: NowPlayingPublisher?
     private let failoverController = PlaybackFailoverController()
+    private var lifecycleController: PlaybackLifecycleController?
 
     init(
         item: MediaItem,
@@ -219,6 +220,7 @@ final class VideoPlayerViewModel: ObservableObject {
         bindIntroController()
         bindSubtitleManager()
         bindNowPlaying()
+        bindLifecycleController()
 
         setupTimeObserver()
         setupPlayerObservers(playerItem: playerItem)
@@ -322,6 +324,21 @@ final class VideoPlayerViewModel: ObservableObject {
             .store(in: &subtitleSubscriptions)
     }
 
+    /// Bind the lifecycle controller to the current playback session.
+    /// Rebuilt on each session (mid-playback stream reloads tear down
+    /// and rebuild the player) so the callbacks always point at the
+    /// current player via `self`.
+    private func bindLifecycleController() {
+        lifecycleController?.stop()
+        let controller = PlaybackLifecycleController(
+            isPlaying: { [weak self] in self?.isPlaying ?? false },
+            pause: { [weak self] in self?.pausePlayback() },
+            resume: { [weak self] in self?.startPlayback() }
+        )
+        lifecycleController = controller
+        controller.start()
+    }
+
     private func bindNowPlaying() {
         nowPlaying = NowPlayingPublisher(
             item: item,
@@ -398,6 +415,8 @@ final class VideoPlayerViewModel: ObservableObject {
 
         failoverController.cancel()
         nowPlaying = nil  // deinit clears MPNowPlayingInfoCenter
+        lifecycleController?.stop()
+        lifecycleController = nil
         cleanupAVResources()
     }
 

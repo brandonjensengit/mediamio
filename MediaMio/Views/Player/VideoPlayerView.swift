@@ -147,9 +147,6 @@ struct VideoPlayerView: View {
         .task {
             await viewModel.loadVideoURL()
         }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
-            viewModel.pausePlayback()
-        }
         .onDisappear {
             // Clean up when leaving the player
             viewModel.cleanup()
