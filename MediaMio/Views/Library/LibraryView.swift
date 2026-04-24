@@ -9,6 +9,7 @@ import SwiftUI
 
 struct LibraryView: View {
     @ObservedObject var viewModel: LibraryViewModel
+    @EnvironmentObject var navigationManager: NavigationManager
 
     // Focus state
     @FocusState private var toolbarFocus: LibraryToolbar.ToolbarField?
@@ -61,7 +62,13 @@ struct LibraryView: View {
                                         item: item,
                                         baseURL: viewModel.baseURL
                                     ) {
-                                        viewModel.selectItem(item)
+                                        // Use NavigationManager.showDetail
+                                        // (full-screen cover) — the legacy
+                                        // viewModel.selectItem path appended
+                                        // to a NavigationCoordinator path
+                                        // that nothing observed, so Select
+                                        // looked dead.
+                                        navigationManager.showDetail(for: item)
                                     }
                                     .padding(.vertical, 20)
                                     .onAppear {

@@ -26,12 +26,26 @@ struct PosterCard: View {
     @FocusState private var isFocused: Bool
     @State private var imageURL: String?
 
+    @ViewBuilder
     var body: some View {
         // `.focusable()` + `.onTapGesture` (no Button wrapper) so tvOS
         // doesn't draw its plain-button focused-state background —
         // `.focusEffectDisabled()` can't reach that fill because it lives
-        // inside the button style, not the focus-effect API. `.contextMenu`
-        // works fine on any focusable view on tvOS 17+.
+        // inside the button style, not the focus-effect API.
+        //
+        // `.contextMenu` is attached conditionally: on tvOS 26 an empty
+        // `.contextMenu { }` captures Select before `.onTapGesture` sees
+        // it, breaking activation on every callsite that doesn't wire
+        // `onContextAction` (Library / Search / Detail-similar — all nil
+        // by design). Only attach when we have something to show.
+        if onContextAction != nil {
+            cardLayout.contextMenu { contextMenuContent }
+        } else {
+            cardLayout
+        }
+    }
+
+    private var cardLayout: some View {
         VStack(alignment: .leading, spacing: 16) {
             posterImage
 
@@ -50,7 +64,6 @@ struct PosterCard: View {
         .focused($isFocused)
         .contentFocus(isFocused: isFocused)
         .zIndex(isFocused ? 999 : 0)
-        .contextMenu { contextMenuContent }
         .onTapGesture { onSelect() }
         .onAppear {
             imageURL = item.primaryImageURL(
