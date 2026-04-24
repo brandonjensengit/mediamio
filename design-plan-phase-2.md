@@ -1,7 +1,7 @@
 # MediaMio Design Plan — Phase 2: Streaming Flow Repair
 
 **Started:** 2026-04-23
-**Status:** Planned, awaiting approval.
+**Status:** Item A shipped 2026-04-23 (`4dfb6bd`). Item B shipped 2026-04-23. Items C–H pending.
 **Scope:** tvOS streaming-app conventions, focus-engine correctness, real perf bugs, and the three "judge moments" (hero, shelf, detail → player). Picks up where `design-plan.md` left off after 7 chrome/palette items shipped 2026-04-22 / 2026-04-23.
 
 **Explicitly NOT in scope:** business logic, API client, authentication flow, settings business wiring, transcode policy (already fixed in `fix-unnecessary-transcode.md`).
@@ -81,7 +81,31 @@ Phase 2 is everything a tvOS user *feels* but that chrome-level work can't reach
 
 ---
 
-## Item B — Continue Watching becomes 16:9 episode thumbs (P1)
+## Item B — Continue Watching becomes 16:9 episode thumbs (P1) — SHIPPED 2026-04-23
+
+### What landed
+
+- `MediaItem` gained two helpers:
+  - `landscapeImageURL(baseURL:maxWidth:quality:)` — picks the right 16:9 source per Jellyfin semantics: for Episodes, `Primary` IS the 16:9 still; for Movies/Series, prefers `Thumb` → `Backdrop`, falling back to `Primary` (2:3) only when nothing landscape is available.
+  - `remainingText` — `"23m left"` / `"1h 5m left"`, nil when progress is missing or within 1 minute of the end.
+- New `MediaMio/Views/Components/EpisodeThumbCard.swift`:
+  - 400×225pt landscape still with a 48pt bottom-gradient scrim and a 4pt `ProgressBar` flush to the bottom edge (reused from PosterCard).
+  - Three-line label stack: series name (headline semibold), `S1E1 · Lost / Found` (subheadline white-0.65), `29m left` (caption, `Constants.Colors.accent`).
+  - Focus model intentionally mirrors PosterCard: `.focusable() + .onTapGesture` + `.contentFocus(isFocused:)`. The first build tried `Button(.plain)` but tvOS's `PlainButtonStyle` applied its own white-surface focus highlight *on top of* our content-focus tier — two treatments layered. Reverted to the PosterCard idiom; Item F will revisit both with `.buttonStyle(.card)`.
+- `ContentRow` now branches on `section.type`:
+  - `.continueWatching` → `EpisodeThumbCard` with row frame `thumbHeight + 180pt`
+  - everything else → `PosterCard` with row frame `posterHeight + 180pt`
+  - All other behavior (focus memory, navigation/focus manager updates, see-all) unchanged.
+- Build green `tvOS Simulator,OS=26.0,name=Apple TV`. Verified on sim — Continue Watching shows 16:9 tiles (Versa / The Acolyte / Parent Trap / Merry Little Ex-Mas) with accent-colored "m left" labels; Nextflix row below still renders 2:3 posters.
+
+### Known trade-offs carried into Item F
+
+- Focus model is the same `.focusable() + .onTapGesture` pattern PosterCard uses — works, but foregoes tvOS's free card parallax + specular shine. Item F's whole purpose is to move both cards onto `Button(_) { ... }.buttonStyle(.card)` and reconcile the focus tiers; do not re-litigate here.
+- Recently Added stays on `PosterCard` for every item regardless of type. The plan floated per-item branching (`PosterCard` for movies, `EpisodeThumbCard` for episodes inside the same row) — skipped because mixed-height rows break `LazyHStack` layout stability and the shelf is healthier as one consistent 2:3 discovery rail anyway.
+
+---
+
+## Item B — original plan (historical)
 
 **Why:** biggest "didn't test on Apple TV" tell. Anyone who has used Apple TV once immediately sees the mismatch.
 

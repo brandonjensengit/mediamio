@@ -70,20 +70,15 @@ struct ContentRow: View {
                     Color.clear.frame(width: Constants.UI.defaultPadding - Constants.UI.cardSpacing)
 
                     ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
-                        PosterCard(
-                            item: item,
-                            baseURL: baseURL
-                        ) {
-                            onItemSelect(item)
-                        }
-                        .focused($focusedItemId, equals: item.id)
-                        .onChange(of: focusedItemId) { newValue in
-                            if newValue == item.id {
-                                // This item is now focused, save to both managers
-                                navigationManager?.rememberFocus(row: rowIndex, itemIndex: index)
-                                focusManager?.focusedOnRow(rowIndex, itemIndex: index)
+                        cardView(for: item)
+                            .focused($focusedItemId, equals: item.id)
+                            .onChange(of: focusedItemId) { newValue in
+                                if newValue == item.id {
+                                    // This item is now focused, save to both managers
+                                    navigationManager?.rememberFocus(row: rowIndex, itemIndex: index)
+                                    focusManager?.focusedOnRow(rowIndex, itemIndex: index)
+                                }
                             }
-                        }
                     }
 
                     // Trailing padding
@@ -91,8 +86,45 @@ struct ContentRow: View {
                 }
                 .padding(.vertical, 40)  // Extra vertical padding to prevent clipping when cards scale
             }
-            .frame(height: Constants.UI.posterHeight + 180)  // Increased from 100 to 180 for scale room
+            .frame(height: rowFrameHeight)
         }
+    }
+
+    // MARK: - Variant selection
+
+    /// Resume rows use the 16:9 EpisodeThumbCard (streaming-app idiom).
+    /// Discovery rows (libraries, recently added) stay on the 2:3 PosterCard
+    /// where keyart does the selling.
+    private var useThumbVariant: Bool {
+        switch section.type {
+        case .continueWatching:
+            return true
+        case .recentlyAdded, .library, .recommended, .favorites:
+            return false
+        }
+    }
+
+    @ViewBuilder
+    private func cardView(for item: MediaItem) -> some View {
+        if useThumbVariant {
+            EpisodeThumbCard(item: item, baseURL: baseURL) {
+                onItemSelect(item)
+            }
+        } else {
+            PosterCard(item: item, baseURL: baseURL) {
+                onItemSelect(item)
+            }
+        }
+    }
+
+    /// Row frame accounts for card content plus scale-lift breathing room.
+    private var rowFrameHeight: CGFloat {
+        if useThumbVariant {
+            // 225 image + 8 + ~28 primary + ~22 secondary + ~20 tertiary ≈ 303,
+            // with 80pt of padding + scale room.
+            return Constants.UI.thumbHeight + 180
+        }
+        return Constants.UI.posterHeight + 180
     }
 }
 

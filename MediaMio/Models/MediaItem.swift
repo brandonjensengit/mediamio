@@ -130,6 +130,23 @@ struct MediaItem: Codable, Identifiable, Hashable {
         return nil
     }
 
+    /// "23m left" / "1h 5m left" for Continue Watching tiles. Returns nil
+    /// when no progress exists or when playback is within 1 minute of the
+    /// end (avoids "0m left" strings on all-but-finished items).
+    var remainingText: String? {
+        guard let position = userData?.playbackPositionTicks,
+              let total = runTimeTicks,
+              total > position else { return nil }
+        let remainingMinutes = Int((total - position) / 600_000_000)
+        guard remainingMinutes > 0 else { return nil }
+        let hours = remainingMinutes / 60
+        let mins = remainingMinutes % 60
+        if hours > 0 {
+            return "\(hours)h \(mins)m left"
+        }
+        return "\(mins)m left"
+    }
+
     // MARK: - Image URLs
 
     func primaryImageURL(baseURL: String, maxWidth: Int = 400, quality: Int = 90) -> String? {
@@ -145,6 +162,27 @@ struct MediaItem: Codable, Identifiable, Hashable {
     func thumbImageURL(baseURL: String, maxWidth: Int = 600, quality: Int = 90) -> String? {
         guard imageTags?.thumb != nil else { return nil }
         return "\(baseURL)/Items/\(id)/Images/Thumb?maxWidth=\(maxWidth)&quality=\(quality)"
+    }
+
+    /// Best 16:9 landscape image for a "Continue Watching"-style tile.
+    /// Jellyfin is asymmetric: for an Episode, `Primary` IS the 16:9 still;
+    /// for a Movie/Series, `Primary` is a 2:3 poster and the 16:9 frame
+    /// lives on `Thumb` or `Backdrop`. Falls back to `Primary` only when
+    /// nothing landscape is available (the card will letterbox-crop).
+    func landscapeImageURL(baseURL: String, maxWidth: Int = 600, quality: Int = 90) -> String? {
+        if isEpisode, imageTags?.primary != nil {
+            return "\(baseURL)/Items/\(id)/Images/Primary?maxWidth=\(maxWidth)&quality=\(quality)"
+        }
+        if imageTags?.thumb != nil {
+            return "\(baseURL)/Items/\(id)/Images/Thumb?maxWidth=\(maxWidth)&quality=\(quality)"
+        }
+        if imageTags?.backdrop != nil {
+            return "\(baseURL)/Items/\(id)/Images/Backdrop?maxWidth=\(maxWidth)&quality=\(quality)"
+        }
+        if imageTags?.primary != nil {
+            return "\(baseURL)/Items/\(id)/Images/Primary?maxWidth=\(maxWidth)&quality=\(quality)"
+        }
+        return nil
     }
 
     /// Jellyfin chapter thumbnails are addressable by chapter index, not by
