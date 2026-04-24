@@ -90,3 +90,7 @@ iOSInjectionProject/
 
 ## macOS
 .DS_Store
+
+## Claude Code (transient runtime state; committed settings stay tracked)
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
