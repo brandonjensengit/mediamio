@@ -7,20 +7,25 @@
 
 import SwiftUI
 
+/// Unified focus targets for the Search screen. Using a single enum
+/// (instead of separate `@FocusState<Bool>` for the field and grid) lets us
+/// express focus transitions as "set `focus = .field`" or "set `focus = .result(0)`"
+/// and SwiftUI's focus engine handles the binding updates in both directions —
+/// the separate `@FocusState<Bool> + .onMoveCommand` approach got stuck because
+/// programmatically setting the bound Bool to true didn't release cleanly on
+/// the next user-driven move.
+enum SearchFocus: Hashable {
+    case field
+    case result(Int)
+}
+
 struct SearchView: View {
     @ObservedObject var viewModel: SearchViewModel
     let authService: AuthenticationService
     let coordinator: NavigationCoordinator
-    var navigationManager: NavigationManager? = nil
+    @ObservedObject var navigationManager: NavigationManager
     @EnvironmentObject var env: AppEnvironment
-    @FocusState private var isSearchFieldFocused: Bool
-
-    // Scope shared by the results grid cells. `.prefersDefaultFocus` on
-    // the first cell anchored in this namespace tells the focus engine
-    // "when focus lands in this region, pick this element" — avoids the
-    // geometric-routing failure where a single lone result-tile off to
-    // the left can't be reached from the much wider search TextField.
-    @Namespace private var resultsFocusNamespace
+    @FocusState private var focus: SearchFocus?
 
     private let columns = [
         GridItem(.adaptive(minimum: 250, maximum: 350), spacing: 40)
@@ -30,116 +35,139 @@ struct SearchView: View {
         ZStack {
             Constants.Colors.background.ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                // Search Header
-                SearchHeader(viewModel: viewModel, isSearchFieldFocused: $isSearchFieldFocused)
+            // Everything lives inside ONE ScrollView — header AND results.
+            // Earlier split-layout (header in outer VStack, results in its
+            // own ScrollView) hit a tvOS focus-engine bug: single-result
+            // Up-press from the lone grid cell escaped past the header
+            // straight to the TopNavBar's "Home" chip. Programmatic fixes
+            // (focusSection + prefersDefaultFocus + onMoveCommand reseating
+            // focus) all created a different bug: focus got pinned to the
+            // field, so Down was sticky. Making header+grid siblings in one
+            // ScrollView routes focus via the ScrollView's own vertical
+            // traversal, which is deterministic — no programmatic override
+            // needed, and matches the native tvOS search pattern.
+            ScrollView(.vertical, showsIndicators: true) {
+                VStack(spacing: 0) {
+                    SearchHeader(
+                        viewModel: viewModel,
+                        focus: $focus
+                    )
                     .padding(.horizontal, Constants.UI.defaultPadding)
                     .padding(.top, 40)
                     .padding(.bottom, 30)
 
-                // Content
-                if viewModel.isInitialState {
-                    // Initial state — show recents if we have any, else the
-                    // "search your library" hint.
-                    if viewModel.recentSearches.isEmpty {
-                        EmptyStateView(
-                            systemImage: "magnifyingglass",
-                            title: "Search Your Library",
-                            message: "Find movies, TV shows, and more"
-                        )
-                    } else {
-                        RecentSearchesView(viewModel: viewModel)
-                    }
-                } else if viewModel.isSearching && !viewModel.hasResults {
-                    // Searching for first time
-                    LoadingView(message: "Searching...")
-                } else if let error = viewModel.errorMessage {
-                    // Error state
-                    ErrorView(message: error) {
-                        // Retry not needed - search will retry automatically
-                    }
-                } else if viewModel.isEmpty {
-                    EmptyStateView(
-                        systemImage: "magnifyingglass",
-                        title: "No Results Found",
-                        message: "No results for \"\(viewModel.searchQuery)\". Try different keywords."
-                    )
-                } else {
-                    // Results
-                    ScrollView(.vertical, showsIndicators: true) {
-                        VStack(spacing: 30) {
-                            // (Results content begins here — wrapped in a
-                            // `.focusSection()` + `.focusScope(...)` below
-                            // so the first cell's `prefersDefaultFocus` is
-                            // honored when focus routes in from the field.)
-                            // Results count
-                            if !viewModel.statusText.isEmpty {
-                                HStack {
-                                    Text(viewModel.statusText)
-                                        .font(.title3)
-                                        .foregroundColor(.secondary)
-
-                                    Spacer()
-                                }
-                                .padding(.horizontal, Constants.UI.defaultPadding)
-                            }
-
-                            // Results grid. Wrapped in `.focusSection()` so
-                            // the focus engine treats the whole grid as one
-                            // candidate region (a single lone tile is still
-                            // reachable geometrically even if offset from
-                            // the search field above), and the first cell
-                            // is marked `.prefersDefaultFocus` so pressing
-                            // Down from the TextField lands there regardless
-                            // of exact x-coordinate alignment.
-                            LazyVGrid(columns: columns, spacing: 60) {
-                                ForEach(Array(viewModel.results.enumerated()), id: \.element.id) { index, item in
-                                    PosterCard(
-                                        item: item,
-                                        baseURL: viewModel.baseURL
-                                    ) {
-                                        navigationManager?.showDetail(for: item)
-                                    }
-                                    .padding(.vertical, 20)
-                                    .prefersDefaultFocus(index == 0, in: resultsFocusNamespace)
-                                    .onAppear {
-                                        // Load more when approaching end
-                                        if item == viewModel.results.last {
-                                            Task {
-                                                await viewModel.loadMore()
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Loading more indicator
-                                if viewModel.isLoadingMore {
-                                    VStack(spacing: 20) {
-                                        ProgressView()
-                                            .scaleEffect(1.5)
-
-                                        Text("Loading more...")
-                                            .font(.title3)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 40)
-                                    .gridCellColumns(columns.count)
-                                }
-                            }
-                            .padding(.horizontal, Constants.UI.defaultPadding)
-                            .padding(.bottom, 80)
-                        }
-                        .focusSection()
-                        .focusScope(resultsFocusNamespace)
-                    }
+                    content
                 }
             }
         }
-        .onAppear {
-            // Auto-focus search field when view appears
-            isSearchFieldFocused = true
+        .onAppear { claimFieldFocus() }
+        .onChange(of: navigationManager.selectedTab) { _, newTab in
+            // SearchView is mounted once at app launch (MainTabView keeps all
+            // four tabs alive in a ZStack via opacity flips), so .onAppear
+            // only fires that one time — long before the user touches the
+            // Search chip. React to the tab actually becoming .search to
+            // claim focus on every entry.
+            if newTab == .search {
+                claimFieldFocus()
+            }
         }
+    }
+
+    /// Defer the focus set so it lands after SwiftUI has finished applying
+    /// the tab-switch state changes. A synchronous set loses the race against
+    /// the TopNavBar chip's focus claim; 50ms is the smallest delay that
+    /// wins reliably on the Apple TV 4K sim.
+    private func claimFieldFocus() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            focus = .field
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if viewModel.isInitialState {
+            if viewModel.recentSearches.isEmpty {
+                EmptyStateView(
+                    systemImage: "magnifyingglass",
+                    title: "Search Your Library",
+                    message: "Find movies, TV shows, and more"
+                )
+                .frame(minHeight: 400)
+            } else {
+                RecentSearchesView(viewModel: viewModel)
+            }
+        } else if viewModel.isSearching && !viewModel.hasResults {
+            LoadingView(message: "Searching...")
+                .frame(minHeight: 400)
+        } else if let error = viewModel.errorMessage {
+            ErrorView(message: error) {}
+                .frame(minHeight: 400)
+        } else if viewModel.isEmpty {
+            EmptyStateView(
+                systemImage: "magnifyingglass",
+                title: "No Results Found",
+                message: "No results for \"\(viewModel.searchQuery)\". Try different keywords."
+            )
+            .frame(minHeight: 400)
+        } else {
+            resultsGrid
+        }
+    }
+
+    private var resultsGrid: some View {
+        VStack(spacing: 30) {
+            if !viewModel.statusText.isEmpty {
+                HStack {
+                    Text(viewModel.statusText)
+                        .font(.title3)
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+                }
+                .padding(.horizontal, Constants.UI.defaultPadding)
+            }
+
+            LazyVGrid(columns: columns, spacing: 60) {
+                ForEach(Array(viewModel.results.enumerated()), id: \.element.id) { index, item in
+                    PosterCard(
+                        item: item,
+                        baseURL: viewModel.baseURL
+                    ) {
+                        navigationManager.showDetail(for: item)
+                    }
+                    .padding(.vertical, 20)
+                    .onAppear {
+                        if item == viewModel.results.last {
+                            Task {
+                                await viewModel.loadMore()
+                            }
+                        }
+                    }
+                }
+
+                if viewModel.isLoadingMore {
+                    VStack(spacing: 20) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+
+                        Text("Loading more...")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                    .gridCellColumns(columns.count)
+                }
+            }
+            .padding(.horizontal, Constants.UI.defaultPadding)
+            .padding(.bottom, 80)
+        }
+        // Grid gets a focus section so Down from the sticky-top search
+        // field has an explicit destination region. Without this, focus
+        // routing from the field straight into a lone grid cell on the
+        // leading edge is unreliable — the field is full-width while the
+        // cell is narrow on the left.
+        .focusSection()
     }
 }
 
@@ -147,7 +175,7 @@ struct SearchView: View {
 
 struct SearchHeader: View {
     @ObservedObject var viewModel: SearchViewModel
-    @FocusState.Binding var isSearchFieldFocused: Bool
+    @FocusState.Binding var focus: SearchFocus?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -166,12 +194,12 @@ struct SearchHeader: View {
                     TextField("Search for movies, TV shows...", text: $viewModel.searchQuery)
                         .font(.title3)
                         .textFieldStyle(.plain)
-                        .focused($isSearchFieldFocused)
+                        .focused($focus, equals: .field)
 
                     if !viewModel.searchQuery.isEmpty {
                         Button {
                             viewModel.clearSearch()
-                            isSearchFieldFocused = true
+                            focus = .field
                         } label: {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.title2)
@@ -335,6 +363,6 @@ struct RecentSearchRow: View {
         viewModel: viewModel,
         authService: authService,
         coordinator: coordinator,
-        navigationManager: nil
+        navigationManager: NavigationManager()
     )
 }

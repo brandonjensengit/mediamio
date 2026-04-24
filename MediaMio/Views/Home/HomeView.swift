@@ -76,6 +76,7 @@ struct SearchViewWrapper: View {
     let authService: AuthenticationService
     let coordinator: NavigationCoordinator
     @StateObject private var viewModel: SearchViewModel
+    @EnvironmentObject var navigationManager: NavigationManager
 
     init(authService: AuthenticationService, coordinator: NavigationCoordinator, env: AppEnvironment) {
         self.authService = authService
@@ -91,7 +92,8 @@ struct SearchViewWrapper: View {
         SearchView(
             viewModel: viewModel,
             authService: authService,
-            coordinator: coordinator
+            coordinator: coordinator,
+            navigationManager: navigationManager
         )
     }
 }
