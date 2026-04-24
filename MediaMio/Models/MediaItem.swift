@@ -51,6 +51,13 @@ struct MediaItem: Codable, Identifiable, Hashable {
     // optional image tag (rendered as a thumbnail scrubber on Detail).
     let chapters: [Chapter]?
 
+    // Parent image lookups. For Episodes, Jellyfin does not stamp a `Logo`
+    // on the episode itself — the series owns the logo. These two fields
+    // let us resolve a hero title treatment for featured episodes without
+    // an extra API round-trip to `/Items/{seriesId}`.
+    let parentLogoItemId: String?
+    let parentLogoImageTag: String?
+
     enum CodingKeys: String, CodingKey {
         case id = "Id"
         case name = "Name"
@@ -79,6 +86,8 @@ struct MediaItem: Codable, Identifiable, Hashable {
         case externalUrls = "ExternalUrls"
         case remoteTrailers = "RemoteTrailers"
         case chapters = "Chapters"
+        case parentLogoItemId = "ParentLogoItemId"
+        case parentLogoImageTag = "ParentLogoImageTag"
     }
 
     // MARK: - Computed Properties
@@ -162,6 +171,22 @@ struct MediaItem: Codable, Identifiable, Hashable {
     func thumbImageURL(baseURL: String, maxWidth: Int = 600, quality: Int = 90) -> String? {
         guard imageTags?.thumb != nil else { return nil }
         return "\(baseURL)/Items/\(id)/Images/Thumb?maxWidth=\(maxWidth)&quality=\(quality)"
+    }
+
+    /// Title-treatment logo (transparent PNG with the title styled). Populated
+    /// from Jellyfin's `ImageTags.Logo` — for TMDb-scraped instances this
+    /// resolves for most movies and shows, and renders as the hero headline
+    /// instead of plain text. For Episodes, the logo lives on the parent
+    /// series, so this helper falls back to `ParentLogoItemId` when the
+    /// item has no direct logo of its own.
+    func logoImageURL(baseURL: String, maxWidth: Int = 600, quality: Int = 90) -> String? {
+        if imageTags?.logo != nil {
+            return "\(baseURL)/Items/\(id)/Images/Logo?maxWidth=\(maxWidth)&quality=\(quality)"
+        }
+        if let parentId = parentLogoItemId, parentLogoImageTag != nil {
+            return "\(baseURL)/Items/\(parentId)/Images/Logo?maxWidth=\(maxWidth)&quality=\(quality)"
+        }
+        return nil
     }
 
     /// Best 16:9 landscape image for a "Continue Watching"-style tile.

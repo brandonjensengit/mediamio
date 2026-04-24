@@ -329,7 +329,7 @@ class JellyfinAPIClient: ObservableObject {
             URLQueryItem(name: "Limit", value: String(limit)),
             URLQueryItem(name: "Fields", value: "PrimaryImageAspectRatio,BasicSyncInfo"),
             URLQueryItem(name: "ImageTypeLimit", value: "1"),
-            URLQueryItem(name: "EnableImageTypes", value: "Primary,Backdrop,Thumb"),
+            URLQueryItem(name: "EnableImageTypes", value: "Primary,Backdrop,Thumb,Logo"),
             URLQueryItem(name: "EnableTotalRecordCount", value: "false"),
             URLQueryItem(name: "MediaTypes", value: "Video")
         ]
@@ -351,7 +351,7 @@ class JellyfinAPIClient: ObservableObject {
             URLQueryItem(name: "Limit", value: String(limit)),
             URLQueryItem(name: "Fields", value: "PrimaryImageAspectRatio,Path,OfficialRating"),
             URLQueryItem(name: "ImageTypeLimit", value: "1"),
-            URLQueryItem(name: "EnableImageTypes", value: "Primary,Backdrop,Thumb")
+            URLQueryItem(name: "EnableImageTypes", value: "Primary,Backdrop,Thumb,Logo")
         ]
 
         if let parentId = parentId {
@@ -385,7 +385,7 @@ class JellyfinAPIClient: ObservableObject {
         var queryItems = [
             URLQueryItem(name: "Fields", value: "PrimaryImageAspectRatio,Path,Overview,OfficialRating"),
             URLQueryItem(name: "ImageTypeLimit", value: "1"),
-            URLQueryItem(name: "EnableImageTypes", value: "Primary,Backdrop,Thumb"),
+            URLQueryItem(name: "EnableImageTypes", value: "Primary,Backdrop,Thumb,Logo"),
             URLQueryItem(name: "StartIndex", value: String(startIndex)),
             URLQueryItem(name: "Limit", value: String(limit)),
             URLQueryItem(name: "Recursive", value: "true")
@@ -508,7 +508,7 @@ class JellyfinAPIClient: ObservableObject {
             URLQueryItem(name: "Recursive", value: "true"),
             URLQueryItem(name: "Fields", value: "PrimaryImageAspectRatio,Path,Overview,OfficialRating"),
             URLQueryItem(name: "ImageTypeLimit", value: "1"),
-            URLQueryItem(name: "EnableImageTypes", value: "Primary,Backdrop,Thumb"),
+            URLQueryItem(name: "EnableImageTypes", value: "Primary,Backdrop,Thumb,Logo"),
             URLQueryItem(name: "Limit", value: String(limit)),
             URLQueryItem(name: "StartIndex", value: String(startIndex))
         ]

@@ -726,7 +726,9 @@ struct EpisodeCard: View {
         providerIds: nil,
         externalUrls: nil,
         remoteTrailers: nil,
-        chapters: nil
+        chapters: nil,
+        parentLogoItemId: nil,
+        parentLogoImageTag: nil
     )
 
     let authService = AuthenticationService()

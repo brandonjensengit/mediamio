@@ -277,7 +277,9 @@ extension View {
             providerIds: nil,
             externalUrls: nil,
             remoteTrailers: nil,
-            chapters: nil
+            chapters: nil,
+            parentLogoItemId: nil,
+            parentLogoImageTag: nil
         )
     }
 

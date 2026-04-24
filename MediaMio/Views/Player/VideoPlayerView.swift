@@ -321,7 +321,9 @@ struct ErrorPlayerView: View {
         providerIds: nil,
         externalUrls: nil,
         remoteTrailers: nil,
-        chapters: nil
+        chapters: nil,
+        parentLogoItemId: nil,
+        parentLogoImageTag: nil
     )
 
     VideoPlayerView(

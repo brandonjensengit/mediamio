@@ -1,7 +1,7 @@
 # MediaMio Design Plan — Phase 2: Streaming Flow Repair
 
 **Started:** 2026-04-23
-**Status:** Item A shipped 2026-04-23 (`4dfb6bd`). Item B shipped 2026-04-23. Items C–H pending.
+**Status:** Items A + B + C.1 shipped 2026-04-23. Item C.2 (actual trailer playback) deferred — blocked on YouTube URL resolution / Jellyfin local-trailers integration. Items D–H pending.
 **Scope:** tvOS streaming-app conventions, focus-engine correctness, real perf bugs, and the three "judge moments" (hero, shelf, detail → player). Picks up where `design-plan.md` left off after 7 chrome/palette items shipped 2026-04-22 / 2026-04-23.
 
 **Explicitly NOT in scope:** business logic, API client, authentication flow, settings business wiring, transcode policy (already fixed in `fix-unnecessary-transcode.md`).
@@ -122,7 +122,50 @@ Phase 2 is everything a tvOS user *feels* but that chrome-level work can't reach
 
 ---
 
-## Item C — Hero gets a title treatment + focus-dwell trailer (P1)
+## Item C.1 — Hero title treatment + vignette + settings scaffold — SHIPPED 2026-04-23
+
+### What landed
+
+- `MediaItem` + `JellyfinAPIClient` co-evolved so the server actually sends us logo data:
+  - Added `parentLogoItemId` / `parentLogoImageTag` to `MediaItem` — for Episodes, Jellyfin puts the logo on the parent series, not the episode itself. Without these two fields, every episode featured in the hero falls back to text.
+  - Four API endpoints (`getContinueWatching`, `getRecentlyAdded`, `getLibraryItems`, plus the search variant at 511) had `EnableImageTypes=Primary,Backdrop,Thumb` — explicitly excluding Logo. Added Logo to all four.
+  - New `MediaItem.logoImageURL(baseURL:maxWidth:quality:)` tries direct logo first, falls back to parent-logo URL for episodes.
+  - Updated the 6 `MediaItem(...)` preview callsites with the two new nil fields.
+- New private `HeroTitle` view inside `HeroBanner.swift`:
+  - Uses a private `ImageLoader` directly (not `AsyncImageView`) so the failure case is a silent fall-through to typographic text, not a "Failed to load" placeholder card.
+  - Renders the logo `contentMode: .fit` within a 600×180pt box so wordmarks stay readable and square logos don't letterbox.
+  - Shadow `.black.opacity(0.5)` radius 12pt y=4 for legibility against any backdrop.
+  - Preserves the previous `.system(size: 60, weight: .bold)` Text as the fallback — zero regression when no logo exists.
+- `HeroBannerContent` backdrop composition:
+  - Added a centered `RadialGradient` vignette (clear → `.black.opacity(0.35)` at 60% of screen width) layered between the linear gradient and the content overlay. Corner dim, center clear, `.allowsHitTesting(false)` so it never intercepts remote input.
+  - Replaced the inline title Text with `HeroTitle(item:baseURL:)` — rest of the content stack (metadata line / overview / action buttons) unchanged.
+  - Terminal gradient stop was *already* blending to `Constants.Colors.background` from Item A's work — no change needed there.
+- `SettingsManager` gained `@AppStorage("autoPlayTrailers") var autoPlayTrailers = true` (opt-out, default on).
+- `PlaybackSettingsView`'s Auto-Play section gets a new "Auto-Play Hero Trailers" toggle and updated footer copy ("Hero trailers start muted on focus dwell.").
+
+### Verified on sim
+
+Demo server featured-items rotation produced title treatments for:
+- The Parent Trap (branded yellow/teal decorative wordmark)
+- Books of Blood (stylized "BLOOD" serif)
+- Versa (Disney banner + serif VERSA wordmark)
+- THE ACOLYTE — **episode** pulling through `ParentLogoItemId` (this is the one that proves the fallback works; without it episodes render text)
+
+Falls back cleanly for items with no logo (e.g. Sid and Nancy).
+
+### Known trade-offs / C.2 follow-up
+
+- **Trailer playback deferred.** The plan called for a 2s-dwell muted trailer over the backdrop. Blocked because Jellyfin's `RemoteTrailers` entries are YouTube URLs, and AVPlayer can't play YouTube directly. Three viable paths for C.2:
+  1. Integrate Jellyfin's local-trailer API — `/Users/{userId}/Items/{itemId}/LocalTrailers` returns actual playable Jellyfin items. Works only on servers where the admin enabled local-trailer scraping.
+  2. Add a YouTube extractor dependency (XCDYouTubeKit or similar) to resolve a direct stream URL from the `youtube.com/watch?v=…` link. Adds a third-party dep + fragile against YouTube changes.
+  3. Skip trailer playback entirely and close the ticket.
+  - Default direction: path 1 (local trailers), fall back to showing nothing. Gate on `autoPlayTrailers == true && localTrailers.first != nil`.
+- Vignette is intentionally subtle (α=0.35 outer). If it reads as invisible on the TV at 10ft, raise to 0.5 in a follow-up tweak — do not go past 0.6 or the backdrop photo starts to feel artificially boxed.
+- Logo size (600×180pt) is a fixed upper bound. Square logos (series-style circle marks) will render much smaller inside that box; if that becomes a visual issue, pass a per-item aspect hint from Jellyfin's `LogoImageTags` metadata (not currently decoded).
+
+---
+
+## Item C — original plan (historical)
 
 **Why:** the first 2 seconds of the app. Biggest cinematic upgrade per line of code.
 

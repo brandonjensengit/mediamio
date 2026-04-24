@@ -101,12 +101,20 @@ struct PlaybackSettingsView: View {
                         .accentColor(Constants.Colors.accent)
                         .listRowBackground(Constants.Colors.surface1)
                     }
+
+                    Toggle("Auto-Play Hero Trailers", isOn: $settingsManager.autoPlayTrailers)
+                        .foregroundColor(.white)
+                        .tint(Constants.Colors.accent)
+                        .listRowBackground(Constants.Colors.surface1)
                 } header: {
                     Text("Auto-Play")
                         .foregroundColor(.white)
                 } footer: {
                     if settingsManager.autoPlayNext && settingsManager.autoPlayCountdown > 0 {
-                        Text("Next episode will start after \(settingsManager.autoPlayCountdown) seconds")
+                        Text("Next episode will start after \(settingsManager.autoPlayCountdown) seconds. Hero trailers start muted on focus dwell.")
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("Hero trailers start muted on focus dwell.")
                             .foregroundColor(.secondary)
                     }
                 }

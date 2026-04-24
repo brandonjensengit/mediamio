@@ -27,6 +27,11 @@ class SettingsManager: ObservableObject {
     @AppStorage("markPlayedThreshold") var markPlayedThreshold = 90
     @AppStorage("rememberAudioTrack") var rememberAudioTrack = true
     @AppStorage("rememberSubtitleTrack") var rememberSubtitleTrack = true
+    /// Streaming convention: on 2s hero focus dwell, start a muted looping
+    /// trailer over the backdrop. Opt-out (default on). The actual trailer
+    /// playback is blocked on a YouTube URL resolver or Jellyfin
+    /// local-trailer API integration — phase 2 item C.2 will wire playback.
+    @AppStorage("autoPlayTrailers") var autoPlayTrailers = true
 
     // MARK: - Subtitle Settings
     @AppStorage("subtitleMode") var subtitleMode = SubtitleMode.off.rawValue
