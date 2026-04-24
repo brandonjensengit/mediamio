@@ -13,10 +13,6 @@ struct LibraryView: View {
     // Focus state
     @FocusState private var toolbarFocus: LibraryToolbar.ToolbarField?
 
-    // Modal state. Filter pickers were folded into tvOS Menu popovers on
-    // the filter chips themselves — no more sheet-on-focus takeover.
-    @State private var showSearch = false
-
     private let columns = [
         GridItem(.adaptive(minimum: 250, maximum: 350), spacing: 40)
     ]
@@ -46,10 +42,9 @@ struct LibraryView: View {
                 HStack(spacing: 0) {
                     ScrollView(.vertical, showsIndicators: true) {
                         VStack(spacing: 0) {
-                            // Toolbar with title, sort, and search
+                            // Toolbar with title and sort
                             LibraryToolbar(
                                 viewModel: viewModel,
-                                showSearch: $showSearch,
                                 focusedField: $toolbarFocus
                             )
                             .padding(.top, 40)
@@ -114,9 +109,6 @@ struct LibraryView: View {
         .task {
             await viewModel.loadContent()
             await viewModel.loadFilterOptions()
-        }
-        .sheet(isPresented: $showSearch) {
-            LibrarySearchModal(viewModel: viewModel)
         }
     }
 }

@@ -9,13 +9,11 @@ import SwiftUI
 
 struct LibraryToolbar: View {
     @ObservedObject var viewModel: LibraryViewModel
-    @Binding var showSearch: Bool
 
     @FocusState.Binding var focusedField: ToolbarField?
 
     enum ToolbarField: Hashable {
         case sort
-        case search
     }
 
     var body: some View {
@@ -69,12 +67,6 @@ struct LibraryToolbar: View {
             .buttonStyle(.plain)
             .chromeFocus()
             .focused($focusedField, equals: .sort)
-
-            // Search — plain action, use the shared MenuChip.
-            MenuChip(title: "Search", leadingIcon: "magnifyingglass") {
-                showSearch = true
-            }
-            .focused($focusedField, equals: .search)
         }
         .padding(.horizontal, 60)
         .padding(.vertical, 20)
