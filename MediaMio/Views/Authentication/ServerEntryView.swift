@@ -36,7 +36,7 @@ struct ServerEntryView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Constants.Colors.background.ignoresSafeArea()
 
             if isLoading {
                 LoadingView(message: "Connecting to server...")
@@ -315,14 +315,9 @@ private struct SavedProfileRow: View {
             }
             .padding()
             .frame(maxWidth: .infinity)
-            .background(Constants.Colors.cardBackground)
+            .background(Constants.Colors.surface1)
             .cornerRadius(Constants.UI.cornerRadius)
-            .scaleEffect(envFocused ? Constants.UI.focusScale : Constants.UI.normalScale)
-            .shadow(
-                color: envFocused ? .white.opacity(0.4) : .clear,
-                radius: Constants.UI.focusShadowRadius
-            )
-            .animation(.easeInOut(duration: Constants.UI.animationDuration), value: envFocused)
+            .chromeFocus(isFocused: envFocused)
         }
         .buttonStyle(.plain)
     }
@@ -359,14 +354,9 @@ private struct DiscoveredServerRow: View {
             }
             .padding()
             .frame(maxWidth: .infinity)
-            .background(Constants.Colors.cardBackground)
+            .background(Constants.Colors.surface1)
             .cornerRadius(Constants.UI.cornerRadius)
-            .scaleEffect(envFocused ? Constants.UI.focusScale : Constants.UI.normalScale)
-            .shadow(
-                color: envFocused ? .white.opacity(0.4) : .clear,
-                radius: Constants.UI.focusShadowRadius
-            )
-            .animation(.easeInOut(duration: Constants.UI.animationDuration), value: envFocused)
+            .chromeFocus(isFocused: envFocused)
         }
         .buttonStyle(.plain)
     }

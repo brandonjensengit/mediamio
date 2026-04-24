@@ -53,10 +53,9 @@ struct SettingsRowWithFocus: View {
         .padding(.horizontal, 20)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(isFocused ? Color(hex: "667eea").opacity(0.2) : Color.clear)
+                .fill(isFocused ? Constants.Colors.accent.opacity(0.2) : Color.clear)
         )
-        .scaleEffect(isFocused ? 1.02 : 1.0)
-        .animation(.easeInOut(duration: 0.2), value: isFocused)
+        .chromeFocus()
     }
 }
 

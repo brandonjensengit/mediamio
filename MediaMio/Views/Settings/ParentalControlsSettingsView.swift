@@ -22,7 +22,7 @@ struct ParentalControlsSettingsView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Constants.Colors.background.ignoresSafeArea()
 
             if !hasPIN {
                 PINSetupView(
@@ -86,7 +86,7 @@ private struct PINSetupView: View {
                 Text("Set a 4-digit PIN")
                     .font(.title2)
                     .foregroundColor(.white)
-                    .listRowBackground(Color.black.opacity(0.3))
+                    .listRowBackground(Constants.Colors.surface1)
             } footer: {
                 Text("You'll enter this PIN to change parental controls. Don't lose it — the only recovery path turns parental controls off.")
                     .foregroundColor(.secondary)
@@ -96,12 +96,12 @@ private struct PINSetupView: View {
                 SecureField("PIN", text: $pin)
                     .foregroundColor(.white)
                     .focused($focused, equals: .pin)
-                    .listRowBackground(Color.black.opacity(0.3))
+                    .listRowBackground(Constants.Colors.surface1)
 
                 SecureField("Confirm PIN", text: $confirmPin)
                     .foregroundColor(.white)
                     .focused($focused, equals: .confirm)
-                    .listRowBackground(Color.black.opacity(0.3))
+                    .listRowBackground(Constants.Colors.surface1)
             } footer: {
                 if let error = errorMessage {
                     Text(error)
@@ -118,7 +118,7 @@ private struct PINSetupView: View {
                         .padding(.vertical, 8)
                 }
                 .focused($focused, equals: .save)
-                .listRowBackground(Color(hex: "667eea"))
+                .listRowBackground(Constants.Colors.accent)
                 .disabled(!canSave)
             }
         }
@@ -162,12 +162,12 @@ private struct PINUnlockView: View {
                 HStack {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 40))
-                        .foregroundColor(Color(hex: "667eea"))
+                        .foregroundColor(Constants.Colors.accent)
                     Text("Enter PIN")
                         .font(.title2)
                         .foregroundColor(.white)
                 }
-                .listRowBackground(Color.black.opacity(0.3))
+                .listRowBackground(Constants.Colors.surface1)
             } footer: {
                 Text("Parental controls are locked. Enter your PIN to change settings.")
                     .foregroundColor(.secondary)
@@ -177,7 +177,7 @@ private struct PINUnlockView: View {
                 SecureField("PIN", text: $pin)
                     .foregroundColor(.white)
                     .focused($focused, equals: .pin)
-                    .listRowBackground(Color.black.opacity(0.3))
+                    .listRowBackground(Constants.Colors.surface1)
             } footer: {
                 if let error = errorMessage {
                     Text(error)
@@ -194,7 +194,7 @@ private struct PINUnlockView: View {
                         .padding(.vertical, 8)
                 }
                 .focused($focused, equals: .submit)
-                .listRowBackground(Color(hex: "667eea"))
+                .listRowBackground(Constants.Colors.accent)
                 .disabled(pin.isEmpty)
             }
 
@@ -205,7 +205,7 @@ private struct PINUnlockView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .focused($focused, equals: .forgot)
-                .listRowBackground(Color.black.opacity(0.3))
+                .listRowBackground(Constants.Colors.surface1)
             }
         }
         .buttonStyle(.plain)
@@ -245,8 +245,8 @@ private struct ParentalControlsMainView: View {
             Section {
                 Toggle("Enable Parental Controls", isOn: $settingsManager.parentalControlsEnabled)
                     .foregroundColor(.white)
-                    .tint(Color(hex: "667eea"))
-                    .listRowBackground(Color.black.opacity(0.3))
+                    .tint(Constants.Colors.accent)
+                    .listRowBackground(Constants.Colors.surface1)
             } footer: {
                 Text(settingsManager.parentalControlsEnabled
                      ? "Content above the selected rating will be hidden from Home, Library, and Search."
@@ -265,13 +265,13 @@ private struct ParentalControlsMainView: View {
                                 .foregroundColor(.secondary)
                         }
                         .tag(level.rawValue)
-                        .listRowBackground(Color.black.opacity(0.3))
+                        .listRowBackground(Constants.Colors.surface1)
                     }
                 }
                 .pickerStyle(.navigationLink)
                 .foregroundColor(.white)
-                .accentColor(Color(hex: "667eea"))
-                .listRowBackground(Color.black.opacity(0.3))
+                .accentColor(Constants.Colors.accent)
+                .listRowBackground(Constants.Colors.surface1)
                 .disabled(!settingsManager.parentalControlsEnabled)
             } header: {
                 Text("Content Level")
@@ -285,13 +285,13 @@ private struct ParentalControlsMainView: View {
                 Button(action: { showChangePIN = true }) {
                     HStack {
                         Image(systemName: "key.fill")
-                            .foregroundColor(Color(hex: "667eea"))
+                            .foregroundColor(Constants.Colors.accent)
                         Text("Change PIN")
                             .foregroundColor(.white)
                         Spacer()
                     }
                 }
-                .listRowBackground(Color.black.opacity(0.3))
+                .listRowBackground(Constants.Colors.surface1)
 
                 Button(role: .destructive, action: onClearPIN) {
                     HStack {
@@ -302,7 +302,7 @@ private struct ParentalControlsMainView: View {
                         Spacer()
                     }
                 }
-                .listRowBackground(Color.black.opacity(0.3))
+                .listRowBackground(Constants.Colors.surface1)
             } header: {
                 Text("PIN")
                     .foregroundColor(.white)
@@ -341,18 +341,18 @@ private struct ChangePINSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.black.ignoresSafeArea()
+                Constants.Colors.background.ignoresSafeArea()
                 Form {
                     Section {
                         SecureField("Current PIN", text: $oldPin)
                             .foregroundColor(.white)
-                            .listRowBackground(Color.black.opacity(0.3))
+                            .listRowBackground(Constants.Colors.surface1)
                         SecureField("New PIN", text: $newPin)
                             .foregroundColor(.white)
-                            .listRowBackground(Color.black.opacity(0.3))
+                            .listRowBackground(Constants.Colors.surface1)
                         SecureField("Confirm New PIN", text: $confirmPin)
                             .foregroundColor(.white)
-                            .listRowBackground(Color.black.opacity(0.3))
+                            .listRowBackground(Constants.Colors.surface1)
                     } footer: {
                         if let error = errorMessage {
                             Text(error).foregroundColor(.red)
@@ -367,7 +367,7 @@ private struct ChangePINSheet: View {
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
                         }
-                        .listRowBackground(Color(hex: "667eea"))
+                        .listRowBackground(Constants.Colors.accent)
                         .disabled(!canSave)
 
                         Button(action: onDone) {
@@ -375,7 +375,7 @@ private struct ChangePINSheet: View {
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                         }
-                        .listRowBackground(Color.black.opacity(0.3))
+                        .listRowBackground(Constants.Colors.surface1)
                     }
                 }
                 .buttonStyle(.plain)

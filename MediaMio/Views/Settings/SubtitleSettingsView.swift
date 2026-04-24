@@ -20,7 +20,7 @@ struct SubtitleSettingsView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Constants.Colors.background.ignoresSafeArea()
 
             Form {
                 // Subtitle Mode
@@ -35,13 +35,13 @@ struct SubtitleSettingsView: View {
                                     .foregroundColor(.secondary)
                             }
                             .tag(mode.rawValue)
-                            .listRowBackground(Color.black.opacity(0.3))
+                            .listRowBackground(Constants.Colors.surface1)
                         }
                     }
                     .pickerStyle(.navigationLink)
                     .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Color(hex: "667eea"))
-                    .listRowBackground(Color.black.opacity(0.3))
+                    .accentColor(Constants.Colors.accent)
+                    .listRowBackground(Constants.Colors.surface1)
                 } header: {
                     Text("Mode")
                         .foregroundColor(.white)
@@ -54,26 +54,26 @@ struct SubtitleSettingsView: View {
                 Section {
                     Picker("Default Language", selection: $settingsManager.defaultSubtitleLanguage) {
                         Text("None").tag("none")
-                            .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                         Text("English").tag("eng")
-                            .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                         Text("Spanish").tag("spa")
-                            .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                         Text("French").tag("fra")
-                            .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                         Text("German").tag("deu")
-                            .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                         Text("Italian").tag("ita")
-                            .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                         Text("Japanese").tag("jpn")
-                            .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                         Text("Korean").tag("kor")
-                            .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                     }
                     .pickerStyle(.navigationLink)
                     .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Color(hex: "667eea"))
-                    .listRowBackground(Color.black.opacity(0.3))
+                    .accentColor(Constants.Colors.accent)
+                    .listRowBackground(Constants.Colors.surface1)
                 } header: {
                     Text("Language")
                         .foregroundColor(.white)
@@ -85,7 +85,7 @@ struct SubtitleSettingsView: View {
                         ForEach(SubtitleSize.allCases) { size in
                             Text(size.rawValue).tag(size.rawValue)
                                 .foregroundColor(.white)  // ALWAYS white
-                                .listRowBackground(Color.black.opacity(0.3))
+                                .listRowBackground(Constants.Colors.surface1)
                         }
                     }
                     .pickerStyle(.segmented)
@@ -97,61 +97,61 @@ struct SubtitleSettingsView: View {
                             Text("White").foregroundColor(.white)
                         }
                         .tag("white")
-                        .listRowBackground(Color.black.opacity(0.3))
+                        .listRowBackground(Constants.Colors.surface1)
 
                         HStack {
                             Circle().fill(.yellow).frame(width: 20, height: 20)
                             Text("Yellow").foregroundColor(.white)
                         }
                         .tag("yellow")
-                        .listRowBackground(Color.black.opacity(0.3))
+                        .listRowBackground(Constants.Colors.surface1)
 
                         HStack {
                             Circle().fill(.cyan).frame(width: 20, height: 20)
                             Text("Cyan").foregroundColor(.white)
                         }
                         .tag("cyan")
-                        .listRowBackground(Color.black.opacity(0.3))
+                        .listRowBackground(Constants.Colors.surface1)
 
                         HStack {
                             Circle().fill(.green).frame(width: 20, height: 20)
                             Text("Green").foregroundColor(.white)
                         }
                         .tag("green")
-                        .listRowBackground(Color.black.opacity(0.3))
+                        .listRowBackground(Constants.Colors.surface1)
                     }
                     .pickerStyle(.navigationLink)
                     .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Color(hex: "667eea"))
+                    .accentColor(Constants.Colors.accent)
 
-                    .listRowBackground(Color.black.opacity(0.3))
+                    .listRowBackground(Constants.Colors.surface1)
                     Picker("Background", selection: $settingsManager.subtitleBackground) {
                         Text("None").tag("none")
-                            .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                         Text("Semi-Transparent").tag("semitransparent")
-                            .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                         Text("Black").tag("black")
-                            .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                     }
                     .pickerStyle(.navigationLink)
                     .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Color(hex: "667eea"))
+                    .accentColor(Constants.Colors.accent)
 
-                    .listRowBackground(Color.black.opacity(0.3))
+                    .listRowBackground(Constants.Colors.surface1)
                     Picker("Edge Style", selection: $settingsManager.subtitleEdgeStyle) {
                         Text("None").tag("none")
-                            .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                         Text("Drop Shadow").tag("dropShadow")
-                            .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                         Text("Outline").tag("outline")
-                            .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                         Text("Raised").tag("raised")
-                            .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                     }
                     .pickerStyle(.navigationLink)
                     .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Color(hex: "667eea"))
-                    .listRowBackground(Color.black.opacity(0.3))
+                    .accentColor(Constants.Colors.accent)
+                    .listRowBackground(Constants.Colors.surface1)
                 } header: {
                     Text("Appearance")
                         .foregroundColor(.white)

@@ -16,7 +16,7 @@ struct AccountSettingsView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Constants.Colors.background.ignoresSafeArea()
 
             Form {
                 // User Profile
@@ -26,7 +26,7 @@ struct AccountSettingsView: View {
                             // User avatar placeholder
                             ZStack {
                                 Circle()
-                                    .fill(Color(hex: "667eea"))
+                                    .fill(Constants.Colors.accent)
                                     .frame(width: 80, height: 80)
 
                                 Text(session.user.name.prefix(1).uppercased())

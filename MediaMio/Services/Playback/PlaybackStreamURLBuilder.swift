@@ -172,7 +172,7 @@ struct PlaybackStreamURLBuilder {
             URLQueryItem(name: "EnableAutoStreamCopy", value: "true"),
             URLQueryItem(name: "CopyTimestamps", value: "true"),
             URLQueryItem(name: "RequireNonAnamorphic", value: "false"),
-            URLQueryItem(name: "SubtitleMethod", value: "Encode"),
+            URLQueryItem(name: "SubtitleMethod", value: "Hls"),
             URLQueryItem(name: "SubtitleCodec", value: "webvtt"),
             URLQueryItem(name: "VerticalTextPosition", value: "90"),
             URLQueryItem(name: "SubtitleProfile", value: "default")
@@ -220,7 +220,7 @@ struct PlaybackStreamURLBuilder {
             URLQueryItem(name: "EnableAutoStreamCopy", value: "true"),
             URLQueryItem(name: "CopyTimestamps", value: "true"),
             URLQueryItem(name: "RequireNonAnamorphic", value: "false"),
-            URLQueryItem(name: "SubtitleMethod", value: "Encode"),
+            URLQueryItem(name: "SubtitleMethod", value: "Hls"),
             URLQueryItem(name: "SubtitleCodec", value: "webvtt"),
             URLQueryItem(name: "VerticalTextPosition", value: "90"),
             URLQueryItem(name: "SubtitleProfile", value: "default")
@@ -260,7 +260,7 @@ struct PlaybackStreamURLBuilder {
             URLQueryItem(name: "EnableAutoStreamCopy", value: "true"),
             URLQueryItem(name: "CopyTimestamps", value: "true"),
             URLQueryItem(name: "RequireNonAnamorphic", value: "false"),
-            URLQueryItem(name: "SubtitleMethod", value: "Encode"),
+            URLQueryItem(name: "SubtitleMethod", value: "Hls"),
             URLQueryItem(name: "SubtitleCodec", value: "webvtt"),
             URLQueryItem(name: "VerticalTextPosition", value: "90"),
             URLQueryItem(name: "SubtitleProfile", value: "default")

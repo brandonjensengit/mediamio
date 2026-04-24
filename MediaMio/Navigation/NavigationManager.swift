@@ -20,8 +20,14 @@ class NavigationManager: ObservableObject {
     // Detail view presentation
     @Published var presentedItem: MediaItem?
 
-    // Player state
-    @Published var showingPlayer: Bool = false
+    // Player state. Two separate flags so the correct presenter fires
+    // without making the other presenter race on the same boolean — tvOS
+    // only has one modal context per view, so binding both a root-level
+    // cover and a sheet-level cover to the same flag results in one of
+    // them silently losing the race. `playItem` picks which flag to set
+    // based on whether a Detail sheet is currently open.
+    @Published var showingPlayerAtRoot: Bool = false     // from Hero / Continue Watching / Library row
+    @Published var showingPlayerOverDetail: Bool = false // from inside an open Detail sheet
     @Published var currentPlayerItem: MediaItem?
     // Start offset override, set when launching playback from a chapter tap
     // on Detail. Nil = "use the item's resume data, if any".
@@ -46,22 +52,29 @@ class NavigationManager: ObservableObject {
 
     /// Start playing a media item. Pass `startPositionTicks` to jump to a
     /// specific offset (chapter tap); omit it to use the item's resume data.
+    ///
+    /// If the Detail sheet is open, the player presents from the sheet's
+    /// own modal context (`showingPlayerOverDetail`) — the sheet stays
+    /// mounted underneath, so Menu-back returns to Detail, not Home, and
+    /// there is no sheet-dismiss / re-present flicker.
     func playItem(_ item: MediaItem, startPositionTicks: Int64? = nil) {
         currentPlayerItem = item
         currentPlayerStartTicks = startPositionTicks
 
-        // If detail sheet is open, dismiss it first before showing player
         if presentedItem != nil {
-            presentedItem = nil
-            // Delay showing player to allow sheet dismiss animation
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                self.showingPlayer = true
-                print("▶️ Playing: \(item.name)")
-            }
+            showingPlayerOverDetail = true
         } else {
-            showingPlayer = true
-            print("▶️ Playing: \(item.name)")
+            showingPlayerAtRoot = true
         }
+        print("▶️ Playing: \(item.name)")
+    }
+
+    /// Invoked by whichever `.fullScreenCover` presented the player, on
+    /// dismiss. Clears the transient player state; the underlying presenter
+    /// (root view or Detail sheet) returns on its own.
+    func handlePlayerDismissed() {
+        currentPlayerItem = nil
+        currentPlayerStartTicks = nil
     }
 
     /// Dismiss the detail view
@@ -70,9 +83,12 @@ class NavigationManager: ObservableObject {
         print("📱 Dismissed detail view")
     }
 
-    /// Close the video player
+    /// Close the video player. Currently unused — the fullScreenCover
+    /// binding drives dismissal; kept for callers that may want to force-
+    /// close the player programmatically later.
     func closePlayer() {
-        showingPlayer = false
+        showingPlayerAtRoot = false
+        showingPlayerOverDetail = false
         currentPlayerItem = nil
         currentPlayerStartTicks = nil
         print("⏹️ Closed player")

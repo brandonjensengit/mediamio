@@ -54,7 +54,7 @@ struct QuickConnectView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Constants.Colors.background.ignoresSafeArea()
 
             VStack(spacing: 40) {
                 header
@@ -138,7 +138,7 @@ struct QuickConnectView: View {
                 .tracking(24)
                 .padding(.horizontal, 80)
                 .padding(.vertical, 40)
-                .background(Color.white.opacity(0.1))
+                .background(Constants.Colors.surface1)
                 .cornerRadius(Constants.UI.cornerRadius)
 
             HStack(spacing: 16) {

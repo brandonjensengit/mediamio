@@ -24,7 +24,7 @@ struct LibraryTabView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Constants.Colors.background.ignoresSafeArea()
 
             if viewModel.isLoading {
                 LoadingView(message: "Loading libraries...")

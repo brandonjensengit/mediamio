@@ -95,11 +95,29 @@ enum Constants {
 
     // MARK: - UI Constants
     enum UI {
-        // Focus Effects (Netflix-level specs)
-        static let focusScale: CGFloat = 1.1  // Netflix-level: 1.0 → 1.1
-        static let normalScale: CGFloat = 1.0
-        static let focusShadowRadius: CGFloat = 20  // 20pt blur radius
-        static let animationDuration: Double = 0.2  // 200ms - feels instant
+        // ── Focus tiers ──────────────────────────────────────────
+        /// Chrome surfaces: nav chips, settings rows, toolbar pills, sidebar
+        /// rows. Subtle lift, no glow — never competes with content.
+        enum ChromeFocus {
+            static let scale: CGFloat = 1.03
+            static let yOffset: CGFloat = -4
+            static let shadowColor: Color = .black.opacity(0.35)
+            static let shadowRadius: CGFloat = 10
+            static let shadowY: CGFloat = 6
+            static let animation: Animation = .easeInOut(duration: 0.2)
+        }
+
+        /// Content surfaces: posters, hero CTAs. Bigger lift + dark drop
+        /// shadow that reads as depth on a dark background. Never white
+        /// glow — that's the AI-generated tell.
+        enum ContentFocus {
+            static let scale: CGFloat = 1.10
+            static let yOffset: CGFloat = -8
+            static let shadowColor: Color = .black.opacity(0.55)
+            static let shadowRadius: CGFloat = 24
+            static let shadowY: CGFloat = 12
+            static let animation: Animation = .spring(response: 0.3, dampingFraction: 0.7)
+        }
 
         // Spacing (Netflix-level: 60pt edge padding)
         static let defaultPadding: CGFloat = 60  // Edge breathing room
@@ -134,12 +152,40 @@ enum Constants {
     }
 
     // MARK: - Colors
+    /// Cinematic palette: warm-amber accent on a cool dark blue-black base.
+    /// Source values authored in OKLCH (perceptually even L ramp at fixed
+    /// hue 260°, chroma 0.015) and pre-converted to sRGB hex below.
+    /// Re-derive in any OKLCH-aware tool if shades need tuning.
     enum Colors {
-        static let primary = Color.blue
-        static let secondary = Color.gray
-        static let background = Color.black
-        static let cardBackground = Color(white: 0.15)
+        // ── Brand accent ──────────────────────────────────────────
+        /// Warm amber — projector-tungsten warmth. oklch(0.78 0.15 75)
+        static let accent = Color(hex: "e8a13b")
+        /// Darker amber for pressed/secondary accent. oklch(0.65 0.13 75)
+        static let accentMuted = Color(hex: "b97d22")
+
+        // ── Surfaces (cool dark, never pure black) ────────────────
+        /// Page background. oklch(0.15 0.015 260)
+        static let background = Color(hex: "0d0f15")
+        /// Card / list-row fill. oklch(0.20 0.015 260)
+        static let surface1 = Color(hex: "161922")
+        /// Pill / secondary-button fill. oklch(0.25 0.015 260)
+        static let surface2 = Color(hex: "1f2330")
+        /// Focused-chip / elevated fill. oklch(0.32 0.015 260)
+        static let surface3 = Color(hex: "2c303f")
+
+        // ── Lines & focus ─────────────────────────────────────────
+        /// Hairline divider. surface3 @ 0.6
+        static let divider = Color(hex: "2c303f").opacity(0.6)
+        /// Default focused-border tint (chrome focus, not glow).
         static let focusedBorder = Color.white
+
+        // ── Legacy aliases (do not use in new code) ───────────────
+        /// Use `accent` instead.
+        static let primary = accent
+        /// Generic muted-text. Prefer `.white.opacity(0.7)` inline.
+        static let secondary = Color.gray
+        /// Use `surface1` instead.
+        static let cardBackground = surface1
     }
 
     // MARK: - Error Messages

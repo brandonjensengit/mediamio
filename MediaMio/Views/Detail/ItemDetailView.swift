@@ -13,7 +13,7 @@ struct ItemDetailView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Constants.Colors.background.ignoresSafeArea()
 
             ScrollView(.vertical, showsIndicators: true) {
                 VStack(spacing: 0) {
@@ -100,6 +100,11 @@ struct ItemDetailView: View {
                 }
             }
             .id(viewModel.item.id)  // Force ScrollView to recreate at position 0
+            // Push the cinematic header past tvOS overscan margins on the
+            // sides and top so the backdrop/gradient bleed to the screen
+            // edges. Bottom safe area is preserved so the last scroll
+            // section ends with natural breathing room.
+            .ignoresSafeArea(edges: [.horizontal, .top])
         }
         .task {
             await viewModel.loadDetails()
@@ -109,169 +114,235 @@ struct ItemDetailView: View {
 
 // MARK: - Detail Header
 
+/// Apple-TV-style cinematic header: full-bleed backdrop, poster on the left,
+/// title/metadata/actions stacked to its right. When no real backdrop image
+/// exists (Jellyfin returns nothing for many catalog entries) we fall through
+/// to a solid surface so the poster carries the visual weight rather than
+/// reusing the poster as a centered "logo on a void".
 struct DetailHeaderView: View {
     @ObservedObject var viewModel: ItemDetailViewModel
     @State private var backdropURL: String?
-    @State private var showHandoff: Bool = false
+    @State private var posterURL: String?
+    @State private var showPlayChoice: Bool = false
     @FocusState private var focusedButton: FocusableButton?
 
     enum FocusableButton {
         case play
         case favorite
-        case handoff
     }
 
+    private static let headerHeight: CGFloat = 900
+    private static let posterWidth: CGFloat = 320
+    private static let posterHeight: CGFloat = 480
+    private static let horizontalPadding: CGFloat = 80
+    private static let bottomPadding: CGFloat = 70
+    private static let posterInfoGap: CGFloat = 50
+
     var body: some View {
-        ZStack(alignment: .bottom) {
-            // Backdrop Image — downsample to screen-pixel size to avoid 4K decode cost.
-            if let url = backdropURL {
-                GeometryReader { geometry in
-                    AsyncImageView(
-                        url: url,
-                        contentMode: .fill,
-                        targetPixelSize: ImageSizing.pixelSize(
-                            points: CGSize(width: geometry.size.width, height: 700)
-                        )
-                    )
-                        .frame(width: geometry.size.width)
-                        .offset(y: -100)  // Shift up slightly to show upper-middle portion
-                }
-                .frame(height: 700)
-                .clipped()
-            } else {
-                Color.gray.opacity(0.2)
-                    .frame(height: 700)
-            }
+        let displayItem = viewModel.detailedItem ?? viewModel.item
+        let isEpisode = displayItem.type == "Episode"
+        let showPoster = !isEpisode && posterURL != nil
 
-            // Gradient Overlay
-            LinearGradient(
-                colors: [
-                    Color.black.opacity(0.0),
-                    Color.black.opacity(0.5),
-                    Color.black.opacity(0.9),
-                    Color.black
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 700)
-
-            // Content
-            VStack(alignment: .leading, spacing: 24) {
-                let displayItem = viewModel.detailedItem ?? viewModel.item
-
-                // Title
-                Text(displayItem.name)
-                    .font(.system(size: 64, weight: .bold))
-                    .foregroundColor(.white)
-                    .lineLimit(2)
-                    .shadow(color: .black.opacity(0.5), radius: 10)
-
-                // Metadata Badges
-                HStack(spacing: 16) {
-                    if let year = displayItem.yearText {
-                        MetadataBadge(text: year, icon: nil)
-                    }
-
-                    if let rating = displayItem.ratingText {
-                        MetadataBadge(text: rating, icon: "star.fill")
-                    }
-
-                    if let runtime = displayItem.runtimeFormatted {
-                        MetadataBadge(text: runtime, icon: "clock")
-                    }
-
-                    if let officialRating = displayItem.officialRating {
-                        MetadataBadge(text: officialRating, icon: nil, style: .outlined)
-                    }
-                }
-
-                // Progress Bar
-                if viewModel.hasProgress {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("\(Int(viewModel.progressPercentage))% watched")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
-
-                        ProgressBar(progress: viewModel.progressPercentage / 100.0)
-                            .frame(height: 6)
-                            .frame(maxWidth: 600)
-                    }
-                }
-
-                // Action Buttons (hide Play for Series - episodes shown below)
-                if displayItem.type != "Series" {
-                    HStack(spacing: 24) {
-                        // Play/Resume Button (default focus)
-                        DetailActionButton(
-                            title: viewModel.hasProgress ? "Resume" : "Play",
-                            icon: "play.fill",
-                            style: .primary
-                        ) {
-                            viewModel.playItem()
-                        }
-                        .focused($focusedButton, equals: .play)
-
-                        // Favorite Button
-                        DetailActionButton(
-                            title: viewModel.isFavorite ? "Unfavorite" : "Favorite",
-                            icon: viewModel.isFavorite ? "heart.fill" : "heart",
-                            style: .secondary
-                        ) {
-                            viewModel.toggleFavorite()
-                        }
-                        .focused($focusedButton, equals: .favorite)
-
-                        // Handoff to Phone — only if we have a server URL to link to
-                        if !viewModel.handoffURL.isEmpty {
-                            DetailActionButton(
-                                title: "Open on Phone",
-                                icon: "qrcode",
-                                style: .secondary
-                            ) {
-                                showHandoff = true
-                            }
-                            .focused($focusedButton, equals: .handoff)
-                        }
-                    }
-                    .padding(.bottom, 40)
-                }
-            }
-            .padding(.horizontal, Constants.UI.defaultPadding)
+        ZStack(alignment: .bottomLeading) {
+            backdropLayer
+            gradientLayer
+            contentRow(displayItem: displayItem, showPoster: showPoster)
         }
-        .frame(height: 700)
+        .frame(height: Self.headerHeight)
         .onAppear {
-            updateBackdropURL()
-            // Set default focus to Play button (Netflix-level UX)
+            updateImageURLs()
             focusedButton = .play
         }
         .onChange(of: viewModel.detailedItem) { _ in
-            updateBackdropURL()
+            updateImageURLs()
         }
-        .sheet(isPresented: $showHandoff) {
-            let displayItem = viewModel.detailedItem ?? viewModel.item
-            QRHandoffView(
-                title: displayItem.name,
-                subtitle: "Scan with your phone to open this title in the Jellyfin web player.",
-                url: viewModel.handoffURL
-            )
+        .confirmationDialog(
+            "Continue Watching",
+            isPresented: $showPlayChoice,
+            titleVisibility: .visible
+        ) {
+            Button(resumeButtonTitle) { viewModel.playItem() }
+            Button("Play from Beginning") { viewModel.playItem(fromBeginning: true) }
+            Button("Cancel", role: .cancel) {}
         }
     }
 
-    private func updateBackdropURL() {
+    @ViewBuilder
+    private var backdropLayer: some View {
+        if let url = backdropURL {
+            // Real backdrop — render full-bleed cinematic still.
+            GeometryReader { geometry in
+                AsyncImageView(
+                    url: url,
+                    contentMode: .fill,
+                    targetPixelSize: ImageSizing.pixelSize(
+                        points: CGSize(width: geometry.size.width, height: Self.headerHeight)
+                    )
+                )
+                .frame(width: geometry.size.width, height: Self.headerHeight)
+                .clipped()
+            }
+            .frame(height: Self.headerHeight)
+        } else if let url = posterURL {
+            // No backdrop in Jellyfin for this item — use the poster as a
+            // heavily blurred ambient backdrop so the header still has
+            // color and mood. The crisp poster on the left of the content
+            // row remains the visual anchor.
+            GeometryReader { geometry in
+                AsyncImageView(
+                    url: url,
+                    contentMode: .fill,
+                    targetPixelSize: ImageSizing.pixelSize(
+                        points: CGSize(width: geometry.size.width / 4, height: Self.headerHeight / 4)
+                    )
+                )
+                .frame(width: geometry.size.width, height: Self.headerHeight)
+                .clipped()
+                .blur(radius: 80)
+                .scaleEffect(1.2)  // Hides the soft-edge artifact at the blur boundary
+                .opacity(0.7)
+            }
+            .frame(height: Self.headerHeight)
+            .clipped()
+        } else {
+            Constants.Colors.surface1
+                .frame(height: Self.headerHeight)
+        }
+    }
+
+    private var gradientLayer: some View {
+        LinearGradient(
+            colors: [
+                .clear,
+                .black.opacity(0.25),
+                .black.opacity(0.65),
+                .black.opacity(0.92),
+                Constants.Colors.background
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .frame(height: Self.headerHeight)
+    }
+
+    private func contentRow(displayItem: MediaItem, showPoster: Bool) -> some View {
+        HStack(alignment: .bottom, spacing: Self.posterInfoGap) {
+            if showPoster, let url = posterURL {
+                AsyncImageView(
+                    url: url,
+                    contentMode: .fill,
+                    targetPixelSize: ImageSizing.pixelSize(
+                        points: CGSize(width: Self.posterWidth, height: Self.posterHeight)
+                    )
+                )
+                .frame(width: Self.posterWidth, height: Self.posterHeight)
+                .clipped()
+                .cornerRadius(Constants.UI.cornerRadius)
+                .shadow(color: .black.opacity(0.6), radius: 30, x: 0, y: 12)
+            }
+
+            infoColumn(displayItem: displayItem)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, Self.horizontalPadding)
+        .padding(.bottom, Self.bottomPadding)
+    }
+
+    private func infoColumn(displayItem: MediaItem) -> some View {
+        VStack(alignment: .leading, spacing: 28) {
+            Text(displayItem.name)
+                .font(.system(size: 72, weight: .bold))
+                .foregroundColor(.white)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .shadow(color: .black.opacity(0.6), radius: 12)
+
+            if let line = metadataLine(for: displayItem) {
+                Text(line)
+                    .font(.title2.weight(.medium))
+                    .foregroundColor(.white.opacity(0.85))
+                    .shadow(color: .black.opacity(0.5), radius: 8)
+            }
+
+            if viewModel.hasProgress {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("\(Int(viewModel.progressPercentage))% watched")
+                        .font(.callout)
+                        .foregroundColor(.white.opacity(0.75))
+
+                    ProgressBar(progress: viewModel.progressPercentage / 100.0)
+                        .frame(height: 6)
+                        .frame(maxWidth: 700)
+                }
+            }
+
+            if displayItem.type != "Series" {
+                HStack(spacing: 40) {
+                    DetailActionButton(
+                        title: "Play",
+                        icon: "play.fill",
+                        style: .primary
+                    ) {
+                        if viewModel.hasProgress {
+                            showPlayChoice = true
+                        } else {
+                            viewModel.playItem()
+                        }
+                    }
+                    .focused($focusedButton, equals: .play)
+
+                    DetailActionButton(
+                        title: viewModel.isFavorite ? "Unfavorite" : "Favorite",
+                        icon: viewModel.isFavorite ? "heart.fill" : "heart",
+                        style: .secondary
+                    ) {
+                        viewModel.toggleFavorite()
+                    }
+                    .focused($focusedButton, equals: .favorite)
+                }
+            }
+        }
+    }
+
+    /// "2026 · PG-13 · 1h 38m · ★ 7.5" — same single-line treatment HeroBanner uses.
+    private func metadataLine(for item: MediaItem) -> String? {
+        var parts: [String] = []
+        if let year = item.yearText { parts.append(year) }
+        if let officialRating = item.officialRating, !officialRating.isEmpty {
+            parts.append(officialRating)
+        }
+        if let runtime = item.runtimeFormatted { parts.append(runtime) }
+        if let rating = item.ratingText { parts.append("★ \(rating)") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// "Resume from 1h 20m" when a position label is available, else "Resume".
+    private var resumeButtonTitle: String {
+        if let label = viewModel.resumePositionLabel {
+            return "Resume from \(label)"
+        }
+        return "Resume"
+    }
+
+    /// Backdrop is intentionally NOT falling back to primaryImageURL anymore —
+    /// using the poster as a centered "backdrop" is what produced the cramped
+    /// "logo on a void" look. Empty backdrop now resolves to surface1 and the
+    /// poster column carries the identity instead.
+    private func updateImageURLs() {
         let displayItem = viewModel.detailedItem ?? viewModel.item
 
-        let url = displayItem.backdropImageURL(
-            baseURL: viewModel.baseURL,
-            maxWidth: Constants.UI.backdropImageMaxWidth,
-            quality: Constants.UI.imageQuality
-        ) ?? displayItem.primaryImageURL(
+        backdropURL = displayItem.backdropImageURL(
             baseURL: viewModel.baseURL,
             maxWidth: Constants.UI.backdropImageMaxWidth,
             quality: Constants.UI.imageQuality
         )
 
-        backdropURL = url
+        posterURL = displayItem.primaryImageURL(
+            baseURL: viewModel.baseURL,
+            maxWidth: 600,
+            quality: Constants.UI.imageQuality
+        )
     }
 }
 
@@ -401,8 +472,6 @@ struct DetailActionButton: View {
     let style: ButtonStyle
     let action: () -> Void
 
-    @Environment(\.isFocused) private var isFocused
-
     enum ButtonStyle {
         case primary
         case secondary
@@ -410,13 +479,13 @@ struct DetailActionButton: View {
         var backgroundColor: Color {
             switch self {
             case .primary: return .white
-            case .secondary: return Color.white.opacity(0.2)
+            case .secondary: return Constants.Colors.surface2
             }
         }
 
         var foregroundColor: Color {
             switch self {
-            case .primary: return .black
+            case .primary: return Constants.Colors.background
             case .secondary: return .white
             }
         }
@@ -424,27 +493,87 @@ struct DetailActionButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 Image(systemName: icon)
                     .font(.title3)
 
                 Text(title)
                     .font(.title3)
                     .fontWeight(.semibold)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
-            .padding(.horizontal, 40)
-            .padding(.vertical, 20)
-            .background(style.backgroundColor)
-            .foregroundColor(style.foregroundColor)
-            .cornerRadius(8)
-            .scaleEffect(isFocused ? 1.05 : 1.0)
-            .shadow(
-                color: isFocused ? .white.opacity(0.3) : .clear,
-                radius: isFocused ? 15 : 0
-            )
-            .animation(.easeInOut(duration: 0.2), value: isFocused)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(DetailActionButtonStyle(
+            backgroundColor: style.backgroundColor,
+            foregroundColor: style.foregroundColor
+        ))
+        // Belt-and-suspenders against the tvOS system focus halo.
+        // .buttonStyle(.plain) + .focusEffectDisabled() alone did NOT
+        // remove the white pill underneath — verified in simulator. A
+        // custom ButtonStyle is what actually suppresses it because we
+        // own the entire rendering chain.
+        .focusEffectDisabled()
+    }
+}
+
+/// Custom ButtonStyle owns the entire visual chain — no system halo can
+/// stack underneath. The same `RoundedRectangle` value drives both the
+/// background fill and the focus stroke so the shapes literally cannot
+/// drift apart.
+///
+/// Non-private so the link pills + any other Detail surface can opt into
+/// the same treatment (one focus language across the whole screen).
+struct DetailActionButtonStyle: SwiftUI.ButtonStyle {
+    let backgroundColor: Color
+    let foregroundColor: Color
+    var minWidth: CGFloat = 220
+    var horizontalPadding: CGFloat = 32
+    var verticalPadding: CGFloat = 14
+
+    func makeBody(configuration: Configuration) -> some View {
+        DetailActionButtonStyleBody(
+            configuration: configuration,
+            backgroundColor: backgroundColor,
+            foregroundColor: foregroundColor,
+            minWidth: minWidth,
+            horizontalPadding: horizontalPadding,
+            verticalPadding: verticalPadding
+        )
+    }
+}
+
+/// Wrapped in a separate View struct so `@Environment(\.isFocused)` is
+/// read in the right context — the value flows in from the focus engine
+/// when this view is the label of a focused Button.
+struct DetailActionButtonStyleBody: View {
+    let configuration: SwiftUI.ButtonStyle.Configuration
+    let backgroundColor: Color
+    let foregroundColor: Color
+    let minWidth: CGFloat
+    let horizontalPadding: CGFloat
+    let verticalPadding: CGFloat
+
+    @Environment(\.isFocused) private var isFocused
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: Constants.UI.cornerRadius, style: .continuous)
+    }
+
+    var body: some View {
+        configuration.label
+            .frame(minWidth: minWidth)
+            .padding(.horizontal, horizontalPadding)
+            .padding(.vertical, verticalPadding)
+            .foregroundColor(foregroundColor)
+            .background(backgroundColor, in: shape)
+            .overlay(
+                shape.strokeBorder(Constants.Colors.accent, lineWidth: 4)
+                    .opacity(isFocused ? 1 : 0)
+            )
+            .scaleEffect(isFocused ? 1.04 : 1.0)
+            .opacity(configuration.isPressed ? 0.85 : 1.0)
+            .animation(.easeInOut(duration: 0.15), value: isFocused)
     }
 }
 
@@ -510,19 +639,14 @@ struct SeasonButton: View {
             Text(season.name)
                 .font(.title3)
                 .fontWeight(isSelected ? .bold : .regular)
-                .foregroundColor(isSelected ? .black : .white)
+                .foregroundColor(isSelected ? Constants.Colors.background : .white)
                 .padding(.horizontal, 30)
                 .padding(.vertical, 15)
-                .background(isSelected ? Color.white : Color.white.opacity(0.2))
+                .background(isSelected ? Constants.Colors.accent : Constants.Colors.surface2)
                 .cornerRadius(8)
-                .scaleEffect(isFocused ? 1.05 : 1.0)
-                .shadow(
-                    color: isFocused ? .white.opacity(0.3) : .clear,
-                    radius: isFocused ? 15 : 0
-                )
         }
         .buttonStyle(.plain)
-        .animation(.easeInOut(duration: 0.2), value: isFocused)
+        .chromeFocus(isFocused: isFocused)
     }
 }
 

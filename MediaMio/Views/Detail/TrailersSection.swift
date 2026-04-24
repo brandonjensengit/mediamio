@@ -63,9 +63,7 @@ private struct TrailerTile: View {
                     .lineLimit(2)
                     .frame(width: 360, alignment: .leading)
             }
-            .scaleEffect(hasFocus ? 1.05 : 1.0)
-            .shadow(color: hasFocus ? .white.opacity(0.3) : .clear, radius: hasFocus ? 15 : 0)
-            .animation(.easeInOut(duration: 0.2), value: hasFocus)
+            .contentFocus(isFocused: hasFocus)
         }
         .buttonStyle(.plain)
         .focused($hasFocus)

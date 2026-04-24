@@ -24,7 +24,7 @@ struct PlaybackSettingsView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Constants.Colors.background.ignoresSafeArea()
 
             Form {
                 // Video Quality
@@ -40,13 +40,13 @@ struct PlaybackSettingsView: View {
                                     .foregroundColor(.secondary)
                             }
                             .tag(quality.rawValue)
-                            .listRowBackground(Color.black.opacity(0.3))
+                            .listRowBackground(Constants.Colors.surface1)
                         }
                     }
                     .pickerStyle(.navigationLink)
                     .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Color(hex: "667eea"))
-                    .listRowBackground(Color.black.opacity(0.3))
+                    .accentColor(Constants.Colors.accent)
+                    .listRowBackground(Constants.Colors.surface1)
                 } header: {
                     Text("Video")
                         .foregroundColor(.white)
@@ -68,13 +68,13 @@ struct PlaybackSettingsView: View {
                                     .foregroundColor(.secondary)
                             }
                             .tag(quality.rawValue)
-                            .listRowBackground(Color.black.opacity(0.3))
+                            .listRowBackground(Constants.Colors.surface1)
                         }
                     }
                     .pickerStyle(.navigationLink)
                     .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Color(hex: "667eea"))
-                    .listRowBackground(Color.black.opacity(0.3))
+                    .accentColor(Constants.Colors.accent)
+                    .listRowBackground(Constants.Colors.surface1)
                 } header: {
                     Text("Audio")
                         .foregroundColor(.white)
@@ -87,19 +87,19 @@ struct PlaybackSettingsView: View {
                 Section {
                     Toggle("Auto-Play Next Episode", isOn: $settingsManager.autoPlayNext)
                         .foregroundColor(.white)  // ALWAYS white
-                        .tint(Color(hex: "667eea"))
-                        .listRowBackground(Color.black.opacity(0.3))
+                        .tint(Constants.Colors.accent)
+                        .listRowBackground(Constants.Colors.surface1)
 
                     if settingsManager.autoPlayNext {
                         Picker("Countdown", selection: $settingsManager.autoPlayCountdown) {
-                            Text("5 seconds").tag(5).foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
-                            Text("10 seconds").tag(10).foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
-                            Text("15 seconds").tag(15).foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
-                            Text("Off").tag(0).foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                            Text("5 seconds").tag(5).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
+                            Text("10 seconds").tag(10).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
+                            Text("15 seconds").tag(15).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
+                            Text("Off").tag(0).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                         }
                         .foregroundColor(.white)  // ALWAYS white
-                        .accentColor(Color(hex: "667eea"))
-                        .listRowBackground(Color.black.opacity(0.3))
+                        .accentColor(Constants.Colors.accent)
+                        .listRowBackground(Constants.Colors.surface1)
                     }
                 } header: {
                     Text("Auto-Play")
@@ -117,13 +117,13 @@ struct PlaybackSettingsView: View {
                         ForEach(ResumeBehavior.allCases) { behavior in
                             Text(behavior.rawValue).tag(behavior.rawValue)
                                 .foregroundColor(.white)  // ALWAYS white
-                                .listRowBackground(Color.black.opacity(0.3))
+                                .listRowBackground(Constants.Colors.surface1)
                         }
                     }
                     .pickerStyle(.navigationLink)
                     .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Color(hex: "667eea"))
-                    .listRowBackground(Color.black.opacity(0.3))
+                    .accentColor(Constants.Colors.accent)
+                    .listRowBackground(Constants.Colors.surface1)
                 } header: {
                     Text("Resume")
                         .foregroundColor(.white)
@@ -136,13 +136,13 @@ struct PlaybackSettingsView: View {
                 Section {
                     Toggle("Remember Audio Track", isOn: $settingsManager.rememberAudioTrack)
                         .foregroundColor(.white)  // ALWAYS white
-                        .tint(Color(hex: "667eea"))
-                        .listRowBackground(Color.black.opacity(0.3))
+                        .tint(Constants.Colors.accent)
+                        .listRowBackground(Constants.Colors.surface1)
 
                     Toggle("Remember Subtitle Track", isOn: $settingsManager.rememberSubtitleTrack)
                         .foregroundColor(.white)  // ALWAYS white
-                        .tint(Color(hex: "667eea"))
-                        .listRowBackground(Color.black.opacity(0.3))
+                        .tint(Constants.Colors.accent)
+                        .listRowBackground(Constants.Colors.surface1)
                 } header: {
                     Text("Track Memory")
                         .foregroundColor(.white)

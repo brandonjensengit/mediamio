@@ -21,7 +21,7 @@ struct SearchView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Constants.Colors.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // Search Header
@@ -170,7 +170,7 @@ struct SearchHeader: View {
                 }
                 .padding(.horizontal, 30)
                 .padding(.vertical, 20)
-                .background(Color.white.opacity(0.1))
+                .background(Constants.Colors.surface1)
                 .cornerRadius(12)
                 .frame(maxWidth: 1200)
 
@@ -200,7 +200,7 @@ struct SearchHeader: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 30)
                     .padding(.vertical, 20)
-                    .background(Color.white.opacity(0.15))
+                    .background(Constants.Colors.surface2)
                     .cornerRadius(8)
                 }
                 .buttonStyle(.plain)
@@ -287,10 +287,9 @@ struct RecentSearchRow: View {
                 }
                 .padding(.horizontal, 30)
                 .padding(.vertical, 18)
-                .background(isFocused ? Color.white.opacity(0.18) : Color.white.opacity(0.08))
+                .background(isFocused ? Constants.Colors.surface3 : Constants.Colors.surface1)
                 .cornerRadius(Constants.UI.cornerRadius)
-                .scaleEffect(isFocused ? 1.02 : 1.0)
-                .animation(.easeInOut(duration: 0.15), value: isFocused)
+                .chromeFocus(isFocused: isFocused)
             }
             .buttonStyle(.plain)
 

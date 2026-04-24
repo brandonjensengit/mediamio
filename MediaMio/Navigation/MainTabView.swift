@@ -39,33 +39,39 @@ struct MainTabView: View {
     }
 
     var body: some View {
-        TabView(selection: $navigationManager.selectedTab) {
-            HomeTabView(viewModel: homeViewModel)
-                .tabItem {
-                    Label(Tab.home.title, systemImage: Tab.home.icon)
-                }
-                .tag(Tab.home)
+        ZStack {
+            Constants.Colors.background.ignoresSafeArea()
 
-            SearchTabView(viewModel: searchViewModel)
-                .tabItem {
-                    Label(Tab.search.title, systemImage: Tab.search.icon)
-                }
-                .tag(Tab.search)
+            VStack(spacing: 0) {
+                TopNavBar(selectedTab: $navigationManager.selectedTab)
+                    .environmentObject(env.authService)
 
-            LibraryTabViewWrapper(contentService: env.contentService, coordinator: libraryCoordinator)
-                .tabItem {
-                    Label(Tab.library.title, systemImage: Tab.library.icon)
-                }
-                .tag(Tab.library)
+                // All four tabs stay mounted so scroll position, focus
+                // memory, and in-flight loads survive tab switches (same
+                // contract tvOS's native TabView provides). `.disabled`
+                // on hidden tabs removes them from the focus engine.
+                ZStack {
+                    HomeTabView(viewModel: homeViewModel)
+                        .opacity(navigationManager.selectedTab == .home ? 1 : 0)
+                        .disabled(navigationManager.selectedTab != .home)
 
-            SettingsTabView()
-                .tabItem {
-                    Label(Tab.settings.title, systemImage: Tab.settings.icon)
+                    SearchTabView(viewModel: searchViewModel)
+                        .opacity(navigationManager.selectedTab == .search ? 1 : 0)
+                        .disabled(navigationManager.selectedTab != .search)
+
+                    LibraryTabViewWrapper(contentService: env.contentService, coordinator: libraryCoordinator)
+                        .opacity(navigationManager.selectedTab == .library ? 1 : 0)
+                        .disabled(navigationManager.selectedTab != .library)
+
+                    SettingsTabView()
+                        .opacity(navigationManager.selectedTab == .settings ? 1 : 0)
+                        .disabled(navigationManager.selectedTab != .settings)
                 }
-                .tag(Tab.settings)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
         .environmentObject(navigationManager)
-        .accentColor(Color(hex: "667eea")) // MediaMio brand color
+        .accentColor(Constants.Colors.accent)
         .preferredColorScheme(.dark)
         .onAppear {
             // Wire navigationManager into VMs that need it. Done here (not in
@@ -73,15 +79,25 @@ struct MainTabView: View {
             // can't reference each other at init time.
             homeViewModel.navigationManager = navigationManager
         }
-        // Present detail view as sheet
-        .sheet(item: $navigationManager.presentedItem) { item in
+        // Present detail view full-screen. We deliberately avoid `.sheet` /
+        // `.presentationDetents([.large])` because tvOS renders that as an
+        // inset card with rounded corners — leaves the parent tab bleeding
+        // through on the sides and constrains the 700pt backdrop header.
+        .fullScreenCover(item: $navigationManager.presentedItem) { item in
             ItemDetailSheetWrapper(item: item)
                 .environmentObject(env.authService)
                 .environmentObject(env)
                 .environmentObject(navigationManager)
         }
-        // Present video player as full screen cover
-        .fullScreenCover(isPresented: $navigationManager.showingPlayer) {
+        // Root-level player cover — fires on Play taps from Hero /
+        // Continue Watching / Library rows, where no Detail sheet is open.
+        // The sibling cover inside `ItemDetailSheetWrapper` handles the
+        // Detail → Play path; the two bind to different flags so tvOS
+        // routes each present to the correct modal context.
+        .fullScreenCover(
+            isPresented: $navigationManager.showingPlayerAtRoot,
+            onDismiss: { navigationManager.handlePlayerDismissed() }
+        ) {
             if let item = navigationManager.currentPlayerItem {
                 VideoPlayerView(
                     item: item,
@@ -104,7 +120,6 @@ struct HomeTabView: View {
         NavigationStack {
             HomeContentView(
                 viewModel: viewModel,
-                isSidebarVisible: .constant(false),
                 navigationManager: navigationManager
             )
             .navigationBarHidden(true)
@@ -177,17 +192,28 @@ struct ItemDetailSheetWrapper: View {
         Group {
             if let vm = viewModel {
                 ItemDetailView(viewModel: vm)
-                    .presentationDetents([.large])
-                    .presentationBackground(.ultraThinMaterial)
-                    .presentationCornerRadius(30)
             } else {
                 LoadingView(message: "Loading details...", showLogo: false)
-                    .presentationDetents([.large])
-                    .presentationBackground(.ultraThinMaterial)
-                    .presentationCornerRadius(30)
                     .onAppear {
                         initializeViewModel()
                     }
+            }
+        }
+        // Sheet-level player cover — when Play is tapped inside this Detail
+        // sheet, the player presents on top without dismissing the sheet.
+        // Menu-back from the player returns to this sheet; another Menu
+        // dismisses the sheet itself and lands on Home.
+        .fullScreenCover(
+            isPresented: $navigationManager.showingPlayerOverDetail,
+            onDismiss: { navigationManager.handlePlayerDismissed() }
+        ) {
+            if let item = navigationManager.currentPlayerItem {
+                VideoPlayerView(
+                    item: item,
+                    authService: env.authService,
+                    startPositionTicks: navigationManager.currentPlayerStartTicks
+                )
+                .environmentObject(navigationManager)
             }
         }
     }
@@ -204,31 +230,3 @@ struct ItemDetailSheetWrapper: View {
     }
 }
 
-// MARK: - Color Extension for Hex
-
-extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        switch hex.count {
-        case 3: // RGB (12-bit)
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6: // RGB (24-bit)
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8: // ARGB (32-bit)
-            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (a, r, g, b) = (1, 1, 1, 0)
-        }
-
-        self.init(
-            .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue:  Double(b) / 255,
-            opacity: Double(a) / 255
-        )
-    }
-}

@@ -13,7 +13,7 @@ class SettingsManager: ObservableObject {
     // MARK: - Video Settings
     @AppStorage("videoQuality") var videoQuality = VideoQuality.auto.rawValue
     @AppStorage("maxBitrate") var maxBitrate = 120_000_000 // 120 Mbps for maximum quality
-    @AppStorage("streamingMode") var streamingMode = StreamingMode.transcode.rawValue  // Force transcode to fix video decoder error -12900
+    @AppStorage("streamingMode") var streamingMode = StreamingMode.auto.rawValue
     @AppStorage("videoCodec") var videoCodec = VideoCodec.h264.rawValue
 
     // MARK: - Audio Settings
@@ -59,7 +59,7 @@ class SettingsManager: ObservableObject {
 
     // MARK: - Interface Settings
     @AppStorage("theme") var theme = AppTheme.dark.rawValue
-    @AppStorage("accentColor") var accentColor = "667eea"
+    @AppStorage("accentColor") var accentColor = "e8a13b"
     @AppStorage("showRatings") var showRatings = true
     @AppStorage("showAdultContent") var showAdultContent = false
     @AppStorage("spoilerProtection") var spoilerProtection = false
@@ -89,8 +89,9 @@ class SettingsManager: ObservableObject {
     }
 
     var subtitleSummary: String {
-        let lang = defaultSubtitleLanguage == "none" ? "Off" : defaultSubtitleLanguage.uppercased()
-        return "Default: \(lang)"
+        if defaultSubtitleLanguage == "none" { return "Off" }
+        return Locale.current.localizedString(forLanguageCode: defaultSubtitleLanguage)?.capitalized
+            ?? defaultSubtitleLanguage.uppercased()
     }
 
     var parentalControlsSummary: String {
@@ -125,7 +126,7 @@ class SettingsManager: ObservableObject {
     func resetToDefaults() {
         videoQuality = VideoQuality.auto.rawValue
         maxBitrate = 120_000_000  // 120 Mbps for maximum quality
-        streamingMode = StreamingMode.transcode.rawValue  // Force transcode to fix video decoder error -12900
+        streamingMode = StreamingMode.auto.rawValue
         audioQuality = AudioQuality.high.rawValue
         autoPlayNext = true
         autoPlayCountdown = 10

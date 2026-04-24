@@ -43,7 +43,12 @@ final class VideoPlayerViewModel: ObservableObject {
 
     // MARK: - Inputs
 
-    let item: MediaItem
+    /// The item being played. Starts as whatever the caller passed in
+    /// (often a sparse `MediaItem` from `/Items/Resume` or `/Items/Latest`
+    /// without `MediaSources`), and gets replaced by the full version
+    /// returned from `getItemDetails()` in `refetchFullItemIfNeeded()`.
+    /// `@Published` so the Playback Info panel re-renders after the fetch.
+    @Published private(set) var item: MediaItem
     private let authService: AuthenticationService
     private let settingsManager = SettingsManager()
 
@@ -99,7 +104,10 @@ final class VideoPlayerViewModel: ObservableObject {
         // this first, so it takes precedence over any server-provided resume
         // point — which is the expected behavior: the user explicitly asked
         // to start at this chapter.
-        if let ticks = initialStartPositionTicks, ticks > 0 {
+        // nil  → auto-resume from userData.playbackPositionTicks
+        // 0    → explicit "play from the beginning" (bypass userData)
+        // N>0  → explicit seek target (chapter jump, resume-from-detail, etc.)
+        if let ticks = initialStartPositionTicks {
             self.pendingSeekOnReload = Double(ticks) / 10_000_000.0
         }
         observeStreamingSettingsChanges()
@@ -172,6 +180,13 @@ final class VideoPlayerViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
 
+        // Home-tab carousels (Resume / Latest) ship sparse MediaItems
+        // without MediaSources. Without that, `PlaybackStreamURLBuilder`
+        // can't do codec analysis → falls through to forced transcode,
+        // and `PlaybackInfoBuilder` renders "Video: Unknown". Refetch the
+        // full item before handing it to the URL builder.
+        await refetchFullItemIfNeeded()
+
         let urlBuilder = PlaybackStreamURLBuilder(
             item: item,
             baseURL: baseURL,
@@ -189,6 +204,30 @@ final class VideoPlayerViewModel: ObservableObject {
 
         failoverController.setMode(result.mode)
         await startPlayback(url: result.url, mode: result.mode)
+    }
+
+    /// Replace `self.item` with the server's full record when the input is
+    /// missing MediaSources. No-op when MediaSources is already populated
+    /// (avoids a wasted round-trip for the Detail-view → Play path, where
+    /// `getItemDetails` already brought them in).
+    private func refetchFullItemIfNeeded() async {
+        guard item.mediaSources?.isEmpty ?? true else { return }
+        guard !userId.isEmpty, !baseURL.isEmpty, !accessToken.isEmpty else {
+            print("⚠️ Cannot refetch item: missing session (userId/baseURL/token empty)")
+            return
+        }
+
+        let api = JellyfinAPIClient()
+        api.configure(baseURL: baseURL, accessToken: accessToken)
+        do {
+            let full = try await api.getItemDetails(userId: userId, itemId: item.id)
+            let sourceCount = full.mediaSources?.count ?? 0
+            let streamCount = full.mediaSources?.first?.mediaStreams?.count ?? 0
+            print("🔁 Refetched '\(full.name)' with \(sourceCount) MediaSource(s), \(streamCount) MediaStream(s)")
+            self.item = full
+        } catch {
+            print("⚠️ getItemDetails failed for '\(item.name)': \(error). Continuing with sparse item — playback will likely fall back to transcode.")
+        }
     }
 
     /// Shared startup path used by both initial load and transcode failover.
@@ -628,9 +667,13 @@ final class VideoPlayerViewModel: ObservableObject {
     // MARK: - Helpers
 
     private func getResumePosition() -> Double? {
+        // Explicit caller intent takes precedence over userData auto-resume.
+        // `pending == 0` is a deliberate "Play from Beginning" signal from
+        // the detail screen — return 0 (not nil) so we do NOT fall through
+        // to the userData path.
         if let pending = pendingSeekOnReload {
             pendingSeekOnReload = nil
-            return pending > 0 ? pending : nil
+            return pending
         }
         guard let userData = item.userData,
               let position = userData.playbackPositionTicks,

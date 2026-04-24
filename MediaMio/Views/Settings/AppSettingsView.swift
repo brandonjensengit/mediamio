@@ -14,7 +14,7 @@ struct AppSettingsView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Constants.Colors.background.ignoresSafeArea()
 
             Form {
                 // Interface
@@ -23,7 +23,7 @@ struct AppSettingsView: View {
                         ForEach(AppTheme.allCases) { theme in
                             Text(theme.rawValue).tag(theme.rawValue)
                                 .foregroundColor(.white)  // ALWAYS white
-                                .listRowBackground(Color.black.opacity(0.3))
+                                .listRowBackground(Constants.Colors.surface1)
                         }
                     }
                     .pickerStyle(.segmented)
@@ -31,13 +31,13 @@ struct AppSettingsView: View {
 
                     Toggle("Show Ratings", isOn: $settingsManager.showRatings)
                         .foregroundColor(.white)  // ALWAYS white
-                        .tint(Color(hex: "667eea"))
-                        .listRowBackground(Color.black.opacity(0.3))
+                        .tint(Constants.Colors.accent)
+                        .listRowBackground(Constants.Colors.surface1)
 
                     Toggle("Spoiler Protection", isOn: $settingsManager.spoilerProtection)
                         .foregroundColor(.white)  // ALWAYS white
-                        .tint(Color(hex: "667eea"))
-                        .listRowBackground(Color.black.opacity(0.3))
+                        .tint(Constants.Colors.accent)
+                        .listRowBackground(Constants.Colors.surface1)
                 } header: {
                     Text("Interface")
                         .foregroundColor(.white)
@@ -58,20 +58,20 @@ struct AppSettingsView: View {
 
                     Picker("Maximum Cache Size", selection: $settingsManager.cacheSize) {
                         Text("100 MB").tag(100)
-                            .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                         Text("500 MB").tag(500)
-                            .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                         Text("1 GB").tag(1000)
-                            .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                         Text("2 GB").tag(2000)
-                            .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                         Text("5 GB").tag(5000)
-                            .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                     }
                     .pickerStyle(.navigationLink)
                     .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Color(hex: "667eea"))
-                    .listRowBackground(Color.black.opacity(0.3))
+                    .accentColor(Constants.Colors.accent)
+                    .listRowBackground(Constants.Colors.surface1)
 
                     Button(action: {
                         showClearCacheAlert = true
@@ -187,7 +187,7 @@ struct AppSettingsView: View {
 struct OpenSourceLicensesView: View {
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Constants.Colors.background.ignoresSafeArea()
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 30) {
@@ -239,7 +239,7 @@ struct LicenseSection: View {
 
             Text(license)
                 .font(.caption)
-                .foregroundColor(Color(hex: "667eea"))
+                .foregroundColor(Constants.Colors.accent)
                 .padding(.top, 4)
         }
     }

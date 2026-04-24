@@ -48,7 +48,8 @@ struct SimpleVideoPlayerRepresentable: UIViewControllerRepresentable {
         let info = PlaybackInfoBuilder.build(
             item: item,
             mode: playbackMode,
-            subtitleDisplay: subtitleDisplay
+            subtitleDisplay: subtitleDisplay,
+            maxStreamingBitrate: settingsManager.maxBitrate
         )
         let playbackInfoVC = PlaybackInfoViewController(info: info)
         let bitrateVC = BitrateSelectionViewController(settingsManager: settingsManager)
@@ -103,7 +104,8 @@ struct SimpleVideoPlayerRepresentable: UIViewControllerRepresentable {
         let info = PlaybackInfoBuilder.build(
             item: item,
             mode: playbackMode,
-            subtitleDisplay: subtitleDisplay
+            subtitleDisplay: subtitleDisplay,
+            maxStreamingBitrate: settingsManager.maxBitrate
         )
         context.coordinator.playbackInfoVC?.update(info: info)
     }

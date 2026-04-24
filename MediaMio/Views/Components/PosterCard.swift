@@ -89,15 +89,8 @@ struct PosterCard: View {
                 }
                 .frame(width: Constants.UI.posterWidth, alignment: .leading)
         }
-        .scaleEffect(isFocused ? 1.15 : 1.0)  // Increased from 1.1 to 1.15 for more pop
-        .shadow(
-            color: isFocused ? .black.opacity(0.8) : .clear,  // Darker shadow
-            radius: isFocused ? 30 : 0,  // Larger blur radius
-            x: 0,
-            y: isFocused ? 15 : 0  // More vertical offset for depth
-        )
-        .zIndex(isFocused ? 999 : 0)  // Much higher z-index to ensure it's on top
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isFocused)
+        .contentFocus(isFocused: isFocused)
+        .zIndex(isFocused ? 999 : 0)  // Keep focused poster above its row siblings.
         .allowsHitTesting(true)
         .focusable()
         .focused($isFocused)
@@ -145,7 +138,7 @@ struct ProgressBar: View {
             ZStack(alignment: .leading) {
                 // Background
                 Rectangle()
-                    .fill(Color.white.opacity(0.3))
+                    .fill(Constants.Colors.surface2.opacity(0.8))
 
                 // Progress
                 Rectangle()

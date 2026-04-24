@@ -49,7 +49,7 @@ struct ShimmerTile: View {
 struct HomeSkeletonView: View {
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Constants.Colors.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // Hero placeholder

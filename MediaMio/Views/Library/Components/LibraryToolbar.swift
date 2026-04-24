@@ -33,7 +33,11 @@ struct LibraryToolbar: View {
 
             Spacer()
 
-            // Sort Button
+            // Sort Button — note: `Menu { ... } label: { MenuChip(...) }` isn't
+            // directly usable because `Menu.label` expects a View, not a
+            // Button. Wrap the chip's HStack inline for the menu trigger so
+            // tvOS's native menu presentation works, but keep visuals identical
+            // to the `MenuChip` component.
             Menu {
                 ForEach(LibraryViewModel.SortOption.allCases) { option in
                     Button(action: {
@@ -55,28 +59,21 @@ struct LibraryToolbar: View {
                     Text("Sort: \(viewModel.sortOption.displayName)")
                     Image(systemName: "chevron.down")
                 }
+                .font(.headline)
+                .foregroundColor(.white)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 12)
-                .background(Color.white.opacity(0.1))
+                .background(Constants.Colors.surface1)
                 .cornerRadius(10)
             }
-            .buttonStyle(.card)
+            .buttonStyle(.plain)
+            .chromeFocus()
             .focused($focusedField, equals: .sort)
 
-            // Search Button
-            Button(action: {
+            // Search — plain action, use the shared MenuChip.
+            MenuChip(title: "Search", leadingIcon: "magnifyingglass") {
                 showSearch = true
-            }) {
-                HStack(spacing: 12) {
-                    Image(systemName: "magnifyingglass")
-                    Text("Search")
-                }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 12)
-                .background(Color.white.opacity(0.1))
-                .cornerRadius(10)
             }
-            .buttonStyle(.card)
             .focused($focusedField, equals: .search)
         }
         .padding(.horizontal, 60)

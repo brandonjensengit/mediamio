@@ -72,16 +72,17 @@ class HomeViewModel: ObservableObject {
                 self.featuredItem = firstItem
             }
 
-            // Populate featured items for rotating hero banner (Netflix-style)
-            // Get up to 5 items from continue watching and recently added
+            // Populate featured items for rotating hero banner (Netflix-style).
+            // Prefer Continue Watching (first section) so returning users land
+            // on something they're already invested in. Backfill from the
+            // first library section — which is now sorted DateCreated desc,
+            // so its prefix is effectively the most recent library additions.
             var heroItems: [MediaItem] = []
 
-            // Get items from first section (Continue Watching)
             if let firstSection = loadedSections.first {
                 heroItems.append(contentsOf: firstSection.items.prefix(3))
             }
 
-            // Add items from second section (Recently Added) if needed
             if heroItems.count < 5 && loadedSections.count > 1 {
                 let remaining = 5 - heroItems.count
                 heroItems.append(contentsOf: loadedSections[1].items.prefix(remaining))

@@ -27,7 +27,7 @@ struct LibraryView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Constants.Colors.background.ignoresSafeArea()
 
             if viewModel.isLoading && !viewModel.hasContent {
                 // Initial loading
@@ -216,7 +216,7 @@ struct LibraryHeader: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 30)
                         .padding(.vertical, 16)
-                        .background(Color.white.opacity(0.15))
+                        .background(Constants.Colors.surface2)
                         .cornerRadius(8)
                     }
                     .buttonStyle(.plain)

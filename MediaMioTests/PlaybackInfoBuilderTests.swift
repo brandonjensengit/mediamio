@@ -174,6 +174,30 @@ struct PlaybackInfoBuilderTests {
         #expect(info.sections[2].rows.contains { $0.value == "Unknown" })  // Audio
     }
 
+    @Test("build: Max Bitrate row appears in General when maxStreamingBitrate is provided")
+    func buildShowsMaxBitrateRow() {
+        let info = PlaybackInfoBuilder.build(
+            item: makeItem(),
+            mode: .directPlay,
+            subtitleDisplay: nil,
+            maxStreamingBitrate: 120_000_000
+        )
+        let general = info.sections.first { $0.title == "General" }
+        let maxRow = general?.rows.first { $0.label == "Max Bitrate" }
+        #expect(maxRow?.value == "120 Mbps")
+    }
+
+    @Test("build: Max Bitrate row is omitted when maxStreamingBitrate is nil")
+    func buildOmitsMaxBitrateRowWhenNil() {
+        let info = PlaybackInfoBuilder.build(
+            item: makeItem(),
+            mode: .directPlay,
+            subtitleDisplay: nil
+        )
+        let general = info.sections.first { $0.title == "General" }
+        #expect(general?.rows.contains { $0.label == "Max Bitrate" } == false)
+    }
+
     // MARK: - Total bitrate (the reason Brandon flagged this)
 
     @Test("totalBitrate: sums per-stream bitrates (video + audio)")

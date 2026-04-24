@@ -170,15 +170,36 @@ class ItemDetailViewModel: ObservableObject {
 
     // MARK: - Actions
 
-    func playItem() {
-        print("▶️ Play: \(displayItem.name)")
+    /// Launch the video player.
+    /// - Parameter fromBeginning: When `true`, pass an explicit `0` start tick
+    ///   to the player so it skips `userData.playbackPositionTicks` and
+    ///   starts at 00:00. When `false` (default), the player's own resume
+    ///   logic kicks in — auto-resumes if userData has progress, else plays
+    ///   from start.
+    func playItem(fromBeginning: Bool = false) {
+        print("▶️ Play: \(displayItem.name)\(fromBeginning ? " (from beginning)" : "")")
 
         guard let navManager = navigationManager else {
             print("❌ playItem failed: NavigationManager is nil — Play button is unwired")
             errorMessage = "Cannot start playback (navigation not configured)"
             return
         }
-        navManager.playItem(displayItem)
+        navManager.playItem(displayItem, startPositionTicks: fromBeginning ? 0 : nil)
+    }
+
+    /// Human-readable resume-from label — "1h 20m" or "25m". Used in the
+    /// Play confirmation dialog on items that already have progress so the
+    /// Resume button communicates exactly where it'd resume from.
+    var resumePositionLabel: String? {
+        guard let userData = displayItem.userData,
+              let position = userData.playbackPositionTicks,
+              position > 0 else {
+            return nil
+        }
+        let totalSeconds = position / 10_000_000
+        let hours = Int(totalSeconds / 3600)
+        let minutes = Int((totalSeconds % 3600) / 60)
+        return hours > 0 ? "\(hours)h \(minutes)m" : "\(minutes)m"
     }
 
     func toggleFavorite() {

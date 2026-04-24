@@ -312,11 +312,17 @@ class PlaybackInfoViewController: UIViewController, AVPlayerViewControllerDelega
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
         ])
+
+        print("📋 PlaybackInfoViewController viewDidLoad — sections=\(info.sections.count) rows=\(info.totalRows)")
+        for section in info.sections {
+            print("   § \(section.title): \(section.rows.count) rows — \(section.rows.map { "\($0.label)=\($0.value)" }.joined(separator: ", "))")
+        }
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         tableView.reloadData()  // picks up any mid-playback mode flips
+        print("📋 PlaybackInfoViewController viewWillAppear — rendering \(info.totalRows) rows across \(info.sections.count) sections")
     }
 
     /// Push fresh info into the pane. Called by the player when the

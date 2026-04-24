@@ -40,7 +40,7 @@ struct LoginView: View {
     var body: some View {
         ZStack {
             // Background
-            Color.black.ignoresSafeArea()
+            Constants.Colors.background.ignoresSafeArea()
 
             if isLoading {
                 LoadingView(message: "Signing in...")

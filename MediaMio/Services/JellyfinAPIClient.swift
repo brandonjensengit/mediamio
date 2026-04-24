@@ -443,13 +443,18 @@ class JellyfinAPIClient: ObservableObject {
         return try await get(endpoint: endpoint, queryItems: queryItems)
     }
 
-    /// Get detailed information about a specific item
+    /// Get detailed information about a specific item.
+    /// `MediaSources,MediaStreams` are required for the playback URL builder
+    /// (codec analysis → Direct Play / Remux / Transcode decision) and for
+    /// the Playback Info panel's General / Video / Audio rows. Without them,
+    /// the URL builder defaults to forced transcode and the info panel
+    /// renders "Video: Unknown" / "Audio: Unknown".
     func getItemDetails(userId: String, itemId: String) async throws -> MediaItem {
         let endpoint = Constants.API.Endpoints.userItemDetails(userId: userId, itemId: itemId)
         let queryItems = [
             URLQueryItem(
                 name: "Fields",
-                value: "Path,Genres,Studios,People,Overview,ProviderIds,Chapters"
+                value: "Path,Genres,Studios,People,Overview,ProviderIds,Chapters,MediaSources,MediaStreams"
             )
         ]
         return try await get(endpoint: endpoint, queryItems: queryItems)

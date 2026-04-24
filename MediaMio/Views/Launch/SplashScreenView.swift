@@ -55,7 +55,7 @@ struct SplashScreenView: View {
                             loadJellyfinData()
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(Color(hex: "667eea"))
+                        .tint(Constants.Colors.accent)
                     }
                     .padding()
                     .transition(.opacity)

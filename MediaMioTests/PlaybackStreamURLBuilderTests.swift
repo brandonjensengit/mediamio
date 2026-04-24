@@ -158,6 +158,56 @@ struct PlaybackStreamURLBuilderTests {
         #expect(q["EnableAutoStreamCopy"] == "true")
     }
 
+    // MARK: - Remux
+
+    @Test func remux_hevc_ac3_mkv_copiesStreamsWithoutVideoBitrate() {
+        // HEVC video + AC-3 audio in MKV is the common disc-rip case. Apple
+        // TV decodes both codecs natively but MKV isn't an AVFoundation
+        // container, so the server does a container swap (Remux) rather
+        // than a full re-encode. Regression guard: a previous default had
+        // `streamingMode` locked to `.transcode`, forcing a 4K→1080p
+        // re-encode on every MKV movie.
+        let item = Self.makeItem(container: "mkv", videoCodec: "hevc", audioCodec: "ac3")
+        let builder = Self.makeBuilder(item: item, streamingMode: .auto)
+
+        guard let result = builder.build() else {
+            Issue.record("URL builder returned nil")
+            return
+        }
+        let q = Self.queryItems(result.url)
+
+        #expect(result.mode == .remux)
+        #expect(q["VideoCodec"] == "copy")
+        #expect(q["AudioCodec"] == "copy")
+        // Remux contract: no video bitrate cap and no max width/height —
+        // those would force the server to re-encode instead of remux.
+        #expect(q["VideoBitrate"] == nil)
+        #expect(q["MaxWidth"] == nil)
+        #expect(q["MaxHeight"] == nil)
+    }
+
+    @Test func nonTranscodeModes_deliverSubtitlesViaHls_notBurnIn() {
+        // Regression guard. SubtitleMethod=Encode tells Jellyfin to burn
+        // subtitles INTO the video stream, which forces a full video
+        // re-encode on the server even when VideoCodec=copy is set — this
+        // silently downgrades a 4K HEVC remux to a 1080p H.264 transcode.
+        // Non-transcode modes must use Hls (deliver as a separate HLS
+        // subtitle track) so the video can pass through untouched.
+        let item = Self.makeItem(
+            container: "mkv", videoCodec: "hevc", audioCodec: "ac3",
+            subtitleStreams: [(index: 2, codec: "subrip", lang: "eng")]
+        )
+        for mode in [StreamingMode.auto, .directPlay] {
+            let builder = Self.makeBuilder(item: item, streamingMode: mode)
+            guard let url = builder.build()?.url else {
+                Issue.record("nil URL for mode \(mode)")
+                continue
+            }
+            let q = Self.queryItems(url)
+            #expect(q["SubtitleMethod"] == "Hls", "Mode \(mode) must not burn subtitles in")
+        }
+    }
+
     // MARK: - Transcode
 
     @Test func transcode_setsExplicitVideoBitrate() {

@@ -79,9 +79,7 @@ private struct ChapterTile: View {
                 }
                 .frame(width: 320, alignment: .leading)
             }
-            .scaleEffect(hasFocus ? 1.05 : 1.0)
-            .shadow(color: hasFocus ? .white.opacity(0.3) : .clear, radius: hasFocus ? 15 : 0)
-            .animation(.easeInOut(duration: 0.2), value: hasFocus)
+            .contentFocus(isFocused: hasFocus)
         }
         .buttonStyle(.plain)
         .focused($hasFocus)

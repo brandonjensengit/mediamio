@@ -47,7 +47,7 @@ private struct PersonCard: View {
     @FocusState private var hasFocus: Bool
 
     private var headshotURL: String? {
-        person.primaryImageURL(baseURL: baseURL, maxWidth: 280)
+        person.primaryImageURL(baseURL: baseURL, maxWidth: 320)
     }
 
     private var subtitle: String? {
@@ -61,12 +61,15 @@ private struct PersonCard: View {
         // in a Button with no action and the plain style so the visual is
         // fully ours but the focus engine treats it as a focusable stop.
         Button(action: {}) {
-            VStack(spacing: 12) {
+            VStack(spacing: 14) {
                 headshot
-                    .frame(width: 140, height: 140)
+                    .frame(width: 160, height: 160)
                     .clipShape(Circle())
                     .overlay(
-                        Circle().stroke(Color.white.opacity(hasFocus ? 0.9 : 0.15), lineWidth: 2)
+                        Circle().stroke(
+                            hasFocus ? Constants.Colors.accent : Color.white.opacity(0.15),
+                            lineWidth: hasFocus ? 4 : 2
+                        )
                     )
 
                 VStack(spacing: 4) {
@@ -80,17 +83,17 @@ private struct PersonCard: View {
                         Text(subtitle)
                             .font(.caption)
                             .foregroundColor(.white.opacity(0.6))
-                            .lineLimit(2)
+                            .lineLimit(3)
                             .multilineTextAlignment(.center)
                     }
                 }
-                .frame(width: 160)
+                .frame(width: 220)
             }
-            .scaleEffect(hasFocus ? 1.05 : 1.0)
-            .shadow(color: hasFocus ? .white.opacity(0.3) : .clear, radius: hasFocus ? 15 : 0)
-            .animation(.easeInOut(duration: 0.2), value: hasFocus)
+            .scaleEffect(hasFocus ? 1.04 : 1.0)
+            .animation(.easeInOut(duration: 0.15), value: hasFocus)
         }
         .buttonStyle(.plain)
+        .focusEffectDisabled()
         .focused($hasFocus)
     }
 

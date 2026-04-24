@@ -41,10 +41,16 @@ enum PlaybackInfoBuilder {
     /// Build a full info payload. `subtitleDisplay` is the label shown for
     /// the currently-selected subtitle track, or nil when subtitles are
     /// off. Caller (typically `SubtitleTrackManager`) owns that decision.
+    /// `maxStreamingBitrate` is the user's configured cap in bps (from
+    /// SettingsManager); when provided, it's surfaced in the General
+    /// section so users can see *their cap* alongside the *source
+    /// bitrate* and understand why a 5 Mbps file doesn't get throttled
+    /// by a 120 Mbps cap.
     static func build(
         item: MediaItem,
         mode: PlaybackMode,
-        subtitleDisplay: String?
+        subtitleDisplay: String?,
+        maxStreamingBitrate: Int? = nil
     ) -> PlaybackInfo {
         let source = item.mediaSources?.first
         let video = source?.mediaStreams?.first { $0.type == "Video" }
@@ -52,7 +58,7 @@ enum PlaybackInfoBuilder {
             ?? source?.mediaStreams?.first { $0.type == "Audio" }
 
         return PlaybackInfo(sections: [
-            generalSection(source: source, mode: mode),
+            generalSection(source: source, mode: mode, maxStreamingBitrate: maxStreamingBitrate),
             videoSection(video: video),
             audioSection(audio: audio),
             subtitleSection(subtitleDisplay: subtitleDisplay)
@@ -61,7 +67,11 @@ enum PlaybackInfoBuilder {
 
     // MARK: - Sections
 
-    private static func generalSection(source: MediaSource?, mode: PlaybackMode) -> PlaybackInfoSection {
+    private static func generalSection(
+        source: MediaSource?,
+        mode: PlaybackMode,
+        maxStreamingBitrate: Int?
+    ) -> PlaybackInfoSection {
         var rows: [PlaybackInfoRow] = [
             PlaybackInfoRow(label: "Play Method", value: mode.rawValue)
         ]
@@ -73,6 +83,12 @@ enum PlaybackInfoBuilder {
         }
         if let total = totalBitrate(source: source) {
             rows.append(PlaybackInfoRow(label: "Total Bitrate", value: formatBitrate(bps: total)))
+        }
+        // Placed right after Total Bitrate so the file's natural rate and
+        // the user's cap read as a pair. Makes it obvious why a 5 Mbps
+        // file under a 120 Mbps cap isn't being throttled.
+        if let cap = maxStreamingBitrate {
+            rows.append(PlaybackInfoRow(label: "Max Bitrate", value: formatBitrate(bps: cap)))
         }
         return PlaybackInfoSection(title: "General", rows: rows)
     }

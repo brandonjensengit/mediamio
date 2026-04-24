@@ -8,125 +8,6 @@
 import SwiftUI
 import Combine
 
-struct HomeView: View {
-    @EnvironmentObject var authService: AuthenticationService
-    @EnvironmentObject var env: AppEnvironment
-    @StateObject private var coordinator = NavigationCoordinator()
-    @State private var viewModel: HomeViewModel?
-    @State private var isSidebarVisible = false
-
-    var body: some View {
-        NavigationStack(path: $coordinator.navigationPath) {
-            ZStack {
-                Color.black.ignoresSafeArea()
-
-                if let vm = viewModel {
-                    HStack(spacing: 0) {
-                        // Sidebar
-                        SidebarView(isVisible: $isSidebarVisible) { menuItem in
-                            handleMenuSelection(menuItem)
-                        }
-                        .offset(x: isSidebarVisible ? 0 : -350)
-                        .animation(.easeInOut(duration: 0.3), value: isSidebarVisible)
-
-                        // Main content
-                        HomeContentView(viewModel: vm, isSidebarVisible: $isSidebarVisible)
-                            .offset(x: isSidebarVisible ? 0 : -350)
-                            .animation(.easeInOut(duration: 0.3), value: isSidebarVisible)
-                    }
-                } else {
-                    Color.black.ignoresSafeArea()
-                }
-            }
-            .navigationDestination(for: MediaItem.self) { item in
-                createItemDetailView(for: item)
-            }
-            .navigationDestination(for: ContentSection.self) { section in
-                createLibraryView(for: section)
-            }
-            .navigationDestination(for: NavigationDestination.self) { destination in
-                switch destination {
-                case .search:
-                    createSearchView()
-                case .settings:
-                    createSettingsView()
-                }
-            }
-            .onAppear {
-                if viewModel == nil, authService.currentSession != nil {
-                    viewModel = HomeViewModel(
-                        contentService: env.contentService,
-                        authService: authService,
-                        navigationCoordinator: coordinator
-                    )
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func createItemDetailView(for item: MediaItem) -> some View {
-        ItemDetailViewWrapper(item: item, authService: authService, coordinator: coordinator, env: env)
-    }
-
-    @ViewBuilder
-    private func createLibraryView(for section: ContentSection) -> some View {
-        LibraryViewWrapper(section: section, authService: authService, coordinator: coordinator, env: env)
-    }
-
-    @ViewBuilder
-    private func createSearchView() -> some View {
-        SearchViewWrapper(authService: authService, coordinator: coordinator, env: env)
-    }
-
-    @ViewBuilder
-    private func createSettingsView() -> some View {
-        SettingsView()
-            .environmentObject(authService)
-    }
-
-    private func handleMenuSelection(_ item: MenuItem) {
-        print("🎯 Menu selected: \(item.title)")
-
-        // Delay hiding to allow navigation to complete
-        Task {
-            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
-            isSidebarVisible = false
-        }
-
-        switch item {
-        case .home:
-            // Already on home, just close sidebar
-            coordinator.navigationPath.removeLast(coordinator.navigationPath.count)
-        case .search:
-            coordinator.navigateToSearch()
-        case .movies:
-            if let moviesSection = viewModel?.sections.first(where: {
-                if case .library(_, let name) = $0.type, name.lowercased().contains("movie") {
-                    return true
-                }
-                return false
-            }) {
-                coordinator.navigate(to: moviesSection)
-            }
-        case .tvShows:
-            if let tvSection = viewModel?.sections.first(where: {
-                if case .library(_, let name) = $0.type, name.lowercased().contains("tv") || name.lowercased().contains("show") {
-                    return true
-                }
-                return false
-            }) {
-                coordinator.navigate(to: tvSection)
-            }
-        case .favorites:
-            // Will be implemented later
-            print("⭐ Favorites not yet implemented")
-        case .settings:
-            coordinator.navigateToSettings()
-        }
-    }
-}
-
 // MARK: - Item Detail Wrapper
 
 struct ItemDetailViewWrapper: View {
@@ -251,7 +132,6 @@ class NavigationCoordinator: ObservableObject {
 
 struct HomeContentView: View {
     @ObservedObject var viewModel: HomeViewModel
-    @Binding var isSidebarVisible: Bool
     var navigationManager: NavigationManager? = nil
     @State private var hasSetInitialScroll = false
 
@@ -404,7 +284,3 @@ struct ErrorView: View {
     }
 }
 
-#Preview {
-    HomeView()
-        .environmentObject(AuthenticationService())
-}

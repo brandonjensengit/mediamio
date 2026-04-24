@@ -26,7 +26,7 @@ struct QRHandoffView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Constants.Colors.background.ignoresSafeArea()
 
             HStack(spacing: 80) {
                 // QR code

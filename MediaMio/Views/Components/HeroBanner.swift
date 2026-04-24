@@ -208,23 +208,13 @@ private struct HeroBannerContent: View {
                     .lineLimit(2)
                     .shadow(color: .black.opacity(0.5), radius: 10)
 
-                // Metadata
-                HStack(spacing: 16) {
-                    if let year = item.yearText {
-                        MetadataBadge(text: year, icon: nil)
-                    }
-
-                    if let rating = item.ratingText {
-                        MetadataBadge(text: rating, icon: "star.fill")
-                    }
-
-                    if let runtime = item.runtimeFormatted {
-                        MetadataBadge(text: runtime, icon: "clock")
-                    }
-
-                    if let officialRating = item.officialRating {
-                        MetadataBadge(text: officialRating, icon: nil, style: .outlined)
-                    }
+                // Metadata — single typographic line
+                if let metadataLine {
+                    Text(metadataLine)
+                        .font(.title3)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white.opacity(0.85))
+                        .shadow(color: .black.opacity(0.4), radius: 4)
                 }
 
                 // Overview
@@ -271,6 +261,19 @@ private struct HeroBannerContent: View {
         }
     }
 
+    /// Joins available metadata fields into a single interpunct-separated line:
+    /// `"2025 · PG-13 · 1h 55m · ★ 6.1"`. Returns nil when nothing is populated.
+    private var metadataLine: String? {
+        var parts: [String] = []
+        if let year = item.yearText { parts.append(year) }
+        if let officialRating = item.officialRating, !officialRating.isEmpty {
+            parts.append(officialRating)
+        }
+        if let runtime = item.runtimeFormatted { parts.append(runtime) }
+        if let rating = item.ratingText { parts.append("★ \(rating)") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
     private var hasProgress: Bool {
         guard let userData = item.userData,
               let position = userData.playbackPositionTicks,
@@ -304,7 +307,7 @@ struct HeroBannerButton: View {
         var backgroundColor: Color {
             switch self {
             case .primary: return .white
-            case .secondary: return Color.white.opacity(0.2)
+            case .secondary: return Constants.Colors.surface2
             }
         }
 
@@ -331,16 +334,7 @@ struct HeroBannerButton: View {
             .background(style.backgroundColor)
             .foregroundColor(style.foregroundColor)
             .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.clear, lineWidth: 0)
-            )
-            .scaleEffect(isFocused ? 1.05 : 1.0)
-            .shadow(
-                color: isFocused ? .white.opacity(0.3) : .clear,
-                radius: isFocused ? 15 : 0
-            )
-            .animation(.easeInOut(duration: 0.2), value: isFocused)
+            .contentFocus()
         }
         .buttonStyle(.plain)
         .onChange(of: isFocused) { focused in

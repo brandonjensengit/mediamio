@@ -52,6 +52,8 @@ struct ExternalLinksSection: View {
 
 // MARK: - Rating Pill
 
+/// Non-interactive sibling of the link pill — same surface/padding/shape
+/// so the row reads as one design even though only the link pills focus.
 private struct RatingPill: View {
     let label: String
     let value: String
@@ -72,10 +74,12 @@ private struct RatingPill: View {
                     .foregroundColor(.white)
             }
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 16)
-        .background(Color.white.opacity(0.08))
-        .cornerRadius(12)
+        .padding(.horizontal, 28)
+        .padding(.vertical, 14)
+        .background(
+            Constants.Colors.surface2,
+            in: RoundedRectangle(cornerRadius: Constants.UI.cornerRadius, style: .continuous)
+        )
     }
 }
 
@@ -84,8 +88,6 @@ private struct RatingPill: View {
 private struct ExternalLinkPill: View {
     let link: ExternalURL
     let onTap: () -> Void
-
-    @FocusState private var hasFocus: Bool
 
     var body: some View {
         Button(action: onTap) {
@@ -96,17 +98,19 @@ private struct ExternalLinkPill: View {
                     .font(.title3)
                     .fontWeight(.semibold)
             }
-            .foregroundColor(.white)
-            .padding(.horizontal, 28)
-            .padding(.vertical, 18)
-            .background(hasFocus ? Color.white.opacity(0.25) : Color.white.opacity(0.1))
-            .cornerRadius(12)
-            .scaleEffect(hasFocus ? 1.05 : 1.0)
-            .shadow(color: hasFocus ? .white.opacity(0.3) : .clear, radius: hasFocus ? 12 : 0)
-            .animation(.easeInOut(duration: 0.2), value: hasFocus)
         }
-        .buttonStyle(.plain)
-        .focused($hasFocus)
+        // Routes through the shared Detail focus-ring style: tight amber
+        // stroke matching the button shape, no system white halo. Slimmer
+        // padding + smaller min-width than the Play/Favorite hero CTAs
+        // since the link row is dense and these aren't primary actions.
+        .buttonStyle(DetailActionButtonStyle(
+            backgroundColor: Constants.Colors.surface2,
+            foregroundColor: .white,
+            minWidth: 0,
+            horizontalPadding: 28,
+            verticalPadding: 14
+        ))
+        .focusEffectDisabled()
     }
 
     private func iconName(for provider: String) -> String {

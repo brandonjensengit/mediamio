@@ -16,30 +16,30 @@ struct SkipSettingsView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Constants.Colors.background.ignoresSafeArea()
 
             Form {
                 // Intros
                 Section {
                     Toggle("Auto-Skip Intros", isOn: $settingsManager.autoSkipIntros)
                         .foregroundColor(.white)  // ALWAYS white
-                        .tint(Color(hex: "667eea"))
+                        .tint(Constants.Colors.accent)
 
-                        .listRowBackground(Color.black.opacity(0.3))
+                        .listRowBackground(Constants.Colors.surface1)
                     Toggle("Show Skip Button", isOn: $settingsManager.showSkipIntroButton)
                         .foregroundColor(.white)  // ALWAYS white
-                        .tint(Color(hex: "667eea"))
+                        .tint(Constants.Colors.accent)
                         .disabled(!settingsManager.autoSkipIntros)
-                        .listRowBackground(Color.black.opacity(0.3))
+                        .listRowBackground(Constants.Colors.surface1)
 
                     if settingsManager.autoSkipIntros {
                         Picker("Skip After", selection: $settingsManager.skipIntroCountdown) {
                             Text("Instantly").tag(0)
-                                .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                                .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                             Text("3 seconds").tag(3)
-                                .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                                .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                             Text("5 seconds").tag(5)
-                                .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                                .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                         }
                         .pickerStyle(.segmented)
                         .foregroundColor(.white)  // ALWAYS white
@@ -61,29 +61,29 @@ struct SkipSettingsView: View {
                 Section {
                     Toggle("Auto-Skip Credits", isOn: $settingsManager.autoSkipCredits)
                         .foregroundColor(.white)  // ALWAYS white
-                        .tint(Color(hex: "667eea"))
+                        .tint(Constants.Colors.accent)
 
-                        .listRowBackground(Color.black.opacity(0.3))
+                        .listRowBackground(Constants.Colors.surface1)
                     Toggle("Show Skip Credits Button", isOn: $settingsManager.showSkipCreditsButton)
                         .foregroundColor(.white)
-                        .tint(Color(hex: "667eea"))
-                        .listRowBackground(Color.black.opacity(0.3))
+                        .tint(Constants.Colors.accent)
+                        .listRowBackground(Constants.Colors.surface1)
                     Toggle("Show Next Episode Overlay", isOn: $settingsManager.showNextEpisodeOverlay)
                         .foregroundColor(.white)  // ALWAYS white
-                        .tint(Color(hex: "667eea"))
+                        .tint(Constants.Colors.accent)
                         .disabled(!settingsManager.autoSkipCredits)
-                        .listRowBackground(Color.black.opacity(0.3))
+                        .listRowBackground(Constants.Colors.surface1)
 
                     if settingsManager.autoSkipCredits {
                         Picker("Start Next Episode After", selection: $settingsManager.skipCreditsCountdown) {
                             Text("5 seconds").tag(5)
-                                .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                                .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                             Text("10 seconds").tag(10)
-                                .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                                .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                             Text("15 seconds").tag(15)
-                                .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                                .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                             Text("20 seconds").tag(20)
-                                .foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                                .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                         }
                         .pickerStyle(.segmented)
                         .foregroundColor(.white)  // ALWAYS white
@@ -105,14 +105,14 @@ struct SkipSettingsView: View {
                 Section {
                     Toggle("Auto-Skip Recaps", isOn: $settingsManager.autoSkipRecaps)
                         .foregroundColor(.white)  // ALWAYS white
-                        .tint(Color(hex: "667eea"))
+                        .tint(Constants.Colors.accent)
 
-                        .listRowBackground(Color.black.opacity(0.3))
+                        .listRowBackground(Constants.Colors.surface1)
                     Toggle("Show Skip Button", isOn: $settingsManager.showSkipRecapButton)
                         .foregroundColor(.white)  // ALWAYS white
-                        .tint(Color(hex: "667eea"))
+                        .tint(Constants.Colors.accent)
                         .disabled(!settingsManager.autoSkipRecaps)
-                        .listRowBackground(Color.black.opacity(0.3))
+                        .listRowBackground(Constants.Colors.surface1)
                 } header: {
                     Text("Recaps")
                         .foregroundColor(.white)
@@ -133,13 +133,13 @@ struct SkipSettingsView: View {
                                     .foregroundColor(.secondary)
                             }
                             .tag(behavior.rawValue)
-                            .listRowBackground(Color.black.opacity(0.3))
+                            .listRowBackground(Constants.Colors.surface1)
                         }
                     }
                     .pickerStyle(.navigationLink)
                     .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Color(hex: "667eea"))
-                    .listRowBackground(Color.black.opacity(0.3))
+                    .accentColor(Constants.Colors.accent)
+                    .listRowBackground(Constants.Colors.surface1)
                 } header: {
                     Text("General Behavior")
                         .foregroundColor(.white)

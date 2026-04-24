@@ -36,7 +36,7 @@ struct StreamingSettingsView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Constants.Colors.background.ignoresSafeArea()
 
             Form {
                 // Streaming Mode
@@ -52,13 +52,13 @@ struct StreamingSettingsView: View {
                                     .foregroundColor(.secondary)
                             }
                             .tag(mode.rawValue)
-                            .listRowBackground(Color.black.opacity(0.3))
+                            .listRowBackground(Constants.Colors.surface1)
                         }
                     }
                     .pickerStyle(.navigationLink)
                     .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Color(hex: "667eea"))
-                    .listRowBackground(Color.black.opacity(0.3))
+                    .accentColor(Constants.Colors.accent)
+                    .listRowBackground(Constants.Colors.surface1)
                 } header: {
                     Text("Mode")
                         .foregroundColor(.white)
@@ -70,21 +70,21 @@ struct StreamingSettingsView: View {
                 // Bitrate Settings
                 Section {
                     Picker("Maximum Bitrate", selection: $settingsManager.maxBitrate) {
-                        Text("2 Mbps - Mobile").tag(2_000_000).foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
-                        Text("5 Mbps - SD").tag(5_000_000).foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
-                        Text("10 Mbps - 720p").tag(10_000_000).foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
-                        Text("20 Mbps - 1080p").tag(20_000_000).foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
-                        Text("40 Mbps - 1080p HD").tag(40_000_000).foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
-                        Text("60 Mbps - 1080p High").tag(60_000_000).foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
-                        Text("80 Mbps - 1080p Remux").tag(80_000_000).foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
-                        Text("120 Mbps - 4K (Recommended)").tag(120_000_000).foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
-                        Text("150 Mbps - 4K High").tag(150_000_000).foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
-                        Text("200 Mbps - 4K Maximum").tag(200_000_000).foregroundColor(.white).listRowBackground(Color.black.opacity(0.3))
+                        Text("2 Mbps - Mobile").tag(2_000_000).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
+                        Text("5 Mbps - SD").tag(5_000_000).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
+                        Text("10 Mbps - 720p").tag(10_000_000).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
+                        Text("20 Mbps - 1080p").tag(20_000_000).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
+                        Text("40 Mbps - 1080p HD").tag(40_000_000).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
+                        Text("60 Mbps - 1080p High").tag(60_000_000).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
+                        Text("80 Mbps - 1080p Remux").tag(80_000_000).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
+                        Text("120 Mbps - 4K (Recommended)").tag(120_000_000).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
+                        Text("150 Mbps - 4K High").tag(150_000_000).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
+                        Text("200 Mbps - 4K Maximum").tag(200_000_000).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
                     }
                     .pickerStyle(.navigationLink)
                     .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Color(hex: "667eea"))
-                    .listRowBackground(Color.black.opacity(0.3))
+                    .accentColor(Constants.Colors.accent)
+                    .listRowBackground(Constants.Colors.surface1)
                 } header: {
                     Text("Quality")
                         .foregroundColor(.white)
@@ -105,13 +105,13 @@ struct StreamingSettingsView: View {
                                     .foregroundColor(.secondary)
                             }
                             .tag(codec.rawValue)
-                            .listRowBackground(Color.black.opacity(0.3))
+                            .listRowBackground(Constants.Colors.surface1)
                         }
                     }
                     .pickerStyle(.navigationLink)
                     .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Color(hex: "667eea"))
-                    .listRowBackground(Color.black.opacity(0.3))
+                    .accentColor(Constants.Colors.accent)
+                    .listRowBackground(Constants.Colors.surface1)
                 } header: {
                     Text("Video Codec")
                         .foregroundColor(.white)
@@ -121,7 +121,7 @@ struct StreamingSettingsView: View {
                 Section {
                     Toggle("Allow Transcoding", isOn: $settingsManager.allowTranscoding)
                         .foregroundColor(.white)  // ALWAYS white
-                        .tint(Color(hex: "667eea"))
+                        .tint(Constants.Colors.accent)
                         .listRowBackground(Color.clear)
                 } header: {
                     Text("Transcoding")
@@ -135,12 +135,12 @@ struct StreamingSettingsView: View {
                 Section {
                     Toggle("Low Bandwidth Mode", isOn: $settingsManager.lowBandwidthMode)
                         .foregroundColor(.white)  // ALWAYS white
-                        .tint(Color(hex: "667eea"))
+                        .tint(Constants.Colors.accent)
                         .listRowBackground(Color.clear)
 
                     Toggle("Prefer Local Network", isOn: $settingsManager.preferLocalNetwork)
                         .foregroundColor(.white)  // ALWAYS white
-                        .tint(Color(hex: "667eea"))
+                        .tint(Constants.Colors.accent)
                         .listRowBackground(Color.clear)
                 } header: {
                     Text("Network")

@@ -32,21 +32,22 @@ class ContentService: ObservableObject {
 
     /// Load all sections for the home screen.
     ///
-    /// Continue Watching, Recently Added, and the libraries list are fetched in parallel.
-    /// Once libraries arrive, each library's first-page fetch also runs in parallel.
-    /// The returned section order is stable: Continue Watching, Recently Added, then libraries
-    /// in server order.
+    /// Continue Watching + each library's first page (sorted most-recent-first)
+    /// are fetched in parallel. The returned section order is: Continue
+    /// Watching, then libraries in server order. The dedicated "Recently
+    /// Added" section was removed because each library now surfaces its own
+    /// recent additions at the top of its row — one "recently added" stream
+    /// across all content was redundant once per-library sort flipped to
+    /// `DateCreated Descending`.
     func loadHomeContent() async throws -> [ContentSection] {
         guard userId != nil else {
             throw APIError.authenticationFailed
         }
 
         async let continueWatchingTask = try? await loadContinueWatching()
-        async let recentlyAddedTask = try? await loadRecentlyAdded()
         async let librariesTask = try await getLibraries()
 
         let continueWatching = await continueWatchingTask
-        let recentlyAdded = await recentlyAddedTask
         let libraries = try await librariesTask
 
         let homeLibraries = libraries.filter { $0.isMovieLibrary || $0.isTVLibrary }
@@ -72,9 +73,6 @@ class ContentService: ObservableObject {
         var sections: [ContentSection] = []
         if let cw = continueWatching, !cw.items.isEmpty {
             sections.append(cw)
-        }
-        if let ra = recentlyAdded, !ra.items.isEmpty {
-            sections.append(ra)
         }
         sections.append(contentsOf: librarySections)
         return sections
@@ -136,13 +134,18 @@ class ContentService: ObservableObject {
         }
 
         let controls = ParentalControlsConfig.current
+        // Sort by DateCreated descending so the most recently added items
+        // surface first on the Home carousel. SortName is included as a
+        // tie-breaker — without it, items added in the same batch fall into
+        // server-insertion order which reads as random.
         let response = try await apiClient.getLibraryItems(
             userId: userId,
             parentId: library.id,
             includeItemTypes: itemTypes,
             maxOfficialRating: controls.jellyfinMaxRating,
             limit: limit,
-            sortBy: "SortName"
+            sortBy: "DateCreated,SortName",
+            sortOrder: "Descending"
         )
 
         return ContentSection(
