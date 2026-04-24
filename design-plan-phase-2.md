@@ -1,7 +1,7 @@
 # MediaMio Design Plan — Phase 2: Streaming Flow Repair
 
 **Started:** 2026-04-23
-**Status:** Items A + B + C.1 shipped 2026-04-23. Item C.2 (actual trailer playback) deferred — blocked on YouTube URL resolution / Jellyfin local-trailers integration. Items D–H pending.
+**Status:** Items A + B + C.1 + D shipped 2026-04-23. Item C.2 (actual trailer playback) deferred — blocked on YouTube URL resolution / Jellyfin local-trailers integration. Items E–H pending.
 **Scope:** tvOS streaming-app conventions, focus-engine correctness, real perf bugs, and the three "judge moments" (hero, shelf, detail → player). Picks up where `design-plan.md` left off after 7 chrome/palette items shipped 2026-04-22 / 2026-04-23.
 
 **Explicitly NOT in scope:** business logic, API client, authentication flow, settings business wiring, transcode policy (already fixed in `fix-unnecessary-transcode.md`).
@@ -188,7 +188,27 @@ Falls back cleanly for items with no logo (e.g. Sid and Nancy).
 
 ---
 
-## Item D — Player HUD aligns to Apple's tvOS contract (P1)
+## Item D — Player HUD aligns to Apple's tvOS contract (P1) — SHIPPED 2026-04-23
+
+### What landed
+
+- `SimpleVideoPlayerRepresentable` now drives `AVPlayerViewController.contextualActions` directly from `viewModel.showSkipIntroButton` / `showSkipCreditsButton`. Skip Intro appears as a native `UIAction` chip with Apple's transport-bar animation; the SwiftUI overlay is gone. When the VM state flips false the array goes empty and Apple animates the chip out — no custom transition code.
+- New `syncContextualActions(on:)` helper is called from both `makeUIViewController` and `updateUIViewController`. The SwiftUI parent observes `viewModel.showSkipIntroButton` via `@StateObject`, which forces an invalidation each time the controller's intro-skipper window opens or closes → `updateUIViewController` re-runs → contextual actions refresh.
+- New `syncPlaybackRateMenu(on:)` publishes a `UIMenu` with 0.5× / 1× / 1.25× / 1.5× / 2× children as the sole `transportBarCustomMenuItems` entry. Check-state comes from `player.defaultRate` (tvOS 16+) not `player.rate` — `rate` goes to 0 while paused, which would otherwise flip the checkmark back to 1× incorrectly whenever the user paused. Selecting a speed writes both `defaultRate` (persists across pause/seek) and `rate` (applies live, but only if currently playing so selecting a speed doesn't unpause).
+- `VideoPlayerView` parent now passes `showSkipIntro` / `showSkipCredits` / `onSkipIntro` / `onSkipCredits` into the representable. Closures capture `viewModel` — safe because they're replaced on every SwiftUI invalidation and `UIAction` holds them only until the array is replaced.
+- Deleted `SkipMarkerOverlay` and `SkipButton` structs entirely — ~60 lines of SwiftUI + `@FocusState` that existed only because we weren't using Apple's contract. Grep for `SkipMarkerOverlay` / `SkipButton` returns nothing. 
+- **`MPNowPlayingInfoCenter` was already wired** by `NowPlayingPublisher` (added since the plan was written) — it already publishes title/series/artwork/elapsed/duration/rate, wires `playCommand`/`pauseCommand`/`togglePlayPauseCommand`/skip ±10s/`changePlaybackPositionCommand`, and clears on deinit. Re-verified; nothing to add.
+- Build green on `tvOS Simulator,OS=26.0,name=Apple TV`, no new warnings.
+
+### Trade-offs / things to watch
+
+- Skip Intro "Auto-skip with countdown" visual: the previous custom overlay showed the button for N seconds then seeked. The contextual-action contract doesn't render a countdown — it's just a chip that's present or not. If the countdown UX matters, we'd need an extra label on the chip (not supported) or fall back to a non-native CTA. Current behavior: the chip appears during the intro window and auto-skip fires after the configured countdown — same VM state, same controller behavior, just a different visual idiom. If a user pref for "show countdown" becomes a requirement, revisit.
+- `UIMenu` for playback rate has no check-mark animation when the selection changes — the menu rebuilds on the next `updateUIViewController` and the new state appears instantly on reopen. This is the same behavior AVKit ships for its native subtitle/audio menus, so it matches platform expectations.
+- `IntroCreditsController.hasSkippedIntro` / `hasSkippedCredits` still latch to `true` after a skip — so if the user seeks *backwards* past the intro marker a second time, the chip won't re-appear. Pre-existing behavior, not in this item's scope.
+
+---
+
+## Item D — original plan (historical)
 
 **Why:** today, Skip Intro is a SwiftUI overlay that ignores the AVKit transport-bar contract; `MPNowPlayingInfoCenter` is silent. Apple convention exists for free; we're not using it.
 

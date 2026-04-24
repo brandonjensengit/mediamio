@@ -17,6 +17,10 @@ struct SimpleVideoPlayerRepresentable: UIViewControllerRepresentable {
     let item: MediaItem
     let playbackMode: PlaybackMode
     let subtitleDisplay: String?
+    let showSkipIntro: Bool
+    let showSkipCredits: Bool
+    let onSkipIntro: () -> Void
+    let onSkipCredits: () -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -57,6 +61,13 @@ struct SimpleVideoPlayerRepresentable: UIViewControllerRepresentable {
 
         controller.customInfoViewControllers = [playbackInfoVC, bitrateVC, audioQualityVC]
         context.coordinator.playbackInfoVC = playbackInfoVC
+
+        // Apple tvOS contract for skip actions + playback speed. Set an
+        // initial pass here; `updateUIViewController` refreshes on every
+        // SwiftUI invalidation so the chips appear/disappear in sync with
+        // `viewModel.showSkipIntroButton` / `showSkipCreditsButton`.
+        syncContextualActions(on: controller)
+        syncPlaybackRateMenu(on: controller)
 
         DebugLog.playback("   Player: \(player)")
         DebugLog.playback("   Player status: \(player.status.rawValue)")
@@ -108,6 +119,66 @@ struct SimpleVideoPlayerRepresentable: UIViewControllerRepresentable {
             maxStreamingBitrate: settingsManager.maxBitrate
         )
         context.coordinator.playbackInfoVC?.update(info: info)
+
+        syncContextualActions(on: uiViewController)
+        syncPlaybackRateMenu(on: uiViewController)
+    }
+
+    // MARK: - tvOS HUD wiring
+
+    /// Drive the Apple "contextual action" chip (lower-right of the
+    /// transport bar) from the VM's skip-button state. Empty array ⇒ no
+    /// chip, which is what Apple renders when the intro/credits window
+    /// is not active.
+    private func syncContextualActions(on controller: AVPlayerViewController) {
+        var actions: [UIAction] = []
+        if showSkipIntro {
+            actions.append(UIAction(
+                title: "Skip Intro",
+                image: UIImage(systemName: "forward.fill")
+            ) { _ in onSkipIntro() })
+        }
+        if showSkipCredits {
+            actions.append(UIAction(
+                title: "Skip Credits",
+                image: UIImage(systemName: "forward.end.fill")
+            ) { _ in onSkipCredits() })
+        }
+        controller.contextualActions = actions
+    }
+
+    /// Publish the playback-speed menu as a transport-bar custom menu item.
+    /// Uses `AVPlayer.defaultRate` (tvOS 16+) so the user's chosen speed
+    /// persists across pause/seek — `rate` goes to 0 when paused, which
+    /// would otherwise flip the checkmark back to 1× incorrectly.
+    private func syncPlaybackRateMenu(on controller: AVPlayerViewController) {
+        let options: [(label: String, value: Float)] = [
+            ("0.5×",  0.5),
+            ("1×",    1.0),
+            ("1.25×", 1.25),
+            ("1.5×",  1.5),
+            ("2×",    2.0)
+        ]
+        let current = player.defaultRate > 0 ? player.defaultRate : 1.0
+        let children = options.map { option -> UIAction in
+            UIAction(
+                title: option.label,
+                state: abs(current - option.value) < 0.01 ? .on : .off
+            ) { [player] _ in
+                player.defaultRate = option.value
+                // Apply live if playing; leave paused state alone so
+                // selecting a speed doesn't unpause the user.
+                if player.rate != 0 {
+                    player.rate = option.value
+                }
+            }
+        }
+        let menu = UIMenu(
+            title: "Playback Speed",
+            image: UIImage(systemName: "speedometer"),
+            children: children
+        )
+        controller.transportBarCustomMenuItems = [menu]
     }
 
     // MARK: - Coordinator for handling AVPlayerViewController delegate
@@ -149,14 +220,21 @@ struct VideoPlayerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            // CLEAN: Native AVPlayerViewController with custom info view controllers
+            // CLEAN: Native AVPlayerViewController with custom info view controllers.
+            // Skip Intro / Skip Credits ride on `controller.contextualActions`
+            // (Apple's tvOS-15+ contract) rather than a custom SwiftUI overlay,
+            // so they animate in/out with the native "Up Next" chrome.
             if let player = viewModel.player {
                 SimpleVideoPlayerRepresentable(
                     player: player,
                     settingsManager: settingsManager,
                     item: viewModel.item,
                     playbackMode: viewModel.currentPlaybackMode,
-                    subtitleDisplay: viewModel.currentSubtitleDisplay
+                    subtitleDisplay: viewModel.currentSubtitleDisplay,
+                    showSkipIntro: viewModel.showSkipIntroButton,
+                    showSkipCredits: viewModel.showSkipCreditsButton,
+                    onSkipIntro: { viewModel.skipIntro() },
+                    onSkipCredits: { viewModel.skipCredits() }
                 )
                     .ignoresSafeArea()
                     // Auto-play is the VM's responsibility — its `.readyToPlay`
@@ -178,8 +256,6 @@ struct VideoPlayerView: View {
                     }
                 }
             }
-
-            SkipMarkerOverlay(viewModel: viewModel)
         }
         .task {
             await viewModel.loadVideoURL()
@@ -188,75 +264,6 @@ struct VideoPlayerView: View {
             // Clean up when leaving the player
             viewModel.cleanup()
         }
-    }
-}
-
-// MARK: - Skip Marker Overlay
-
-/// Bottom-right overlay for Skip Intro / Skip Credits buttons. Sits above
-/// the native `AVPlayerViewController` controls; the focus engine can reach
-/// the buttons when the native controls are dismissed. Both buttons are
-/// driven off `@Published` state on the VM that's re-published from
-/// `IntroCreditsController`.
-struct SkipMarkerOverlay: View {
-    @ObservedObject var viewModel: VideoPlayerViewModel
-
-    var body: some View {
-        VStack {
-            Spacer()
-            HStack {
-                Spacer()
-                VStack(alignment: .trailing, spacing: 16) {
-                    if viewModel.showSkipIntroButton {
-                        SkipButton(title: "Skip Intro", icon: "forward.fill") {
-                            viewModel.skipIntro()
-                        }
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
-                    }
-                    if viewModel.showSkipCreditsButton {
-                        SkipButton(title: "Skip Credits", icon: "forward.end.fill") {
-                            viewModel.skipCredits()
-                        }
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
-                    }
-                }
-                .padding(.trailing, 80)
-                .padding(.bottom, 80)
-            }
-        }
-        .animation(.easeInOut(duration: 0.25), value: viewModel.showSkipIntroButton)
-        .animation(.easeInOut(duration: 0.25), value: viewModel.showSkipCreditsButton)
-        .allowsHitTesting(viewModel.showSkipIntroButton || viewModel.showSkipCreditsButton)
-    }
-}
-
-private struct SkipButton: View {
-    let title: String
-    let icon: String
-    let action: () -> Void
-
-    @FocusState private var hasFocus: Bool
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.title3)
-                Text(title)
-                    .font(.title3)
-                    .fontWeight(.semibold)
-            }
-            .padding(.horizontal, 32)
-            .padding(.vertical, 18)
-            .background(hasFocus ? Color.white : Color.black.opacity(0.7))
-            .foregroundColor(hasFocus ? .black : .white)
-            .cornerRadius(10)
-            .scaleEffect(hasFocus ? 1.05 : 1.0)
-            .shadow(color: .black.opacity(0.4), radius: 8)
-            .animation(.easeInOut(duration: 0.2), value: hasFocus)
-        }
-        .buttonStyle(.plain)
-        .focused($hasFocus)
     }
 }
 
