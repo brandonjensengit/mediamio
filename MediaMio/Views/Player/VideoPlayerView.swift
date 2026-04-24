@@ -19,6 +19,11 @@ struct SimpleVideoPlayerRepresentable: UIViewControllerRepresentable {
     let subtitleDisplay: String?
     let showSkipIntro: Bool
     let showSkipCredits: Bool
+    /// Mirrors the VM's `playbackRate`. Carried as a prop so SwiftUI knows
+    /// to re-run `updateUIViewController` when the rate changes — which is
+    /// what triggers `syncPlaybackRateMenu` to rebuild the speedometer
+    /// menu's checkmark on the active rate (QA-11).
+    let playbackRate: Float
     let onSkipIntro: () -> Void
     let onSkipCredits: () -> Void
 
@@ -233,6 +238,7 @@ struct VideoPlayerView: View {
                     subtitleDisplay: viewModel.currentSubtitleDisplay,
                     showSkipIntro: viewModel.showSkipIntroButton,
                     showSkipCredits: viewModel.showSkipCreditsButton,
+                    playbackRate: viewModel.playbackRate,
                     onSkipIntro: { viewModel.skipIntro() },
                     onSkipCredits: { viewModel.skipCredits() }
                 )

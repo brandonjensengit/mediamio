@@ -41,6 +41,14 @@ final class VideoPlayerViewModel: ObservableObject {
     @Published var observedBitrate: Double = 0.0
     @Published var currentBitrate: Double = 0.0  // legacy: callers may set this from outside
 
+    /// Mirrors `AVPlayer.defaultRate` so SwiftUI invalidates whenever the
+    /// playback speed changes. The transport-bar speedometer menu's checkmark
+    /// is rebuilt by `updateUIViewController`, which only fires on
+    /// representable-prop changes — without this, mutating `defaultRate`
+    /// from the menu's UIAction closure left the ✓ stuck on the previous
+    /// rate until something else invalidated the view (QA-11).
+    @Published private(set) var playbackRate: Float = 1.0
+
     // MARK: - Inputs
 
     /// The item being played. Starts as whatever the caller passed in
@@ -82,6 +90,7 @@ final class VideoPlayerViewModel: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
     private var subtitleSubscriptions: Set<AnyCancellable> = []
     private var introSubscriptions: Set<AnyCancellable> = []
+    private var defaultRateObservation: NSKeyValueObservation?
     private var isLoadingVideo: Bool = false
 
     // Services. Lazily initialized once we have the playback URL.
@@ -276,6 +285,7 @@ final class VideoPlayerViewModel: ObservableObject {
         }
 
         self.player = avPlayer
+        observeDefaultRate(on: avPlayer)
 
         // Build / rebind services for this playback session.
         sessionReporter = PlaybackSessionReporter(
@@ -493,10 +503,32 @@ final class VideoPlayerViewModel: ObservableObject {
             player?.removeTimeObserver(observer)
             timeObserver = nil
         }
+        defaultRateObservation?.invalidate()
+        defaultRateObservation = nil
         progressReportTimer?.invalidate()
         progressReportTimer = nil
         player?.pause()
         player = nil
+    }
+
+    /// KVO bridge from `AVPlayer.defaultRate` (Cocoa property, not Combine
+    /// publishable on its own) into the `playbackRate` `@Published` field.
+    /// Drives SwiftUI invalidation so `updateUIViewController` re-runs and
+    /// `syncPlaybackRateMenu` rebuilds the speedometer menu with a fresh
+    /// checkmark on the active rate.
+    private func observeDefaultRate(on player: AVPlayer) {
+        defaultRateObservation?.invalidate()
+        playbackRate = player.defaultRate > 0 ? player.defaultRate : 1.0
+        defaultRateObservation = player.observe(
+            \.defaultRate,
+             options: [.initial, .new]
+        ) { [weak self] player, _ in
+            let next = player.defaultRate > 0 ? player.defaultRate : 1.0
+            Task { @MainActor [weak self] in
+                guard let self, self.playbackRate != next else { return }
+                self.playbackRate = next
+            }
+        }
     }
 
     // MARK: - Observers
