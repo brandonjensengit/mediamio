@@ -19,20 +19,7 @@ struct LoadingView: View {
     var body: some View {
         VStack(spacing: 40) {
             if showLogo {
-                // Logo and branding
-                VStack(spacing: 30) {
-                    // App Logo
-                    Image("AppLogo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 300, height: 300)
-
-                    // Logo Text
-                    Image("LogoText")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 400)
-                }
+                GloxxWordmark(size: 90)
             }
 
             // Loading indicator

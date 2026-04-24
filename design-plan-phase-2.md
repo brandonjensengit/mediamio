@@ -1,7 +1,7 @@
 # MediaMio Design Plan — Phase 2: Streaming Flow Repair
 
 **Started:** 2026-04-23
-**Status:** Items A + B + C.1 + D shipped 2026-04-23. Item C.2 (actual trailer playback) deferred — blocked on YouTube URL resolution / Jellyfin local-trailers integration. Items E–H pending.
+**Status:** Items A + B + C.1 + D + E + F + H shipped 2026-04-23. Item C.2 (actual trailer playback) deferred — blocked on YouTube URL resolution / Jellyfin local-trailers integration. Item E's zoom transition deferred — blocked on `.fullScreenCover` → `NavigationStack` presentation refactor. Item G pending (defer unless A8 telemetry says otherwise). `/critique` + 4K screenshot pass still to run manually on sim.
 **Scope:** tvOS streaming-app conventions, focus-engine correctness, real perf bugs, and the three "judge moments" (hero, shelf, detail → player). Picks up where `design-plan.md` left off after 7 chrome/palette items shipped 2026-04-22 / 2026-04-23.
 
 **Explicitly NOT in scope:** business logic, API client, authentication flow, settings business wiring, transcode policy (already fixed in `fix-unnecessary-transcode.md`).
@@ -234,7 +234,40 @@ Falls back cleanly for items with no logo (e.g. Sid and Nancy).
 
 ---
 
-## Item E — Detail view pattern decision + layout (P1)
+## Item E — Detail view pattern decision + layout — SHIPPED 2026-04-23
+
+### What landed
+
+- New `MediaMio/Views/Components/TitleTreatment.swift`:
+  - Promoted the private `HeroTitle` view out of `HeroBanner.swift`; both cinematic surfaces (Hero + Detail header) now share the same logo-or-text fallback contract. Accepts `maxWidth` / `maxHeight` / `textFontSize` / `alignment` params so the Detail no-backdrop state (centered, 700×240 box) and the Hero / Detail-with-backdrop states (leading, 600×180 box) use one component.
+- `HeroBanner.swift` — deleted the private `HeroTitle` struct, updated the callsite to `TitleTreatment(item:baseURL:)`.
+- `ItemDetailView.swift` — committed to full-bleed cinematic:
+  - `DetailHeaderView` height 900pt → **720pt** per skill spec (66% of 1080).
+  - Dropped the `HStack { poster · info }` composition entirely — no more poster column. That pattern was a library-browser idiom (Sonarr / Radarr / Jellyfin Web) at odds with a playback client.
+  - Single lower-left `VStack` over backdrop + scrim: title treatment → metadata line → progress (if resumable) → Play / Favorite CTAs.
+  - Empty-backdrop branch: `surface1` + vertical gradient as the stage, centered `TitleTreatment` (700×240) in the upper portion, metadata + CTAs still lower-left. The `.blur(radius: 80)` ambient-poster fallback is gone — it was an A8 frame killer for negligible visual value (already flagged in Item A, now removed entirely).
+  - Removed the `FocusableButton` enum and `@FocusState` tracking from `DetailHeaderView`; initial focus is now declarative.
+- Focus-scope plumbing:
+  - `ItemDetailView` declares `@Namespace private var detailFocusNamespace`, passes it into `DetailHeaderView`, and wraps the outer `ScrollView` in `.focusScope(detailFocusNamespace)`.
+  - The Play CTA gets `.prefersDefaultFocus(true, in: detailFocusNamespace)` — Play auto-focuses on every fresh presentation without the imperative `onAppear { focusedButton = .play }` hack.
+- Section re-order on Movie detail:
+  - Chapters section demoted to render **after** Cast & Crew (was directly under External Links). Plan flagged Chapters as stealing focus from Play on long movies with many chapter thumbs; moving it down keeps the first screen cinematic and puts chapters near the "drill in" section where they belong.
+  - Series detail is unchanged — already chapter-free.
+- Build green on `tvOS Simulator,OS=26.0,name=Apple TV`, zero new warnings.
+
+### What did NOT land (deferred)
+
+- **`matchedTransitionSource` + `.navigationTransition(.zoom(...))` poster → detail zoom transition.** `ItemDetailView` is presented via `.fullScreenCover` (`MainTabView.swift:86`) not `NavigationStack` push — and the zoom transition modifier only applies to `NavigationLink`-pushed destinations. Shipping zoom requires refactoring the presentation path away from `.fullScreenCover`, which conflicts with the intentional "avoid tvOS inset-sheet rendering" comment at `MainTabView.swift:82-85`. The two viable paths are: (1) port Detail presentation to a `NavigationStack` + `.navigationDestination(for: MediaItem.self)` and verify the old inset-sheet issue doesn't resurface, (2) skip zoom entirely and accept the default cross-fade. Default direction: path 1 in a follow-up, gated on the inset-sheet check.
+
+### Known trade-offs carried into Item F+
+
+- `DetailActionButton` / `DetailActionButtonStyle` still live inside `ItemDetailView.swift` (500+ lines). Phase 1 item 5 standardized CTAs via `CTAButton`; this Detail button stayed separate because it needs a custom focus stroke + scale tier that `CTAButton` doesn't expose. Item F / polish could either fold it into `CTAButton` via a `focusStyle:` parameter, or extract it into its own component file.
+- Empty-backdrop composition is intentional but rarely exercised — most TMDb-scraped libraries ship backdrops. Eyeball at 10ft if an item without a backdrop shows up in QA.
+- Focus scope wrapping the ScrollView means the Play CTA is the default focus for every fresh mount of the view. On back-nav return (e.g. from the player), the system preserves prior focus memory for that scope, so the user lands back on the last focused CTA (Play), not on a scroll-section lower down — correct behavior.
+
+---
+
+## Item E — original plan (historical)
 
 **Why:** the current header is a hybrid. Commit to one idiom.
 
@@ -259,7 +292,49 @@ Falls back cleanly for items with no logo (e.g. Sid and Nancy).
 
 ---
 
-## Item F — `PosterCard` becomes a real tvOS `Button` with `.card` style (P2)
+## Item F — `PosterCard` becomes a real tvOS `Button` with `.card` style — SHIPPED 2026-04-23
+
+### What landed
+
+- `PosterCard` and `EpisodeThumbCard` are now `Button(action: onSelect) { … }.buttonStyle(.card)`. Both keep a single `@FocusState private var isFocused` bound via `.focused($isFocused)` — used only for `.zIndex(isFocused ? 999 : 0)` so the card-style parallax can over-hang neighbors without being clipped by `LazyHStack`. The old `.focusable() + .onTapGesture` pair is gone from both files; so is the custom `.contentFocus(isFocused:)` tier — the system `.card` treatment (lift + scale + subtle parallax on remote movement + specular shine) replaces our hand-rolled scale + dark drop shadow.
+- New `PosterContextAction` enum lives on `HomeViewModel.swift` — five cases: `.playFromBeginning`, `.toggleWatched`, `.toggleFavorite`, `.goToSeries`, `.removeFromResume`. Scoped there (not in the card file) so both cards and the Home VM share one vocabulary.
+- `HomeViewModel` gained an injected `apiClient: JellyfinAPIClient` and a `handleContextAction(_:for:)` dispatcher:
+  - `.playFromBeginning` → `navigationManager.playItem(item, startPositionTicks: 0)`.
+  - `.toggleWatched` → new `apiClient.markPlayed` / `unmarkPlayed` (below), then `refresh()`.
+  - `.toggleFavorite` → reuses existing `apiClient.markFavorite` / `unmarkFavorite`, then `refresh()`.
+  - `.goToSeries` → async `apiClient.getItemDetails(userId:itemId: seriesId)` + `navigationManager.showDetail(for:)` so the Series detail opens with full data, not a sparse stub.
+  - `.removeFromResume` → `apiClient.markPlayed` (Jellyfin has no dedicated "hide from resume" endpoint; marking played is what removes an item from `/Items/Resume` and matches Netflix semantics). Destructive label in the menu.
+- `JellyfinAPIClient` gained:
+  - `markPlayed(userId:itemId:) -> UserData` — `POST /Users/{userId}/PlayedItems/{itemId}`.
+  - `unmarkPlayed(userId:itemId:) -> UserData` — `DELETE` on the same endpoint.
+  - `PlaybackSessionReporter` already talked to this endpoint via raw `URLSession`; the new API-client methods are the first-class surface so context-menu calls run through the client's retry policy + auth handling.
+- `MainTabView` passes `env.apiClient` into the `HomeViewModel` init (alongside `env.contentService` + `env.authService`) — no new environment plumbing, just one more constructor arg.
+- Long-press menu surfaces only when the card is given an `onContextAction` closure — nil = no menu (tvOS skips the gesture entirely). Only `HomeContentView` wires it today, via `viewModel.handleContextAction`. `ContentRow` threads an optional `onContextAction: ((MediaItem, PosterContextAction) -> Void)?` and converts it to a per-item closure at the card callsite using `.map`. Library / Search / Detail callsites keep the default nil — they compile unchanged.
+- Menu items are gated conditionally per card:
+  - "Play from Beginning" — only if `playbackProgress` is set (between 1–95%).
+  - "Mark Watched" / "Mark Unwatched" — always present, label + SF Symbol flip on `item.userData?.played`.
+  - "Add to Favorites" / "Remove from Favorites" — always present, flips on `item.userData?.isFavorite`.
+  - "Go to Series" — only for Episodes with a `seriesId`.
+  - "Remove from Continue Watching" — only if `playbackProgress` is set. Marked `role: .destructive`.
+- Build green on `tvOS Simulator,OS=26.0,name=Apple TV`, zero new warnings.
+
+### Trade-offs / things to watch on sim
+
+- **Dropped `.contentFocus(isFocused:)` on both cards.** The spec said "run on-device first; if system treatment is good enough, delete our custom tier here." I couldn't run on hardware, so the call is made from first principles: `.buttonStyle(.card)`'s lift + scale + parallax already overlaps our `ContentFocus` tokens (scale + yOffset + dark drop shadow) — stacking doubles the scale and muddies the parallax transform. If at 10ft the system focus lift reads as under-powered next to `HeroBanner`'s `.contentFocus()` treatment on the hero CTAs, the cheap fix is to add back `.contentFocus(isFocused: isFocused)` *below* the `.buttonStyle(.card)` — no other code change needed. Do not add it above, or the transform order flips.
+- **Context menu ergonomics.** On tvOS the menu is triggered by Siri-Remote long-press on a focused item. Verify Play button (short press) still goes straight to playback and that long-press doesn't fire a stray `onSelect` — the `.contextMenu` modifier on a `Button` handles this split by contract, but it's the one path a sim won't let you fully exercise until QA on a real remote.
+- **Refresh on mutation is shelf-wide**: after `toggleWatched` / `toggleFavorite` / `removeFromResume`, the handler calls `await refresh()` which hits `/Items/Resume` + all library rows again. This is correct (resume shelf has to update), but it's a full reload, not a surgical in-place mutation. On slow networks the shelf will briefly flicker to the skeleton state. Future polish could do an optimistic in-array patch like `ItemDetailViewModel.isFavoriteOverride` does, but the VM currently works off `ContentService`-provided sections and doesn't have a handle on individual `MediaItem` rows — would require a patcher protocol. Deferred.
+- **Context menu only plumbed on Home.** Library, Search, and Detail-similar rows still use `PosterCard` without the menu. The hooks are there (`onContextAction` is on PosterCard itself), but their VMs don't yet have the same `handleContextAction` method. Filing this under Item H polish — LibraryViewModel / SearchViewModel would each need an `apiClient` injection + the same dispatcher, mirroring HomeViewModel.
+- **"Go to Series" on non-Home rows**: if/when we wire Search + Library, the Go-to-Series path already exists — both VMs would need `apiClient` injection anyway for the shared dispatcher, so no extra surface.
+- **No new VM on ItemDetailViewModel yet.** The spec mentioned routing actions through "existing HomeViewModel / ItemDetailViewModel" — ItemDetailViewModel already exposes `toggleFavorite` + `playItem(fromBeginning:)`, but no `markPlayed`. If a context menu eventually lands on the Detail's "Similar" row, we'd add `markPlayed` + a similar dispatcher to ItemDetailViewModel. Deferred.
+
+### Known gaps NOT in this item's scope
+
+- Hero CTA buttons still use `Button(.plain) + .contentFocus()` — unchanged. Per the spec, keep `.contentFocus` for Hero CTAs where we explicitly *don't* want parallax (the Play button should not tilt).
+- The mock `PosterCard` `#Preview` still passes nil `onContextAction` (default) — no menu in preview canvas, which is correct.
+
+---
+
+## Item F — original plan (historical)
 
 **Why:** the free tvOS card parallax + specular glare is the single cheapest upgrade to premium feel. Currently we have `.onTapGesture` bypassing this.
 
@@ -304,7 +379,39 @@ Falls back cleanly for items with no logo (e.g. Sid and Nancy).
 
 ---
 
-## Item H — Final polish pass (P2)
+## Item H — Final polish pass — SHIPPED 2026-04-23
+
+### What landed
+
+- **Typography tokenization (`.system(size:)` → `UIFontMetrics`-scaled):** the two line references the plan called out (`HeroBanner.swift:206` and `ItemDetailView.swift:255`) have been consolidated by Items C.1 + E into a single component — `TitleTreatment.swift:39`. Updated that one file to route the desired 60pt/72pt cinematic size through `UIFontMetrics(forTextStyle: .title1).scaledValue(for: textFontSize)` so tvOS Accessibility → Larger Text actually applies. One gotcha: `.largeTitle` is `API_UNAVAILABLE(tvos)` (iOS-only); on tvOS `.title1` is the correct largest reference style. Build-caught immediately; noted in-file comment for future-us.
+- **Surface-token sweep for non-text `.white.opacity()` fills:**
+  - `CastCrewSection.swift:70` — avatar-circle outline: `Color.white.opacity(0.15)` → `Constants.Colors.surface3` (unfocused state; focused state stays on `Constants.Colors.accent`).
+  - `CastCrewSection.swift:110` — placeholder avatar bg when no headshot URL: `Circle().fill(Color.white.opacity(0.1))` → `Constants.Colors.surface2`.
+  - `LibrarySearchModal.swift:139` — search-field row bg: `Color.white.opacity(0.1)` → `Constants.Colors.surface2`.
+- **Intentionally NOT touched** (these are not AI-slop tells, they're correct idioms):
+  - Every `.foregroundColor(.white.opacity(0.xx))` — text-muting alpha is a typographic control, not a background fill. Swapping to surface tokens would make the text invisible.
+  - `HeroBanner.swift:396` — badge `stroke(.white.opacity(0.5))`. This badge floats over unknown-bg backdrop photos; a surface token would be invisible over a bright photo. White-alpha is the right answer for "float over arbitrary bg."
+  - `SkeletonView.swift:21,27` and `ContentRow.swift:248` — shimmer primitives are white-alpha-over-anything by design. Surface tokens would kill the shimmer effect.
+  - All picker-modal `0.05 / 0.15` pairs (Genre/Status/Rating/YearRange/LibraryFilter/Bitrate/Subtitle) — they share a self-consistent `isFocused ? 0.15 : 0.05` pattern that's already equivalent in appearance to `surface1 / surface3`. Touching 7 files for a visual no-op was churn for no gain; left as-is.
+- **`ItemDetailView` skeleton:** when `viewModel.isLoading && viewModel.detailedItem == nil`, the content column below the header now renders `DetailSkeletonBody` instead of an empty stretch. Shimmer tiles mirror the final Overview → Metadata → Cast → "More Like This" layout, built from `SkeletonView.ShimmerTile`. The header stays as-is (it already renders from the sparse `viewModel.item` passed in by the callsite). Branch gate is symmetrical via a new `private var detailContent: some View` computed property; the outer body now reads as a clean two-branch skeleton/content split.
+
+### Build + regression
+
+- `xcodebuild -destination 'platform=tvOS Simulator,OS=26.0,name=Apple TV'` → green, zero new warnings.
+- First build attempt failed on the `.largeTitle` tvOS unavailability; fix landed same-session (see Typography bullet above).
+
+### Deferred to manual verification
+
+- **`/critique` rerun + 4K screenshot pass.** The plan's validation gate calls for running `/critique` and comparing to the Phase 1 baseline (~32/40 Nielsen), plus screenshots at 4K for Home, Library, Detail (movie), Detail (series), Player (playing), Player (paused w/ info). These both require driving the sim UI interactively — not something I can do from this session. Brandon: boot the sim on `Apple TV (tvOS 26.0)`, walk the golden paths, run `/critique` with the captured screenshots, and compare Nielsen + AI Slop deltas against the Phase 1 doc. If Nielsen < 34/40, surface the friction points and file as phase-3 tickets rather than revisiting Phase 2.
+
+### Known gaps NOT in this item's scope
+
+- The `TitleTreatment` typographic scale only affects the **text fallback** branch (no logo available). When Jellyfin returns a logo image the size question doesn't apply — the `Image` is content-mode fit inside its max-width/height box.
+- The Detail skeleton fires only when `detailedItem == nil`. Re-visits to the same detail (via similar-items navigation) where `detailedItem` is already populated from a prior fetch won't show the skeleton even if `loadDetails()` is re-running — correct behavior, but worth knowing if someone sees a stale detail briefly before the new payload lands. If that flicker becomes a problem, add a second branch keyed on `viewModel.item.id != viewModel.detailedItem?.id`.
+
+---
+
+## Item H — original plan (historical)
 
 **Why:** runs after all structural work, same convention as Phase 1 item 7.
 

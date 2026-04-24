@@ -11,14 +11,10 @@ struct LibraryView: View {
     @ObservedObject var viewModel: LibraryViewModel
 
     // Focus state
-    @FocusState private var filterFocus: LibraryFilterBar.FilterField?
     @FocusState private var toolbarFocus: LibraryToolbar.ToolbarField?
 
-    // Modal state
-    @State private var showGenrePicker = false
-    @State private var showYearPicker = false
-    @State private var showRatingPicker = false
-    @State private var showStatusPicker = false
+    // Modal state. Filter pickers were folded into tvOS Menu popovers on
+    // the filter chips themselves — no more sheet-on-focus takeover.
     @State private var showSearch = false
 
     private let columns = [
@@ -58,15 +54,10 @@ struct LibraryView: View {
                             )
                             .padding(.top, 40)
 
-                            // Filter bar
-                            LibraryFilterBar(
-                                viewModel: viewModel,
-                                focusedField: $filterFocus
-                            )
-                            .padding(.bottom, 20)
-                            .onChange(of: filterFocus) { _, newValue in
-                                handleFilterFocusChange(newValue)
-                            }
+                            // Filter bar — each chip opens a native tvOS
+                            // Menu inline on tap; no sheet presentations.
+                            LibraryFilterBar(viewModel: viewModel)
+                                .padding(.bottom, 20)
 
                             // Grid of items
                             LazyVGrid(columns: columns, spacing: 60) {
@@ -124,39 +115,8 @@ struct LibraryView: View {
             await viewModel.loadContent()
             await viewModel.loadFilterOptions()
         }
-        .sheet(isPresented: $showGenrePicker) {
-            GenrePickerModal(viewModel: viewModel)
-        }
-        .sheet(isPresented: $showYearPicker) {
-            YearRangePickerModal(viewModel: viewModel)
-        }
-        .sheet(isPresented: $showRatingPicker) {
-            RatingPickerModal(viewModel: viewModel)
-        }
-        .sheet(isPresented: $showStatusPicker) {
-            StatusPickerModal(viewModel: viewModel)
-        }
         .sheet(isPresented: $showSearch) {
             LibrarySearchModal(viewModel: viewModel)
-        }
-    }
-
-    // MARK: - Filter Focus Handling
-
-    private func handleFilterFocusChange(_ field: LibraryFilterBar.FilterField?) {
-        guard let field = field else { return }
-
-        switch field {
-        case .genre:
-            showGenrePicker = true
-        case .year:
-            showYearPicker = true
-        case .rating:
-            showRatingPicker = true
-        case .status:
-            showStatusPicker = true
-        case .clearAll:
-            break // Button action handles this
         }
     }
 }

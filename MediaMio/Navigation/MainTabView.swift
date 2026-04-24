@@ -29,6 +29,7 @@ struct MainTabView: View {
         _homeViewModel = StateObject(wrappedValue: HomeViewModel(
             contentService: env.contentService,
             authService: env.authService,
+            apiClient: env.apiClient,
             navigationManager: nil,
             appState: appState
         ))

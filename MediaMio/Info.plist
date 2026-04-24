@@ -7,5 +7,9 @@
 		<string>_jellyfin-server._tcp.</string>
 		<string>_jellyfin._tcp.</string>
 	</array>
+	<key>UIAppFonts</key>
+	<array>
+		<string>SpaceGrotesk-Bold.ttf</string>
+	</array>
 </dict>
 </plist>

@@ -48,19 +48,23 @@ struct LoginView: View {
                 VStack(spacing: 40) {
                     Spacer()
 
-                    // Server info
-                    VStack(spacing: 16) {
-                        Image(systemName: "server.rack")
-                            .font(.system(size: 60))
-                            .foregroundColor(Constants.Colors.primary)
+                    // Brand wordmark + small server-context line. Replaces
+                    // the oversized server-rack icon + 48pt server name —
+                    // the page is about signing in, not broadcasting the
+                    // server's identity.
+                    VStack(spacing: 18) {
+                        GloxxWordmark(size: 72)
 
-                        Text(serverName)
-                            .font(.system(size: 48, weight: .semibold))
-                            .foregroundColor(.white)
+                        VStack(spacing: 6) {
+                            Text(serverName)
+                                .font(.title3)
+                                .fontWeight(.medium)
+                                .foregroundColor(.white.opacity(0.85))
 
-                        Text(serverURL)
-                            .font(.title3)
-                            .foregroundColor(.secondary)
+                            Text(serverURL)
+                                .font(.callout)
+                                .foregroundColor(.white.opacity(0.4))
+                        }
                     }
 
                     Spacer()

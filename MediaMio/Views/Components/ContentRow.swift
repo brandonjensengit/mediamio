@@ -16,6 +16,9 @@ struct ContentRow: View {
     let focusManager: FocusManager?
     let onItemSelect: (MediaItem) -> Void
     let onSeeAll: (() -> Void)?
+    /// Routed to long-press context-menu actions on the cards in this row.
+    /// Nil = no menu (Library / Search / Detail-similar rows today).
+    let onContextAction: ((MediaItem, PosterContextAction) -> Void)?
 
     @FocusState private var focusedItemId: String?
 
@@ -26,7 +29,8 @@ struct ContentRow: View {
         navigationManager: NavigationManager? = nil,
         focusManager: FocusManager? = nil,
         onItemSelect: @escaping (MediaItem) -> Void,
-        onSeeAll: (() -> Void)? = nil
+        onSeeAll: (() -> Void)? = nil,
+        onContextAction: ((MediaItem, PosterContextAction) -> Void)? = nil
     ) {
         self.section = section
         self.baseURL = baseURL
@@ -35,6 +39,7 @@ struct ContentRow: View {
         self.focusManager = focusManager
         self.onItemSelect = onItemSelect
         self.onSeeAll = onSeeAll
+        self.onContextAction = onContextAction
     }
 
     var body: some View {
@@ -107,13 +112,23 @@ struct ContentRow: View {
     @ViewBuilder
     private func cardView(for item: MediaItem) -> some View {
         if useThumbVariant {
-            EpisodeThumbCard(item: item, baseURL: baseURL) {
-                onItemSelect(item)
-            }
+            EpisodeThumbCard(
+                item: item,
+                baseURL: baseURL,
+                onSelect: { onItemSelect(item) },
+                onContextAction: onContextAction.map { dispatch in
+                    { action in dispatch(item, action) }
+                }
+            )
         } else {
-            PosterCard(item: item, baseURL: baseURL) {
-                onItemSelect(item)
-            }
+            PosterCard(
+                item: item,
+                baseURL: baseURL,
+                onSelect: { onItemSelect(item) },
+                onContextAction: onContextAction.map { dispatch in
+                    { action in dispatch(item, action) }
+                }
+            )
         }
     }
 

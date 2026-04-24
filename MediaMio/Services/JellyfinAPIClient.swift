@@ -539,6 +539,22 @@ class JellyfinAPIClient: ObservableObject {
         return try await delete(endpoint: endpoint)
     }
 
+    // MARK: - User Played State
+
+    /// Mark an item as played (fully watched). Also clears it from the
+    /// `/Items/Resume` shelf — Jellyfin has no dedicated "hide from resume"
+    /// endpoint, so the Remove-from-Continue-Watching action routes here.
+    func markPlayed(userId: String, itemId: String) async throws -> UserData {
+        let endpoint = "/Users/\(userId)/PlayedItems/\(itemId)"
+        return try await post(endpoint: endpoint)
+    }
+
+    /// Clear the played flag from an item.
+    func unmarkPlayed(userId: String, itemId: String) async throws -> UserData {
+        let endpoint = "/Users/\(userId)/PlayedItems/\(itemId)"
+        return try await delete(endpoint: endpoint)
+    }
+
     /// Build image URL for an item
     func buildImageURL(
         itemId: String,

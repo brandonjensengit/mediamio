@@ -67,7 +67,7 @@ private struct PersonCard: View {
                     .clipShape(Circle())
                     .overlay(
                         Circle().stroke(
-                            hasFocus ? Constants.Colors.accent : Color.white.opacity(0.15),
+                            hasFocus ? Constants.Colors.accent : Constants.Colors.surface3,
                             lineWidth: hasFocus ? 4 : 2
                         )
                     )
@@ -107,7 +107,7 @@ private struct PersonCard: View {
             )
         } else {
             ZStack {
-                Circle().fill(Color.white.opacity(0.1))
+                Circle().fill(Constants.Colors.surface2)
                 Image(systemName: "person.crop.circle.fill")
                     .font(.system(size: 70))
                     .foregroundColor(.white.opacity(0.4))

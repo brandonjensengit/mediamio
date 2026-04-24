@@ -7,49 +7,35 @@
 
 import SwiftUI
 
-/// Poster card component for displaying media items with tvOS focus effects
+/// Poster card component for displaying media items with tvOS focus effects.
+///
+/// Phase 2 / Item F: wrapped in a `Button` with `.buttonStyle(.card)` so the
+/// native tvOS focus lift + parallax + specular shine kicks in for free.
+/// Replaces the previous `.focusable() + .onTapGesture` pattern, which
+/// bypassed every one of those free affordances.
+///
+/// `onContextAction` is optional — when nil, the long-press menu is empty
+/// and tvOS skips it. Home wires a handler; Library / Search / Detail pass
+/// nil until their own Phase-F polish lands.
 struct PosterCard: View {
     let item: MediaItem
     let baseURL: String
     let onSelect: () -> Void
+    var onContextAction: ((PosterContextAction) -> Void)? = nil
 
     @FocusState private var isFocused: Bool
     @State private var imageURL: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-                // Poster Image
-                ZStack(alignment: .bottomLeading) {
-                    PosterImageView(
-                        url: imageURL,
-                        width: Constants.UI.posterWidth,
-                        height: Constants.UI.posterHeight
-                    )
+        // `.focusable()` + `.onTapGesture` (no Button wrapper) so tvOS
+        // doesn't draw its plain-button focused-state background —
+        // `.focusEffectDisabled()` can't reach that fill because it lives
+        // inside the button style, not the focus-effect API. `.contextMenu`
+        // works fine on any focusable view on tvOS 17+.
+        VStack(alignment: .leading, spacing: 16) {
+            posterImage
 
-                    // Dark gradient at bottom for text readability
-                    LinearGradient(
-                        colors: [
-                            Color.clear,
-                            Color.black.opacity(0.8)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 80)
-                    .frame(maxHeight: .infinity, alignment: .bottom)
-
-                    // Progress indicator for resume items
-                    if let progress = playbackProgress {
-                        ProgressBar(progress: progress)
-                            .frame(height: 6)
-                            .padding(.horizontal, 8)
-                            .padding(.bottom, 8)
-                    }
-                }
-                .frame(width: Constants.UI.posterWidth, height: Constants.UI.posterHeight)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                // Title
+            VStack(alignment: .leading, spacing: 6) {
                 Text(item.name)
                     .font(.headline)
                     .fontWeight(.medium)
@@ -57,53 +43,139 @@ struct PosterCard: View {
                     .lineLimit(2)
                     .frame(width: Constants.UI.posterWidth, alignment: .leading)
 
-                // Metadata
-                HStack(spacing: 6) {
-                    if let year = item.yearText {
-                        Text(year)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-
-                    if let rating = item.ratingText {
-                        HStack(spacing: 2) {
-                            Image(systemName: "star.fill")
-                                .font(.caption2)
-                            Text(rating)
-                                .font(.caption)
-                        }
-                        .foregroundColor(.yellow)
-                    }
-
-                    if let runtime = item.runtimeFormatted {
-                        Text(runtime)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-
-                    if let episode = item.episodeText {
-                        Text(episode)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .frame(width: Constants.UI.posterWidth, alignment: .leading)
+                metadataRow
+            }
         }
-        .contentFocus(isFocused: isFocused)
-        .zIndex(isFocused ? 999 : 0)  // Keep focused poster above its row siblings.
-        .allowsHitTesting(true)
         .focusable()
         .focused($isFocused)
-        .onTapGesture {
-            onSelect()
-        }
+        .contentFocus(isFocused: isFocused)
+        .zIndex(isFocused ? 999 : 0)
+        .contextMenu { contextMenuContent }
+        .onTapGesture { onSelect() }
         .onAppear {
-            // Generate image URL
             imageURL = item.primaryImageURL(
                 baseURL: baseURL,
                 maxWidth: Constants.UI.posterImageMaxWidth,
                 quality: Constants.UI.imageQuality
             )
+        }
+    }
+
+    // MARK: - Poster image
+
+    private var posterImage: some View {
+        ZStack(alignment: .bottomLeading) {
+            PosterImageView(
+                url: imageURL,
+                width: Constants.UI.posterWidth,
+                height: Constants.UI.posterHeight
+            )
+
+            // Dark gradient at bottom for text readability
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    Color.black.opacity(0.8)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 80)
+            .frame(maxHeight: .infinity, alignment: .bottom)
+
+            // Progress indicator for resume items
+            if let progress = playbackProgress {
+                ProgressBar(progress: progress)
+                    .frame(height: 6)
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 8)
+            }
+        }
+        .frame(width: Constants.UI.posterWidth, height: Constants.UI.posterHeight)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    // MARK: - Metadata row
+
+    private var metadataRow: some View {
+        HStack(spacing: 6) {
+            if let year = item.yearText {
+                Text(year)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            if let rating = item.ratingText {
+                HStack(spacing: 2) {
+                    Image(systemName: "star.fill")
+                        .font(.caption2)
+                    Text(rating)
+                        .font(.caption)
+                }
+                .foregroundColor(.yellow)
+            }
+
+            if let runtime = item.runtimeFormatted {
+                Text(runtime)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            if let episode = item.episodeText {
+                Text(episode)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .frame(width: Constants.UI.posterWidth, alignment: .leading)
+    }
+
+    // MARK: - Context menu
+
+    @ViewBuilder
+    private var contextMenuContent: some View {
+        if let dispatch = onContextAction {
+            if hasProgress {
+                Button {
+                    dispatch(.playFromBeginning)
+                } label: {
+                    Label("Play from Beginning", systemImage: "gobackward")
+                }
+            }
+
+            Button {
+                dispatch(.toggleWatched)
+            } label: {
+                Label(
+                    isPlayed ? "Mark as Unwatched" : "Mark as Watched",
+                    systemImage: isPlayed ? "eye.slash" : "eye"
+                )
+            }
+
+            Button {
+                dispatch(.toggleFavorite)
+            } label: {
+                Label(
+                    isFavorite ? "Remove from Favorites" : "Add to Favorites",
+                    systemImage: isFavorite ? "heart.slash" : "heart"
+                )
+            }
+
+            if item.isEpisode, item.seriesId != nil {
+                Button {
+                    dispatch(.goToSeries)
+                } label: {
+                    Label("Go to Series", systemImage: "tv")
+                }
+            }
+
+            if hasProgress {
+                Button(role: .destructive) {
+                    dispatch(.removeFromResume)
+                } label: {
+                    Label("Remove from Continue Watching", systemImage: "minus.circle")
+                }
+            }
         }
     }
 
@@ -125,6 +197,18 @@ struct PosterCard: View {
         }
 
         return nil
+    }
+
+    private var hasProgress: Bool {
+        playbackProgress != nil
+    }
+
+    private var isPlayed: Bool {
+        item.userData?.played ?? false
+    }
+
+    private var isFavorite: Bool {
+        item.userData?.isFavorite ?? false
     }
 }
 

@@ -15,6 +15,13 @@ struct SearchView: View {
     @EnvironmentObject var env: AppEnvironment
     @FocusState private var isSearchFieldFocused: Bool
 
+    // Scope shared by the results grid cells. `.prefersDefaultFocus` on
+    // the first cell anchored in this namespace tells the focus engine
+    // "when focus lands in this region, pick this element" — avoids the
+    // geometric-routing failure where a single lone result-tile off to
+    // the left can't be reached from the much wider search TextField.
+    @Namespace private var resultsFocusNamespace
+
     private let columns = [
         GridItem(.adaptive(minimum: 250, maximum: 350), spacing: 40)
     ]
@@ -61,6 +68,10 @@ struct SearchView: View {
                     // Results
                     ScrollView(.vertical, showsIndicators: true) {
                         VStack(spacing: 30) {
+                            // (Results content begins here — wrapped in a
+                            // `.focusSection()` + `.focusScope(...)` below
+                            // so the first cell's `prefersDefaultFocus` is
+                            // honored when focus routes in from the field.)
                             // Results count
                             if !viewModel.statusText.isEmpty {
                                 HStack {
@@ -73,25 +84,24 @@ struct SearchView: View {
                                 .padding(.horizontal, Constants.UI.defaultPadding)
                             }
 
-                            // Results grid
-                            LazyVGrid(columns: columns, spacing: 60) {  // Increased spacing for scale room
-                                ForEach(viewModel.results) { item in
-                                    NavigationLink(destination: ItemDetailViewWrapper(
+                            // Results grid. Wrapped in `.focusSection()` so
+                            // the focus engine treats the whole grid as one
+                            // candidate region (a single lone tile is still
+                            // reachable geometrically even if offset from
+                            // the search field above), and the first cell
+                            // is marked `.prefersDefaultFocus` so pressing
+                            // Down from the TextField lands there regardless
+                            // of exact x-coordinate alignment.
+                            LazyVGrid(columns: columns, spacing: 60) {
+                                ForEach(Array(viewModel.results.enumerated()), id: \.element.id) { index, item in
+                                    PosterCard(
                                         item: item,
-                                        authService: authService,
-                                        coordinator: coordinator,
-                                        navigationManager: navigationManager,
-                                        env: env
-                                    )) {
-                                        PosterCard(
-                                            item: item,
-                                            baseURL: viewModel.baseURL
-                                        ) {
-                                            print("🔍 Search result tapped: \(item.name)")
-                                        }
+                                        baseURL: viewModel.baseURL
+                                    ) {
+                                        navigationManager?.showDetail(for: item)
                                     }
-                                    .buttonStyle(.plain)
-                                    .padding(.vertical, 20)  // Vertical padding to prevent clipping
+                                    .padding(.vertical, 20)
+                                    .prefersDefaultFocus(index == 0, in: resultsFocusNamespace)
                                     .onAppear {
                                         // Load more when approaching end
                                         if item == viewModel.results.last {
@@ -120,6 +130,8 @@ struct SearchView: View {
                             .padding(.horizontal, Constants.UI.defaultPadding)
                             .padding(.bottom, 80)
                         }
+                        .focusSection()
+                        .focusScope(resultsFocusNamespace)
                     }
                 }
             }

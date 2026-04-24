@@ -36,11 +36,11 @@ struct TopNavBar: View {
     // MARK: - Branding (leading)
 
     private var branding: some View {
-        Image("AppLogo")
-            .resizable()
-            .scaledToFit()
-            .frame(width: 56, height: 56)
-            .frame(minWidth: 180, alignment: .leading)
+        // Typographic wordmark replaces the PNG — crisper at any scale,
+        // honors the gloxx.ai brand treatment (Space Grotesk Bold, wide
+        // tracking, uppercase).
+        GloxxWordmark(size: 42)
+            .frame(minWidth: 300, alignment: .leading)
     }
 
     // MARK: - Tab chips (center)
@@ -96,37 +96,45 @@ private struct TopNavTabChip: View {
     let namespace: Namespace.ID
     let action: () -> Void
 
-    @Environment(\.isFocused) private var isFocused
+    @FocusState private var isFocused: Bool
 
     var body: some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
-                Text(tab.title)
-                    .font(.title2)
-                    .fontWeight(isSelected ? .bold : .semibold)
-                    .foregroundColor(textColor)
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 10)
+        // `.focusable() + .onTapGesture` (no Button wrapper) — same pattern
+        // PosterCard converged on after `.buttonStyle(.plain) +
+        // .focusEffectDisabled()` still leaked the tvOS button-pill fill
+        // behind the label. Only our explicit treatments render:
+        //   • focused → scale + dark drop shadow (from `.chromeFocus()`)
+        //   • selected → yellow accent underline below the label
+        // No white surface anywhere.
+        VStack(spacing: 8) {
+            Text(tab.title)
+                .font(.title2)
+                .fontWeight(isSelected ? .bold : .semibold)
+                .foregroundColor(textColor)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 10)
 
-                // Matched-geometry underline: only the selected chip renders
-                // the bar; SwiftUI animates the slide between chips.
-                ZStack {
-                    if isSelected {
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(Constants.Colors.accent)
-                            .frame(height: 4)
-                            .matchedGeometryEffect(id: "topNavUnderline", in: namespace)
-                    } else {
-                        Color.clear.frame(height: 4)
-                    }
+            // Matched-geometry underline: only the selected chip renders
+            // the bar; SwiftUI animates the slide between chips.
+            ZStack {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Constants.Colors.accent)
+                        .frame(height: 4)
+                        .matchedGeometryEffect(id: "topNavUnderline", in: namespace)
+                } else {
+                    Color.clear.frame(height: 4)
                 }
-                .frame(maxWidth: .infinity)
             }
+            .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.plain)
-        .chromeFocus()
+        .contentShape(Rectangle())
+        .focusable()
+        .focused($isFocused)
+        .chromeFocus(isFocused: isFocused)
+        .onTapGesture { action() }
     }
 
     private var textColor: Color {

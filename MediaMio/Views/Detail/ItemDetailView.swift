@@ -7,9 +7,74 @@
 
 import SwiftUI
 
+/// First-paint skeleton for Detail — fills the gap between "header rendered
+/// from the sparse MediaItem we were pushed with" and "full detail payload
+/// arrived." Shimmer tiles mirror the final Overview → Metadata → Cast →
+/// Similar layout so there's no layout shift when the real content lands.
+private struct DetailSkeletonBody: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 50) {
+            // Overview — three text-line shimmers
+            VStack(alignment: .leading, spacing: 16) {
+                ShimmerTile(cornerRadius: 6).frame(width: 220, height: 24)
+                VStack(alignment: .leading, spacing: 12) {
+                    ShimmerTile(cornerRadius: 4).frame(height: 20)
+                    ShimmerTile(cornerRadius: 4).frame(height: 20)
+                    ShimmerTile(cornerRadius: 4).frame(maxWidth: 900, alignment: .leading).frame(height: 20)
+                }
+            }
+            .padding(.horizontal, Constants.UI.defaultPadding)
+
+            // Metadata — four label/value pairs
+            VStack(alignment: .leading, spacing: 16) {
+                ShimmerTile(cornerRadius: 6).frame(width: 180, height: 24)
+                ForEach(0..<4, id: \.self) { _ in
+                    HStack(spacing: 40) {
+                        ShimmerTile(cornerRadius: 4).frame(width: 160, height: 18)
+                        ShimmerTile(cornerRadius: 4).frame(maxWidth: 600, alignment: .leading).frame(height: 18)
+                    }
+                }
+            }
+            .padding(.horizontal, Constants.UI.defaultPadding)
+
+            // Cast — six circular shimmers
+            VStack(alignment: .leading, spacing: 16) {
+                ShimmerTile(cornerRadius: 6).frame(width: 160, height: 24)
+                HStack(spacing: 24) {
+                    ForEach(0..<6, id: \.self) { _ in
+                        VStack(spacing: 12) {
+                            ShimmerTile(cornerRadius: 80).frame(width: 160, height: 160)
+                            ShimmerTile(cornerRadius: 4).frame(width: 140, height: 16)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, Constants.UI.defaultPadding)
+
+            // More Like This — six poster-shaped shimmers
+            VStack(alignment: .leading, spacing: 16) {
+                ShimmerTile(cornerRadius: 6).frame(width: 200, height: 24)
+                HStack(spacing: Constants.UI.cardSpacing) {
+                    ForEach(0..<6, id: \.self) { _ in
+                        ShimmerTile()
+                            .frame(width: Constants.UI.posterWidth, height: Constants.UI.posterHeight)
+                    }
+                }
+            }
+            .padding(.horizontal, Constants.UI.defaultPadding)
+        }
+    }
+}
+
 struct ItemDetailView: View {
     @ObservedObject var viewModel: ItemDetailViewModel
     @Environment(\.dismiss) private var dismiss
+
+    /// Namespace shared between the lower-left CTA row and the scroll scope
+    /// so `.prefersDefaultFocus(true, in:)` on Play wins the initial-focus
+    /// contest on every fresh presentation. Imperative `focusedButton = .play`
+    /// hacks have been retired.
+    @Namespace private var detailFocusNamespace
 
     var body: some View {
         ZStack {
@@ -18,88 +83,26 @@ struct ItemDetailView: View {
             ScrollView(.vertical, showsIndicators: true) {
                 VStack(spacing: 0) {
                     // Backdrop Header
-                    DetailHeaderView(viewModel: viewModel)
+                    DetailHeaderView(
+                        viewModel: viewModel,
+                        focusNamespace: detailFocusNamespace
+                    )
 
-                    // Content
-                    VStack(alignment: .leading, spacing: 50) {
-                        let displayItem = viewModel.detailedItem ?? viewModel.item
-
-                        // TV Show Episode Info (if applicable)
-                        if displayItem.type == "Episode" {
-                            TVShowEpisodeInfoView(item: displayItem)
-                        }
-
-                        // TV Show Seasons & Episodes (if Series)
-                        if displayItem.type == "Series" {
-                            TVShowSeasonsView(viewModel: viewModel)
-                        }
-
-                        // Overview
-                        if let overview = displayItem.overview {
-                            DetailSectionView(title: "Overview") {
-                                Text(overview)
-                                    .font(.title3)
-                                    .foregroundColor(.white.opacity(0.9))
-                                    .lineSpacing(4)
-                                    .padding(.horizontal, Constants.UI.defaultPadding)
-                            }
-                        }
-
-                        // Metadata
-                        DetailMetadataView(viewModel: viewModel)
-
-                        // Ratings & External Links
-                        ExternalLinksSection(
-                            links: displayItem.externalUrls ?? [],
-                            communityRating: displayItem.communityRating,
-                            criticRating: displayItem.criticRating
-                        )
-
-                        // Chapters (movies only — series/episode chapters live
-                        // on the playback side, not worth showing on Detail)
-                        if displayItem.type != "Series" {
-                            ChaptersSection(
-                                item: displayItem,
-                                baseURL: viewModel.baseURL
-                            ) { chapter in
-                                viewModel.playChapter(chapter)
-                            }
-                        }
-
-                        // Trailers
-                        if let trailers = displayItem.remoteTrailers, !trailers.isEmpty {
-                            TrailersSection(trailers: trailers)
-                        }
-
-                        // Cast & Crew
-                        if let people = displayItem.people, !people.isEmpty {
-                            CastCrewSection(people: people, baseURL: viewModel.baseURL)
-                        }
-
-                        // Similar Items
-                        if !viewModel.similarItems.isEmpty {
-                            DetailSectionView(title: "More Like This") {
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    LazyHStack(spacing: 30) {
-                                        ForEach(viewModel.similarItems) { item in
-                                            PosterCard(
-                                                item: item,
-                                                baseURL: viewModel.baseURL
-                                            ) {
-                                                viewModel.selectSimilarItem(item)
-                                            }
-                                        }
-                                    }
-                                    .padding(.horizontal, Constants.UI.defaultPadding)
-                                }
-                            }
-                        }
+                    // Content — skeleton while the details payload is in
+                    // flight and we only have the sparse list-endpoint item.
+                    if viewModel.isLoading && viewModel.detailedItem == nil {
+                        DetailSkeletonBody()
+                            .padding(.top, 40)
+                            .padding(.bottom, 80)
+                    } else {
+                        detailContent
+                            .padding(.top, 40)
+                            .padding(.bottom, 80)
                     }
-                    .padding(.top, 40)
-                    .padding(.bottom, 80)
                 }
             }
             .id(viewModel.item.id)  // Force ScrollView to recreate at position 0
+            .focusScope(detailFocusNamespace)
             // Push the cinematic header past tvOS overscan margins on the
             // sides and top so the backdrop/gradient bleed to the screen
             // edges. Bottom safe area is preserved so the last scroll
@@ -110,51 +113,143 @@ struct ItemDetailView: View {
             await viewModel.loadDetails()
         }
     }
+
+    /// The real populated-detail content stack. Kept as a computed property
+    /// so the skeleton branch above stays symmetrical and the outer body
+    /// reads as a two-branch load gate.
+    private var detailContent: some View {
+        VStack(alignment: .leading, spacing: 50) {
+            let displayItem = viewModel.detailedItem ?? viewModel.item
+
+            // TV Show Episode Info (if applicable)
+            if displayItem.type == "Episode" {
+                TVShowEpisodeInfoView(item: displayItem)
+            }
+
+            // TV Show Seasons & Episodes (if Series)
+            if displayItem.type == "Series" {
+                TVShowSeasonsView(viewModel: viewModel)
+            }
+
+            // Overview
+            if let overview = displayItem.overview {
+                DetailSectionView(title: "Overview") {
+                    Text(overview)
+                        .font(.title3)
+                        .foregroundColor(.white.opacity(0.9))
+                        .lineSpacing(4)
+                        .padding(.horizontal, Constants.UI.defaultPadding)
+                }
+            }
+
+            // Metadata
+            DetailMetadataView(viewModel: viewModel)
+
+            // Ratings & External Links
+            ExternalLinksSection(
+                links: displayItem.externalUrls ?? [],
+                communityRating: displayItem.communityRating,
+                criticRating: displayItem.criticRating
+            )
+
+            // Trailers
+            if let trailers = displayItem.remoteTrailers, !trailers.isEmpty {
+                TrailersSection(trailers: trailers)
+            }
+
+            // Cast & Crew
+            if let people = displayItem.people, !people.isEmpty {
+                CastCrewSection(people: people, baseURL: viewModel.baseURL)
+            }
+
+            // Chapters demoted below Cast & Crew on Movies (was
+            // directly under External Links, stealing focus from
+            // Play and crowding the cinematic commit). Series
+            // detail stays chapter-free.
+            if displayItem.type != "Series" {
+                ChaptersSection(
+                    item: displayItem,
+                    baseURL: viewModel.baseURL
+                ) { chapter in
+                    viewModel.playChapter(chapter)
+                }
+            }
+
+            // Similar Items
+            if !viewModel.similarItems.isEmpty {
+                DetailSectionView(title: "More Like This") {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHStack(spacing: 30) {
+                            ForEach(viewModel.similarItems) { item in
+                                PosterCard(
+                                    item: item,
+                                    baseURL: viewModel.baseURL
+                                ) {
+                                    viewModel.selectSimilarItem(item)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, Constants.UI.defaultPadding)
+                    }
+                }
+            }
+        }
+    }
 }
 
 // MARK: - Detail Header
 
-/// Apple-TV-style cinematic header: full-bleed backdrop, poster on the left,
-/// title/metadata/actions stacked to its right. When no real backdrop image
-/// exists (Jellyfin returns nothing for many catalog entries) we fall through
-/// to a solid surface so the poster carries the visual weight rather than
-/// reusing the poster as a centered "logo on a void".
+/// Full-bleed cinematic header (Apple TV / Netflix idiom). Backdrop fills the
+/// ~720pt stage; title treatment, metadata, and CTAs anchor lower-left inside
+/// the safe area. No poster column — that composition was a library-browser
+/// pattern (Sonarr / Radarr / Jellyfin Web) at odds with a playback client.
+///
+/// Empty-backdrop fallback renders the title treatment centered above a
+/// `surface1` + gradient stage instead of the old `.blur(radius: 80)` poster
+/// ambient, which was a per-frame GPU kill for negligible value.
 struct DetailHeaderView: View {
     @ObservedObject var viewModel: ItemDetailViewModel
+    let focusNamespace: Namespace.ID
+
     @State private var backdropURL: String?
-    @State private var posterURL: String?
     @State private var showPlayChoice: Bool = false
-    @FocusState private var focusedButton: FocusableButton?
 
-    enum FocusableButton {
-        case play
-        case favorite
-    }
-
-    private static let headerHeight: CGFloat = 900
-    private static let posterWidth: CGFloat = 320
-    private static let posterHeight: CGFloat = 480
+    private static let headerHeight: CGFloat = 720
     private static let horizontalPadding: CGFloat = 80
-    private static let bottomPadding: CGFloat = 70
-    private static let posterInfoGap: CGFloat = 50
+    private static let bottomPadding: CGFloat = 80
 
     var body: some View {
         let displayItem = viewModel.detailedItem ?? viewModel.item
-        let isEpisode = displayItem.type == "Episode"
-        let showPoster = !isEpisode && posterURL != nil
 
         ZStack(alignment: .bottomLeading) {
             backdropLayer
             gradientLayer
-            contentRow(displayItem: displayItem, showPoster: showPoster)
+
+            // When no backdrop exists the title treatment fills the empty
+            // stage centered in the upper portion. The lower-left info stack
+            // still carries the metadata + CTAs so the interaction model is
+            // stable across both branches.
+            if backdropURL == nil {
+                TitleTreatment(
+                    item: displayItem,
+                    baseURL: viewModel.baseURL,
+                    maxWidth: 700,
+                    maxHeight: 240,
+                    textFontSize: 72,
+                    alignment: .center
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                .padding(.top, 80)
+            }
+
+            infoColumn(displayItem: displayItem)
+                .padding(.horizontal, Self.horizontalPadding)
+                .padding(.bottom, Self.bottomPadding)
         }
         .frame(height: Self.headerHeight)
-        .onAppear {
-            updateImageURLs()
-            focusedButton = .play
-        }
+        .onAppear { updateBackdropURL() }
         .onChange(of: viewModel.detailedItem) { _ in
-            updateImageURLs()
+            updateBackdropURL()
         }
         .confirmationDialog(
             "Continue Watching",
@@ -170,7 +265,6 @@ struct DetailHeaderView: View {
     @ViewBuilder
     private var backdropLayer: some View {
         if let url = backdropURL {
-            // Real backdrop — render full-bleed cinematic still.
             GeometryReader { geometry in
                 AsyncImageView(
                     url: url,
@@ -184,11 +278,6 @@ struct DetailHeaderView: View {
             }
             .frame(height: Self.headerHeight)
         } else {
-            // No backdrop: fall through to surface1 + gradient. A previous
-            // branch rendered the poster as a full-screen .blur(radius: 80)
-            // ambient backdrop — that was a per-frame GPU kill on A8 (HD
-            // Apple TV) for negligible visual value. Item E will redesign
-            // the empty-backdrop case around a title-treatment logo.
             Constants.Colors.surface1
                 .frame(height: Self.headerHeight)
         }
@@ -209,38 +298,17 @@ struct DetailHeaderView: View {
         .frame(height: Self.headerHeight)
     }
 
-    private func contentRow(displayItem: MediaItem, showPoster: Bool) -> some View {
-        HStack(alignment: .bottom, spacing: Self.posterInfoGap) {
-            if showPoster, let url = posterURL {
-                AsyncImageView(
-                    url: url,
-                    contentMode: .fill,
-                    targetPixelSize: ImageSizing.pixelSize(
-                        points: CGSize(width: Self.posterWidth, height: Self.posterHeight)
-                    )
-                )
-                .frame(width: Self.posterWidth, height: Self.posterHeight)
-                .clipped()
-                .cornerRadius(Constants.UI.cornerRadius)
-                .shadow(color: .black.opacity(0.6), radius: 30, x: 0, y: 12)
-            }
-
-            infoColumn(displayItem: displayItem)
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, Self.horizontalPadding)
-        .padding(.bottom, Self.bottomPadding)
-    }
-
     private func infoColumn(displayItem: MediaItem) -> some View {
-        VStack(alignment: .leading, spacing: 28) {
-            Text(displayItem.name)
-                .font(.system(size: 72, weight: .bold))
-                .foregroundColor(.white)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
-                .shadow(color: .black.opacity(0.6), radius: 12)
+        VStack(alignment: .leading, spacing: 24) {
+            // When a real backdrop is behind us, the title treatment lives
+            // inline at the top of the info stack (lower-left anchor). The
+            // no-backdrop branch above already rendered a centered version.
+            if backdropURL != nil {
+                TitleTreatment(
+                    item: displayItem,
+                    baseURL: viewModel.baseURL
+                )
+            }
 
             if let line = metadataLine(for: displayItem) {
                 Text(line)
@@ -274,7 +342,7 @@ struct DetailHeaderView: View {
                             viewModel.playItem()
                         }
                     }
-                    .focused($focusedButton, equals: .play)
+                    .prefersDefaultFocus(true, in: focusNamespace)
 
                     DetailActionButton(
                         title: viewModel.isFavorite ? "Unfavorite" : "Favorite",
@@ -283,11 +351,11 @@ struct DetailHeaderView: View {
                     ) {
                         viewModel.toggleFavorite()
                     }
-                    .focused($focusedButton, equals: .favorite)
                 }
                 .focusSection()
             }
         }
+        .frame(maxWidth: 1100, alignment: .leading)
     }
 
     /// "2026 · PG-13 · 1h 38m · ★ 7.5" — same single-line treatment HeroBanner uses.
@@ -310,22 +378,11 @@ struct DetailHeaderView: View {
         return "Resume"
     }
 
-    /// Backdrop is intentionally NOT falling back to primaryImageURL anymore —
-    /// using the poster as a centered "backdrop" is what produced the cramped
-    /// "logo on a void" look. Empty backdrop now resolves to surface1 and the
-    /// poster column carries the identity instead.
-    private func updateImageURLs() {
+    private func updateBackdropURL() {
         let displayItem = viewModel.detailedItem ?? viewModel.item
-
         backdropURL = displayItem.backdropImageURL(
             baseURL: viewModel.baseURL,
             maxWidth: Constants.UI.backdropImageMaxWidth,
-            quality: Constants.UI.imageQuality
-        )
-
-        posterURL = displayItem.primaryImageURL(
-            baseURL: viewModel.baseURL,
-            maxWidth: 600,
             quality: Constants.UI.imageQuality
         )
     }

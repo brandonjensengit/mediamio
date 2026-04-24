@@ -219,7 +219,7 @@ private struct HeroBannerContent: View {
                 // Title treatment — prefer the transparent-PNG logo Jellyfin
                 // serves for TMDb-scraped items; fall back to typographic
                 // title when no logo tag exists.
-                HeroTitle(
+                TitleTreatment(
                     item: item,
                     baseURL: baseURL
                 )
@@ -302,61 +302,6 @@ private struct HeroBannerContent: View {
         let hasProgress = progress > 1.0 && progress < 95.0
         DebugLog.verbose("📊 HeroBanner: hasProgress=\(hasProgress) for '\(item.name)': position=\(position), total=\(total), progress=\(String(format: "%.1f", progress))%")
         return hasProgress
-    }
-}
-
-// MARK: - Hero Title Treatment
-
-/// Renders the transparent-PNG title logo Jellyfin serves via the `Logo`
-/// image endpoint. Falls back to typographic text when no logo tag exists.
-/// Kept as a separate view so the loader state (image cached vs pending)
-/// doesn't rebuild the surrounding content overlay.
-private struct HeroTitle: View {
-    let item: MediaItem
-    let baseURL: String
-
-    @StateObject private var loader = ImageLoader()
-    @State private var attemptedLoad = false
-
-    /// Max box for the logo. Jellyfin logos are typically ~800×300; `.fit`
-    /// keeps the aspect ratio so wordmarks stay readable and square logos
-    /// don't get letterboxed.
-    private let maxWidth: CGFloat = 600
-    private let maxHeight: CGFloat = 180
-
-    var body: some View {
-        Group {
-            if let image = loader.image {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: maxWidth, maxHeight: maxHeight, alignment: .leading)
-                    .shadow(color: .black.opacity(0.5), radius: 12, x: 0, y: 4)
-            } else {
-                Text(item.name)
-                    .font(.system(size: 60, weight: .bold))
-                    .foregroundColor(.white)
-                    .lineLimit(2)
-                    .shadow(color: .black.opacity(0.5), radius: 10)
-            }
-        }
-        .onAppear {
-            guard !attemptedLoad,
-                  let url = item.logoImageURL(
-                      baseURL: baseURL,
-                      maxWidth: Int(maxWidth * UIScreen.main.nativeScale),
-                      quality: Constants.UI.imageQuality
-                  )
-            else { return }
-            attemptedLoad = true
-            loader.load(
-                from: url,
-                targetPixelSize: CGSize(
-                    width: maxWidth * UIScreen.main.nativeScale,
-                    height: maxHeight * UIScreen.main.nativeScale
-                )
-            )
-        }
     }
 }
 

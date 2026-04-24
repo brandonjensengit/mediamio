@@ -11,6 +11,10 @@
 //  still via `MediaItem.landscapeImageURL`; the 4pt progress bar across
 //  the bottom matches Apple TV / Netflix / Disney+ conventions.
 //
+//  Phase 2 / Item F: wraps the tile in a `Button(.card)` so the native
+//  tvOS focus lift + parallax + specular shine replace our hand-rolled
+//  scale/shadow tier. Same long-press context menu as PosterCard.
+//
 
 import SwiftUI
 
@@ -23,52 +27,19 @@ struct EpisodeThumbCard: View {
     let item: MediaItem
     let baseURL: String
     let onSelect: () -> Void
+    var onContextAction: ((PosterContextAction) -> Void)? = nil
 
     @FocusState private var isFocused: Bool
     @State private var imageURL: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-                // 16:9 still
-                ZStack(alignment: .bottom) {
-                    AsyncImageView(
-                        url: imageURL,
-                        contentMode: .fill,
-                        targetPixelSize: ImageSizing.pixelSize(
-                            points: CGSize(
-                                width: Constants.UI.thumbWidth,
-                                height: Constants.UI.thumbHeight
-                            )
-                        )
-                    )
-                    .frame(
-                        width: Constants.UI.thumbWidth,
-                        height: Constants.UI.thumbHeight
-                    )
-                    .clipped()
+        // Same pattern as PosterCard: `.focusable()` + `.onTapGesture`
+        // (no Button wrapper) avoids the tvOS plain-button focus-bg fill.
+        // Long-press still works via `.contextMenu` on any focusable view.
+        VStack(alignment: .leading, spacing: 16) {
+            thumbImage
 
-                    // Scrim above the progress bar so it reads over bright stills.
-                    LinearGradient(
-                        colors: [Color.clear, Color.black.opacity(0.6)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 48)
-                    .frame(maxHeight: .infinity, alignment: .bottom)
-
-                    // Progress bar — 4pt, flush to the bottom edge.
-                    if let progress = playbackProgress {
-                        ProgressBar(progress: progress)
-                            .frame(height: 4)
-                    }
-                }
-                .frame(
-                    width: Constants.UI.thumbWidth,
-                    height: Constants.UI.thumbHeight
-                )
-                .clipShape(RoundedRectangle(cornerRadius: Constants.UI.cardCornerRadius))
-
-                // Primary label
+            VStack(alignment: .leading, spacing: 6) {
                 Text(primaryLabel)
                     .font(.headline)
                     .fontWeight(.semibold)
@@ -76,7 +47,6 @@ struct EpisodeThumbCard: View {
                     .lineLimit(1)
                     .frame(width: Constants.UI.thumbWidth, alignment: .leading)
 
-                // Secondary label (episode locator / subtitle)
                 if let secondary = secondaryLabel {
                     Text(secondary)
                         .font(.subheadline)
@@ -85,7 +55,6 @@ struct EpisodeThumbCard: View {
                         .frame(width: Constants.UI.thumbWidth, alignment: .leading)
                 }
 
-                // Tertiary "23m left" line
                 if let remaining = item.remainingText {
                     Text(remaining)
                         .font(.caption)
@@ -93,20 +62,111 @@ struct EpisodeThumbCard: View {
                         .foregroundColor(Constants.Colors.accent)
                         .frame(width: Constants.UI.thumbWidth, alignment: .leading)
                 }
+            }
         }
-        .contentFocus(isFocused: isFocused)
-        .zIndex(isFocused ? 999 : 0)
         .focusable()
         .focused($isFocused)
-        .onTapGesture {
-            onSelect()
-        }
+        .contentFocus(isFocused: isFocused)
+        .zIndex(isFocused ? 999 : 0)
+        .contextMenu { contextMenuContent }
+        .onTapGesture { onSelect() }
         .onAppear {
             imageURL = item.landscapeImageURL(
                 baseURL: baseURL,
                 maxWidth: Constants.UI.thumbImageMaxWidth,
                 quality: Constants.UI.imageQuality
             )
+        }
+    }
+
+    // MARK: - Thumb image
+
+    private var thumbImage: some View {
+        ZStack(alignment: .bottom) {
+            AsyncImageView(
+                url: imageURL,
+                contentMode: .fill,
+                targetPixelSize: ImageSizing.pixelSize(
+                    points: CGSize(
+                        width: Constants.UI.thumbWidth,
+                        height: Constants.UI.thumbHeight
+                    )
+                )
+            )
+            .frame(
+                width: Constants.UI.thumbWidth,
+                height: Constants.UI.thumbHeight
+            )
+            .clipped()
+
+            // Scrim above the progress bar so it reads over bright stills.
+            LinearGradient(
+                colors: [Color.clear, Color.black.opacity(0.6)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 48)
+            .frame(maxHeight: .infinity, alignment: .bottom)
+
+            // Progress bar — 4pt, flush to the bottom edge.
+            if let progress = playbackProgress {
+                ProgressBar(progress: progress)
+                    .frame(height: 4)
+            }
+        }
+        .frame(
+            width: Constants.UI.thumbWidth,
+            height: Constants.UI.thumbHeight
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Constants.UI.cardCornerRadius))
+    }
+
+    // MARK: - Context menu
+
+    @ViewBuilder
+    private var contextMenuContent: some View {
+        if let dispatch = onContextAction {
+            if hasProgress {
+                Button {
+                    dispatch(.playFromBeginning)
+                } label: {
+                    Label("Play from Beginning", systemImage: "gobackward")
+                }
+            }
+
+            Button {
+                dispatch(.toggleWatched)
+            } label: {
+                Label(
+                    isPlayed ? "Mark as Unwatched" : "Mark as Watched",
+                    systemImage: isPlayed ? "eye.slash" : "eye"
+                )
+            }
+
+            Button {
+                dispatch(.toggleFavorite)
+            } label: {
+                Label(
+                    isFavorite ? "Remove from Favorites" : "Add to Favorites",
+                    systemImage: isFavorite ? "heart.slash" : "heart"
+                )
+            }
+
+            if item.isEpisode, item.seriesId != nil {
+                Button {
+                    dispatch(.goToSeries)
+                } label: {
+                    Label("Go to Series", systemImage: "tv")
+                }
+            }
+
+            if hasProgress {
+                Button(role: .destructive) {
+                    dispatch(.removeFromResume)
+                } label: {
+                    Label("Remove from Continue Watching", systemImage: "minus.circle")
+                }
+            }
         }
     }
 
@@ -129,7 +189,7 @@ struct EpisodeThumbCard: View {
         return nil
     }
 
-    // MARK: - Progress
+    // MARK: - Progress / state
 
     private var playbackProgress: Double? {
         guard let userData = item.userData,
@@ -146,6 +206,18 @@ struct EpisodeThumbCard: View {
             return progress
         }
         return nil
+    }
+
+    private var hasProgress: Bool {
+        playbackProgress != nil
+    }
+
+    private var isPlayed: Bool {
+        item.userData?.played ?? false
+    }
+
+    private var isFavorite: Bool {
+        item.userData?.isFavorite ?? false
     }
 }
 

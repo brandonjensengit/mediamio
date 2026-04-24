@@ -28,11 +28,10 @@ struct SplashScreenView: View {
             Color.black.ignoresSafeArea()
 
             VStack(spacing: 40) {
-                // MediaMio logo
-                Image("AppLogo")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 300, height: 300)
+                // Typographic wordmark — matches gloxx.ai brand treatment
+                // (Space Grotesk Bold, 0.25em tracking, uppercase). Replaces
+                // the combined owl+wordmark PNG.
+                GloxxWordmark(size: 120)
                     .scaleEffect(scale)
                     .opacity(opacity)
 

@@ -217,7 +217,10 @@ struct HomeContentView: View {
                                         onItemSelect: { viewModel.selectItem($0) },
                                         onSeeAll: isLibrarySection(section)
                                             ? { viewModel.showSeeAll(for: section) }
-                                            : nil
+                                            : nil,
+                                        onContextAction: { item, action in
+                                            viewModel.handleContextAction(action, for: item)
+                                        }
                                     )
                                     .id("section-\(index)")
                                     .focused($focusedField, equals: "row-\(index)")

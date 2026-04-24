@@ -103,18 +103,15 @@ struct ServerEntryView: View {
     }
 
     private var header: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "play.rectangle.fill")
-                .font(.system(size: 80))
-                .foregroundColor(Constants.Colors.primary)
+        // Brand wordmark + a single caption line. Dropped the
+        // `play.rectangle.fill` SF glyph + "Premium Jellyfin Client"
+        // subtitle — the wordmark is the brand; the tagline was noise.
+        VStack(spacing: 14) {
+            GloxxWordmark(size: 88)
 
-            Text("MediaMio")
-                .font(.system(size: 60, weight: .bold))
-                .foregroundColor(.white)
-
-            Text("Premium Jellyfin Client")
+            Text("Sign in to your server")
                 .font(.title3)
-                .foregroundColor(.secondary)
+                .foregroundColor(.white.opacity(0.55))
         }
         .padding(.top, 20)
     }

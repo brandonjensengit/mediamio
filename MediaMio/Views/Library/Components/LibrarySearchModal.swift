@@ -136,7 +136,7 @@ struct LibrarySearchModal: View {
             }
             .padding(.horizontal, 30)
             .padding(.vertical, 20)
-            .background(Color.white.opacity(0.1))
+            .background(Constants.Colors.surface2)
             .cornerRadius(12)
 
             // Close button
