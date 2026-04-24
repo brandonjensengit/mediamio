@@ -53,12 +53,12 @@ class HomeViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            print("🏠 Loading home content...")
+            DebugLog.verbose("🏠 Loading home content...")
 
             // Load all sections
             let loadedSections = try await contentService.loadHomeContent()
 
-            print("✅ Loaded \(loadedSections.count) sections")
+            DebugLog.verbose("✅ Loaded \(loadedSections.count) sections")
 
             // Update UI
             self.sections = loadedSections
@@ -96,7 +96,7 @@ class HomeViewModel: ObservableObject {
             appState?.contentLoaded = true
 
         } catch {
-            print("❌ Failed to load home content: \(error)")
+            DebugLog.verbose("❌ Failed to load home content: \(error)")
             errorMessage = "Failed to load content: \(error.localizedDescription)"
             isLoading = false
 
@@ -114,7 +114,7 @@ class HomeViewModel: ObservableObject {
     // MARK: - Content Actions
 
     func selectItem(_ item: MediaItem) {
-        print("📺 Selected: \(item.name)")
+        DebugLog.verbose("📺 Selected: \(item.name)")
         selectedItem = item
 
         // Use NavigationManager if available (new tab-based navigation)
@@ -127,7 +127,7 @@ class HomeViewModel: ObservableObject {
     }
 
     func playItem(_ item: MediaItem) {
-        print("▶️ Play: \(item.name)")
+        DebugLog.verbose("▶️ Play: \(item.name)")
         selectedItem = item
 
         // Use NavigationManager if available (new tab-based navigation)
@@ -140,7 +140,7 @@ class HomeViewModel: ObservableObject {
     }
 
     func showItemDetails(_ item: MediaItem) {
-        print("ℹ️ Show details for: \(item.name)")
+        DebugLog.verbose("ℹ️ Show details for: \(item.name)")
         selectedItem = item
 
         // Use NavigationManager if available (new tab-based navigation)
@@ -153,7 +153,7 @@ class HomeViewModel: ObservableObject {
     }
 
     func showSeeAll(for section: ContentSection) {
-        print("👀 See all for: \(section.title)")
+        DebugLog.verbose("👀 See all for: \(section.title)")
         navigationCoordinator?.navigate(to: section)
     }
 

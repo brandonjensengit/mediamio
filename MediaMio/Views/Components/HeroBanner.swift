@@ -184,13 +184,16 @@ private struct HeroBannerContent: View {
                     .frame(height: Constants.UI.heroBannerHeight)
             }
 
-            // Gradient Overlay
+            // Gradient Overlay — terminal stop must blend to `background`,
+            // not pure black, or a visible seam appears where the hero meets
+            // the scrolling content below (background is #0d0f15, slightly
+            // cooler than true black).
             LinearGradient(
                 colors: [
                     Color.black.opacity(0.0),
                     Color.black.opacity(0.3),
                     Color.black.opacity(0.8),
-                    Color.black
+                    Constants.Colors.background
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -278,13 +281,13 @@ private struct HeroBannerContent: View {
         guard let userData = item.userData,
               let position = userData.playbackPositionTicks,
               let total = item.runTimeTicks else {
-            print("📊 HeroBanner: hasProgress=false for '\(item.name)': userData=\(item.userData != nil), position=\(item.userData?.playbackPositionTicks != nil), total=\(item.runTimeTicks != nil)")
+            DebugLog.verbose("📊 HeroBanner: hasProgress=false for '\(item.name)': userData=\(item.userData != nil), position=\(item.userData?.playbackPositionTicks != nil), total=\(item.runTimeTicks != nil)")
             return false
         }
 
         let progress = Double(position) / Double(total) * 100.0
         let hasProgress = progress > 1.0 && progress < 95.0
-        print("📊 HeroBanner: hasProgress=\(hasProgress) for '\(item.name)': position=\(position), total=\(total), progress=\(String(format: "%.1f", progress))%")
+        DebugLog.verbose("📊 HeroBanner: hasProgress=\(hasProgress) for '\(item.name)': position=\(position), total=\(total), progress=\(String(format: "%.1f", progress))%")
         return hasProgress
     }
 }

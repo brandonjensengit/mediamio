@@ -183,28 +183,12 @@ struct DetailHeaderView: View {
                 .clipped()
             }
             .frame(height: Self.headerHeight)
-        } else if let url = posterURL {
-            // No backdrop in Jellyfin for this item — use the poster as a
-            // heavily blurred ambient backdrop so the header still has
-            // color and mood. The crisp poster on the left of the content
-            // row remains the visual anchor.
-            GeometryReader { geometry in
-                AsyncImageView(
-                    url: url,
-                    contentMode: .fill,
-                    targetPixelSize: ImageSizing.pixelSize(
-                        points: CGSize(width: geometry.size.width / 4, height: Self.headerHeight / 4)
-                    )
-                )
-                .frame(width: geometry.size.width, height: Self.headerHeight)
-                .clipped()
-                .blur(radius: 80)
-                .scaleEffect(1.2)  // Hides the soft-edge artifact at the blur boundary
-                .opacity(0.7)
-            }
-            .frame(height: Self.headerHeight)
-            .clipped()
         } else {
+            // No backdrop: fall through to surface1 + gradient. A previous
+            // branch rendered the poster as a full-screen .blur(radius: 80)
+            // ambient backdrop — that was a per-frame GPU kill on A8 (HD
+            // Apple TV) for negligible visual value. Item E will redesign
+            // the empty-backdrop case around a title-treatment logo.
             Constants.Colors.surface1
                 .frame(height: Self.headerHeight)
         }
@@ -301,6 +285,7 @@ struct DetailHeaderView: View {
                     }
                     .focused($focusedButton, equals: .favorite)
                 }
+                .focusSection()
             }
         }
     }
@@ -702,12 +687,7 @@ struct EpisodeCard: View {
                 }
                 .frame(width: 400, alignment: .leading)
             }
-            .scaleEffect(isFocused ? 1.05 : 1.0)
-            .shadow(
-                color: isFocused ? .white.opacity(0.3) : .clear,
-                radius: isFocused ? 15 : 0
-            )
-            .animation(.easeInOut(duration: 0.2), value: isFocused)
+            .contentFocus(isFocused: isFocused)
         }
         .buttonStyle(.plain)
     }

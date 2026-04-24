@@ -199,7 +199,11 @@ struct HomeContentView: View {
                                 .focused($focusedField, equals: "hero")
                             }
 
-                            // Content Sections with Netflix-level focus memory
+                            // Content Sections with Netflix-level focus memory.
+                            // `.focusSection()` groups all shelves into one
+                            // focus container — a right-swipe from a hero
+                            // CTA lands on the leftmost tile of the current
+                            // row instead of jumping to a distant neighbor.
                             VStack(spacing: Constants.UI.sectionSpacing) {
                                 ForEach(Array(viewModel.sections.enumerated()), id: \.element.id) { index, section in
                                     // Only show "See All" for library sections (Movies, TV Shows, etc)
@@ -219,6 +223,7 @@ struct HomeContentView: View {
                                     .focused($focusedField, equals: "row-\(index)")
                                 }
                             }
+                            .focusSection()
                             .padding(.top, 40)
                             .padding(.bottom, 60)
                         }

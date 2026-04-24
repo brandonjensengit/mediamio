@@ -23,9 +23,9 @@ struct SimpleVideoPlayerRepresentable: UIViewControllerRepresentable {
     }
 
     func makeUIViewController(context: Context) -> AVPlayerViewController {
-        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print("🎥 Creating AVPlayerViewController (SIMPLE)")
-        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        DebugLog.playback("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        DebugLog.playback("🎥 Creating AVPlayerViewController (SIMPLE)")
+        DebugLog.playback("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
         let controller = AVPlayerViewController()
         controller.player = player
@@ -58,44 +58,44 @@ struct SimpleVideoPlayerRepresentable: UIViewControllerRepresentable {
         controller.customInfoViewControllers = [playbackInfoVC, bitrateVC, audioQualityVC]
         context.coordinator.playbackInfoVC = playbackInfoVC
 
-        print("   Player: \(player)")
-        print("   Player status: \(player.status.rawValue)")
-        print("   Player rate: \(player.rate)")
-        print("   Custom info VCs: \(controller.customInfoViewControllers.count)")
+        DebugLog.playback("   Player: \(player)")
+        DebugLog.playback("   Player status: \(player.status.rawValue)")
+        DebugLog.playback("   Player rate: \(player.rate)")
+        DebugLog.playback("   Custom info VCs: \(controller.customInfoViewControllers.count)")
 
         if let item = player.currentItem {
-            print("   Current item: \(item)")
-            print("   Item status: \(item.status.rawValue)")
-            print("   Item duration: \(item.duration.seconds)s")
+            DebugLog.playback("   Current item: \(item)")
+            DebugLog.playback("   Item status: \(item.status.rawValue)")
+            DebugLog.playback("   Item duration: \(item.duration.seconds)s")
 
             if let error = item.error {
-                print("   ❌ ITEM ERROR: \(error)")
+                DebugLog.playback("   ❌ ITEM ERROR: \(error)")
             }
 
             // Check after 1 second
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                print("📊 Status check after 1s:")
-                print("   Item status: \(item.status.rawValue)")
-                print("   Presentation size: \(item.presentationSize)")
-                print("   Tracks: \(item.tracks.count)")
+                DebugLog.playback("📊 Status check after 1s:")
+                DebugLog.playback("   Item status: \(item.status.rawValue)")
+                DebugLog.playback("   Presentation size: \(item.presentationSize)")
+                DebugLog.playback("   Tracks: \(item.tracks.count)")
 
                 if let error = item.error {
-                    print("   ❌ ERROR: \(error)")
+                    DebugLog.playback("   ❌ ERROR: \(error)")
                 }
             }
         } else {
-            print("   ⚠️ No current item!")
+            DebugLog.playback("   ⚠️ No current item!")
         }
 
-        print("✅ AVPlayerViewController created with native controls + custom info")
-        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        DebugLog.playback("✅ AVPlayerViewController created with native controls + custom info")
+        DebugLog.playback("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
         return controller
     }
 
     func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
         if uiViewController.player !== player {
-            print("🔄 Updating player")
+            DebugLog.playback("🔄 Updating player")
             uiViewController.player = player
         }
         // Refresh the Playback Info pane so failover-to-transcode or a
@@ -166,7 +166,7 @@ struct VideoPlayerView: View {
                     // `startPlayback()` here would re-trigger play on every
                     // mid-playback reload, defeating that policy.
                     .onDisappear {
-                        print("⏸️ Pausing playback")
+                        DebugLog.playback("⏸️ Pausing playback")
                         viewModel.pausePlayback()
                     }
             } else if viewModel.isLoading {
