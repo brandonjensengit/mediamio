@@ -152,15 +152,22 @@ struct ItemDetailView: View {
                 criticRating: displayItem.criticRating
             )
 
-            // Trailers
-            if let trailers = displayItem.remoteTrailers, !trailers.isEmpty {
-                TrailersSection(trailers: trailers)
-            }
+            // Trailers — hidden for now. Off-platform (YouTube) so there's
+            // no in-app playback yet, and the tiles were adding focus
+            // noise. Re-enable by restoring the block below.
+            //
+            // if let trailers = displayItem.remoteTrailers, !trailers.isEmpty {
+            //     TrailersSection(trailers: trailers)
+            // }
 
-            // Cast & Crew
-            if let people = displayItem.people, !people.isEmpty {
-                CastCrewSection(people: people, baseURL: viewModel.baseURL)
-            }
+            // Cast & Crew — hidden for now. Focus routing from the
+            // description to the row still needs work, and the section
+            // isn't essential for the cinematic-commit flow. Re-enable
+            // by restoring the block below.
+            //
+            // if let people = displayItem.people, !people.isEmpty {
+            //     CastCrewSection(people: people, baseURL: viewModel.baseURL)
+            // }
 
             // Chapters demoted below Cast & Crew on Movies (was
             // directly under External Links, stealing focus from
@@ -273,7 +280,12 @@ struct DetailHeaderView: View {
                         points: CGSize(width: geometry.size.width, height: Self.headerHeight)
                     )
                 )
-                .frame(width: geometry.size.width, height: Self.headerHeight)
+                // `alignment: .top` anchors the fill so vertical overflow
+                // is pushed DOWN and cropped at the bottom — the gradient
+                // overlay already fades that region to black, so the crop
+                // is invisible. Center-aligned fill (the default) cut ~180pt
+                // off the top of 16:9 backdrops, eating the main subject.
+                .frame(width: geometry.size.width, height: Self.headerHeight, alignment: .top)
                 .clipped()
             }
             .frame(height: Self.headerHeight)
@@ -303,10 +315,15 @@ struct DetailHeaderView: View {
             // When a real backdrop is behind us, the title treatment lives
             // inline at the top of the info stack (lower-left anchor). The
             // no-backdrop branch above already rendered a centered version.
+            // Constrained to ~400×120 (vs the 600×180 hero default) so it
+            // reads as a brand-mark accent, not a second title — Series
+            // backdrops often bake the title into the artwork already.
             if backdropURL != nil {
                 TitleTreatment(
                     item: displayItem,
-                    baseURL: viewModel.baseURL
+                    baseURL: viewModel.baseURL,
+                    maxWidth: 400,
+                    maxHeight: 120
                 )
             }
 
@@ -359,13 +376,17 @@ struct DetailHeaderView: View {
     }
 
     /// "2026 · PG-13 · 1h 38m · ★ 7.5" — same single-line treatment HeroBanner uses.
+    /// Series omit the runtime slot: Jellyfin returns per-episode runtime
+    /// (often 0 on the Series root), which renders as a misleading "0m".
     private func metadataLine(for item: MediaItem) -> String? {
         var parts: [String] = []
         if let year = item.yearText { parts.append(year) }
         if let officialRating = item.officialRating, !officialRating.isEmpty {
             parts.append(officialRating)
         }
-        if let runtime = item.runtimeFormatted { parts.append(runtime) }
+        if item.type != "Series", let runtime = item.runtimeFormatted {
+            parts.append(runtime)
+        }
         if let rating = item.ratingText { parts.append("★ \(rating)") }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
@@ -380,7 +401,11 @@ struct DetailHeaderView: View {
 
     private func updateBackdropURL() {
         let displayItem = viewModel.detailedItem ?? viewModel.item
-        backdropURL = displayItem.backdropImageURL(
+        // `heroBackdropImageURL` cascades through Backdrop → Thumb →
+        // parent-series Backdrop → parent-series Thumb → Episode `Primary`,
+        // so Episodes and backdrop-less Movies get a real landscape image
+        // instead of falling through to the logo-on-dark-stage branch.
+        backdropURL = displayItem.heroBackdropImageURL(
             baseURL: viewModel.baseURL,
             maxWidth: Constants.UI.backdropImageMaxWidth,
             quality: Constants.UI.imageQuality

@@ -163,6 +163,14 @@ class HomeViewModel: ObservableObject {
         }
     }
 
+    /// Play from the very beginning, ignoring any stored resume position.
+    /// Used by the hero's "Play from Beginning" confirmation-dialog branch.
+    func playItemFromBeginning(_ item: MediaItem) {
+        DebugLog.verbose("▶️ Play from beginning: \(item.name)")
+        selectedItem = item
+        navigationManager?.playItem(item, startPositionTicks: 0)
+    }
+
     func showItemDetails(_ item: MediaItem) {
         DebugLog.verbose("ℹ️ Show details for: \(item.name)")
         selectedItem = item

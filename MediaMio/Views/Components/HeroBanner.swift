@@ -12,6 +12,7 @@ struct HeroBanner: View {
     let item: MediaItem
     let baseURL: String
     let onPlay: () -> Void
+    let onPlayFromBeginning: () -> Void
     let onInfo: () -> Void
 
     @State private var backdropURL: String?
@@ -22,6 +23,7 @@ struct HeroBanner: View {
             baseURL: baseURL,
             backdropURL: backdropURL,
             onPlay: onPlay,
+            onPlayFromBeginning: onPlayFromBeginning,
             onInfo: onInfo
         )
         .frame(height: Constants.UI.heroBannerHeight)
@@ -45,6 +47,7 @@ struct HeroBannerRotating: View {
     let items: [MediaItem]
     let baseURL: String
     let onPlay: (MediaItem) -> Void
+    let onPlayFromBeginning: (MediaItem) -> Void
     let onInfo: (MediaItem) -> Void
     var onFocusChange: ((Bool) -> Void)? = nil
 
@@ -67,6 +70,7 @@ struct HeroBannerRotating: View {
                         baseURL: baseURL,
                         backdropURL: generateBackdropURL(for: item),
                         onPlay: { onPlay(item) },
+                        onPlayFromBeginning: { onPlayFromBeginning(item) },
                         onInfo: { onInfo(item) },
                         onFocusChange: { focused in
                             isButtonFocused = focused
@@ -160,11 +164,13 @@ private struct HeroBannerContent: View {
     let baseURL: String
     let backdropURL: String?
     let onPlay: () -> Void
+    let onPlayFromBeginning: () -> Void
     let onInfo: () -> Void
     var onFocusChange: ((Bool) -> Void)? = nil
 
     @State private var playButtonFocused: Bool = false
     @State private var infoButtonFocused: Bool = false
+    @State private var showPlayChoice: Bool = false
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -216,13 +222,11 @@ private struct HeroBannerContent: View {
             VStack(alignment: .leading, spacing: 24) {
                 Spacer()
 
-                // Title treatment — prefer the transparent-PNG logo Jellyfin
-                // serves for TMDb-scraped items; fall back to typographic
-                // title when no logo tag exists.
-                TitleTreatment(
-                    item: item,
-                    baseURL: baseURL
-                )
+                // Poster keyart — Jellyfin's Primary image is the 2:3 movie
+                // poster, which typically includes the title treatment baked
+                // into the artwork. Reads as "streaming app" more clearly
+                // than a separate logo/text block over the backdrop.
+                HeroPosterKeyart(item: item, baseURL: baseURL)
 
                 // Metadata — single typographic line
                 if let metadataLine {
@@ -238,16 +242,19 @@ private struct HeroBannerContent: View {
                     Text(overview)
                         .font(.title3)
                         .foregroundColor(.white.opacity(0.9))
-                        .lineLimit(3)
+                        .lineLimit(4)
                         .shadow(color: .black.opacity(0.3), radius: 5)
                         .frame(maxWidth: 900, alignment: .leading)
                 }
 
                 // Action Buttons
                 HStack(spacing: 20) {
-                    // Play/Resume Button
+                    // Play button — when the item has progress, route
+                    // through a confirmation dialog so the user can pick
+                    // Resume vs. Play from Beginning. Mirrors the contract
+                    // in `ItemDetailView`.
                     HeroBannerButton(
-                        title: hasProgress ? "Resume" : "Play",
+                        title: "Play",
                         icon: "play.fill",
                         style: .primary,
                         onFocusChange: { focused in
@@ -255,7 +262,11 @@ private struct HeroBannerContent: View {
                             onFocusChange?(focused)
                         }
                     ) {
-                        onPlay()
+                        if hasProgress {
+                            showPlayChoice = true
+                        } else {
+                            onPlay()
+                        }
                     }
 
                     // More Info Button
@@ -275,6 +286,28 @@ private struct HeroBannerContent: View {
             }
             .padding(.horizontal, Constants.UI.defaultPadding)
         }
+        .confirmationDialog(
+            "Continue Watching",
+            isPresented: $showPlayChoice,
+            titleVisibility: .visible
+        ) {
+            Button(resumeButtonTitle) { onPlay() }
+            Button("Play from Beginning") { onPlayFromBeginning() }
+            Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    /// "Resume from 1h 20m" when we can compute a position, else "Resume".
+    /// Matches the copy shown on the Detail page's Play confirmation dialog.
+    private var resumeButtonTitle: String {
+        guard let position = item.userData?.playbackPositionTicks, position > 0 else {
+            return "Resume"
+        }
+        let totalSeconds = position / 10_000_000
+        let hours = Int(totalSeconds / 3600)
+        let minutes = Int((totalSeconds % 3600) / 60)
+        let label = hours > 0 ? "\(hours)h \(minutes)m" : "\(minutes)m"
+        return "Resume from \(label)"
     }
 
     /// Joins available metadata fields into a single interpunct-separated line:
@@ -305,6 +338,54 @@ private struct HeroBannerContent: View {
     }
 }
 
+// MARK: - Hero Poster Keyart
+
+/// 2:3 poster rectangle that sits above the metadata/overview in the hero
+/// content overlay. Renders the `Primary` image (keyart with title baked in)
+/// for streaming-app feel; falls back to typographic title when the item has
+/// no poster tag. Sized to feel prominent without swallowing the backdrop.
+private struct HeroPosterKeyart: View {
+    let item: MediaItem
+    let baseURL: String
+
+    private let width: CGFloat = 200
+    private let height: CGFloat = 300
+    private let cornerRadius: CGFloat = 12
+
+    @State private var posterURL: String?
+
+    var body: some View {
+        Group {
+            if let url = posterURL {
+                AsyncImageView(
+                    url: url,
+                    contentMode: .fill,
+                    targetPixelSize: CGSize(
+                        width: width * UIScreen.main.nativeScale,
+                        height: height * UIScreen.main.nativeScale
+                    )
+                )
+                .frame(width: width, height: height)
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                .shadow(color: .black.opacity(0.55), radius: 18, x: 0, y: 10)
+            } else {
+                Text(item.name)
+                    .font(.system(size: 60, weight: .bold))
+                    .foregroundColor(.white)
+                    .lineLimit(2)
+                    .shadow(color: .black.opacity(0.5), radius: 10)
+            }
+        }
+        .onAppear {
+            posterURL = item.heroPosterImageURL(
+                baseURL: baseURL,
+                maxWidth: Int(width * UIScreen.main.nativeScale),
+                quality: Constants.UI.imageQuality
+            )
+        }
+    }
+}
+
 // MARK: - Hero Banner Button
 
 struct HeroBannerButton: View {
@@ -319,42 +400,63 @@ struct HeroBannerButton: View {
     enum ButtonStyle {
         case primary
         case secondary
-
-        var backgroundColor: Color {
-            switch self {
-            case .primary: return .white
-            case .secondary: return Constants.Colors.surface2
-            }
-        }
-
-        var foregroundColor: Color {
-            switch self {
-            case .primary: return .black
-            case .secondary: return .white
-            }
-        }
     }
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.title3)
-
-                Text(title)
-                    .font(.title3)
-                    .fontWeight(.semibold)
-            }
-            .padding(.horizontal, 40)
-            .padding(.vertical, 20)
-            .background(style.backgroundColor)
-            .foregroundColor(style.foregroundColor)
-            .cornerRadius(8)
-            .contentFocus()
+            HeroBannerButtonLabel(title: title, icon: icon, style: style)
         }
         .buttonStyle(.plain)
         .onChange(of: isFocused) { focused in
             onFocusChange?(focused)
+        }
+    }
+}
+
+/// The button's label has to read focus state itself — `@Environment(\.isFocused)`
+/// inside a `Button(.plain)` closure reflects the button's focus, so color shifts
+/// here give the clear "highlighted" cue that scale+shadow alone can't provide
+/// against the bright hero backdrop. Primary stays white but lifts from
+/// translucent to solid; secondary inverts fill/text — Apple TV convention.
+private struct HeroBannerButtonLabel: View {
+    let title: String
+    let icon: String
+    let style: HeroBannerButton.ButtonStyle
+
+    @Environment(\.isFocused) private var isFocused
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.title3)
+
+            Text(title)
+                .font(.title3)
+                .fontWeight(.semibold)
+        }
+        .padding(.horizontal, 40)
+        .padding(.vertical, 20)
+        .background(backgroundColor)
+        .foregroundColor(foregroundColor)
+        .cornerRadius(8)
+        .contentFocus(isFocused: isFocused)
+    }
+
+    private var backgroundColor: Color {
+        switch style {
+        case .primary:
+            return isFocused ? .white : Color.white.opacity(0.7)
+        case .secondary:
+            return isFocused ? .white : Color.white.opacity(0.15)
+        }
+    }
+
+    private var foregroundColor: Color {
+        switch style {
+        case .primary:
+            return .black
+        case .secondary:
+            return isFocused ? .black : .white
         }
     }
 }
@@ -436,11 +538,10 @@ struct MetadataBadge: View {
 
     HeroBanner(
         item: mockItem,
-        baseURL: "https://demo.jellyfin.org/stable"
-    ) {
-        print("Play tapped")
-    } onInfo: {
-        print("Info tapped")
-    }
+        baseURL: "https://demo.jellyfin.org/stable",
+        onPlay: { print("Play tapped") },
+        onPlayFromBeginning: { print("Play from beginning tapped") },
+        onInfo: { print("Info tapped") }
+    )
     .background(Color.black)
 }

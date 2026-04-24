@@ -189,6 +189,39 @@ struct MediaItem: Codable, Identifiable, Hashable {
         return nil
     }
 
+    /// Best 2:3 poster image for a hero keyart slot. For Episodes, `Primary`
+    /// is the 16:9 still (wrong aspect) — fall back to the parent series'
+    /// `Primary`, which is the show's 2:3 poster. Returns nil when nothing
+    /// suitable exists; the caller should render a text fallback then.
+    func heroPosterImageURL(baseURL: String, maxWidth: Int = 400, quality: Int = 90) -> String? {
+        if isEpisode, let parentId = seriesId {
+            return "\(baseURL)/Items/\(parentId)/Images/Primary?maxWidth=\(maxWidth)&quality=\(quality)"
+        }
+        return primaryImageURL(baseURL: baseURL, maxWidth: maxWidth, quality: quality)
+    }
+
+    /// Best 16:9 backdrop for the Detail-page hero. Jellyfin doesn't put
+    /// backdrops on Episodes (they live on the parent series), and some
+    /// Movies ship without one entirely. Cascades: own Backdrop → own Thumb
+    /// → Episode's parent-series Backdrop → parent-series Thumb →
+    /// Episode's own `Primary` (the 16:9 still, last resort). Returns nil
+    /// only when *nothing* landscape is available.
+    func heroBackdropImageURL(baseURL: String, maxWidth: Int = 1920, quality: Int = 90) -> String? {
+        if let url = backdropImageURL(baseURL: baseURL, maxWidth: maxWidth, quality: quality) {
+            return url
+        }
+        if let url = thumbImageURL(baseURL: baseURL, maxWidth: maxWidth, quality: quality) {
+            return url
+        }
+        if isEpisode, let parentId = seriesId {
+            return "\(baseURL)/Items/\(parentId)/Images/Backdrop?maxWidth=\(maxWidth)&quality=\(quality)"
+        }
+        if isEpisode, imageTags?.primary != nil {
+            return "\(baseURL)/Items/\(id)/Images/Primary?maxWidth=\(maxWidth)&quality=\(quality)"
+        }
+        return nil
+    }
+
     /// Best 16:9 landscape image for a "Continue Watching"-style tile.
     /// Jellyfin is asymmetric: for an Episode, `Primary` IS the 16:9 still;
     /// for a Movie/Series, `Primary` is a 2:3 poster and the 16:9 frame

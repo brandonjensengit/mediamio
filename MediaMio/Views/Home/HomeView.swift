@@ -185,6 +185,7 @@ struct HomeContentView: View {
                                     items: viewModel.featuredItems,
                                     baseURL: viewModel.baseURL,
                                     onPlay: { viewModel.playItem($0) },
+                                    onPlayFromBeginning: { viewModel.playItemFromBeginning($0) },
                                     onInfo: { viewModel.showItemDetails($0) }
                                 )
                                 .id("hero")
@@ -195,6 +196,7 @@ struct HomeContentView: View {
                                     item: featured,
                                     baseURL: viewModel.baseURL,
                                     onPlay: { viewModel.playItem(featured) },
+                                    onPlayFromBeginning: { viewModel.playItemFromBeginning(featured) },
                                     onInfo: { viewModel.showItemDetails(featured) }
                                 )
                                 .id("hero")
@@ -267,6 +269,13 @@ struct ErrorView: View {
     let message: String
     let onRetry: () -> Void
 
+    // Without this, focus stays on the Home nav chip when the error view
+    // appears — the Try Again button is reachable geometrically but the
+    // focus engine doesn't route to it from the top-tab row reliably
+    // (reported stuck on physical Apple TV hardware). Grabbing focus on
+    // appear makes the button actionable immediately.
+    @FocusState private var isRetryFocused: Bool
+
     var body: some View {
         VStack(spacing: 30) {
             Image(systemName: "exclamationmark.triangle")
@@ -289,7 +298,17 @@ struct ErrorView: View {
             FocusableButton(title: "Try Again", style: .primary) {
                 onRetry()
             }
+            .focused($isRetryFocused)
             .frame(width: 300)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            // 100ms lets the view finish mounting before the focus engine
+            // tries to find the target — assigning on the same frame as
+            // `.onAppear` occasionally no-ops.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isRetryFocused = true
+            }
         }
     }
 }
