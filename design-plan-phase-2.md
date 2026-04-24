@@ -1,7 +1,7 @@
 # MediaMio Design Plan — Phase 2: Streaming Flow Repair
 
 **Started:** 2026-04-23
-**Status:** Items A + B + C.1 + D + E + F + H shipped 2026-04-23. Item C.2 (actual trailer playback) deferred — blocked on YouTube URL resolution / Jellyfin local-trailers integration. Item E's zoom transition deferred — blocked on `.fullScreenCover` → `NavigationStack` presentation refactor. Item G pending (defer unless A8 telemetry says otherwise). `/critique` + 4K screenshot pass still to run manually on sim.
+**Status:** Items A + B + C.1 + D + E + F + H shipped 2026-04-23. Item C.2 (actual trailer playback) deferred — blocked on YouTube URL resolution / Jellyfin local-trailers integration. Item E's zoom transition deferred — blocked on `.fullScreenCover` → `NavigationStack` presentation refactor. Item G pending (defer unless A8 telemetry says otherwise). **QA pass in progress** (see `qa-phase-2.md`): chunk 1 (Home + Hero) ✅ done 2026-04-24 with two hand-off checks (hero Resume dialog, ErrorView focus fix); chunks 2–5 pending. `/critique` rerun is chunk 5.
 **Scope:** tvOS streaming-app conventions, focus-engine correctness, real perf bugs, and the three "judge moments" (hero, shelf, detail → player). Picks up where `design-plan.md` left off after 7 chrome/palette items shipped 2026-04-22 / 2026-04-23.
 
 **Explicitly NOT in scope:** business logic, API client, authentication flow, settings business wiring, transcode policy (already fixed in `fix-unnecessary-transcode.md`).

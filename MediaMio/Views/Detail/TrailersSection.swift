@@ -39,33 +39,36 @@ private struct TrailerTile: View {
     @FocusState private var hasFocus: Bool
 
     var body: some View {
-        Button(action: {
-            print("🎬 Trailer focused: \(trailer.name ?? "Trailer") → \(trailer.url)")
-        }) {
-            VStack(alignment: .leading, spacing: 12) {
-                ZStack {
-                    LinearGradient(
-                        colors: [Color.purple.opacity(0.7), Color.indigo.opacity(0.9)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    Image(systemName: "play.rectangle.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(.white.opacity(0.95))
-                        .shadow(color: .black.opacity(0.4), radius: 8)
-                }
-                .frame(width: 360, height: 200)
-                .cornerRadius(10)
-
-                Text(trailer.name ?? "Trailer")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .lineLimit(2)
-                    .frame(width: 360, alignment: .leading)
+        // `.focusable()` + `.onTapGesture` — NOT `Button(.plain)` — so tvOS
+        // doesn't draw its focused-state background fill behind the tile.
+        // `.focusEffectDisabled()` cannot reach that fill (it lives inside
+        // the button style, not the focus-effect API). See `PosterCard`.
+        VStack(alignment: .leading, spacing: 12) {
+            ZStack {
+                LinearGradient(
+                    colors: [Color.purple.opacity(0.7), Color.indigo.opacity(0.9)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                Image(systemName: "play.rectangle.fill")
+                    .font(.system(size: 60))
+                    .foregroundColor(.white.opacity(0.95))
+                    .shadow(color: .black.opacity(0.4), radius: 8)
             }
-            .contentFocus(isFocused: hasFocus)
+            .frame(width: 360, height: 200)
+            .cornerRadius(10)
+
+            Text(trailer.name ?? "Trailer")
+                .font(.headline)
+                .foregroundColor(.white)
+                .lineLimit(2)
+                .frame(width: 360, alignment: .leading)
         }
-        .buttonStyle(.plain)
+        .contentFocus(isFocused: hasFocus)
+        .focusable()
         .focused($hasFocus)
+        .onTapGesture {
+            print("🎬 Trailer focused: \(trailer.name ?? "Trailer") → \(trailer.url)")
+        }
     }
 }

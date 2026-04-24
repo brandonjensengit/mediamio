@@ -43,7 +43,6 @@ private struct PersonCard: View {
     let person: PersonInfo
     let baseURL: String
 
-    @Environment(\.isFocused) private var isFocused
     @FocusState private var hasFocus: Bool
 
     private var headshotURL: String? {
@@ -57,43 +56,42 @@ private struct PersonCard: View {
     }
 
     var body: some View {
-        // tvOS needs a focusable surface for the card to receive focus; wrap
-        // in a Button with no action and the plain style so the visual is
-        // fully ours but the focus engine treats it as a focusable stop.
-        Button(action: {}) {
-            VStack(spacing: 14) {
-                headshot
-                    .frame(width: 160, height: 160)
-                    .clipShape(Circle())
-                    .overlay(
-                        Circle().stroke(
-                            hasFocus ? Constants.Colors.accent : Constants.Colors.surface3,
-                            lineWidth: hasFocus ? 4 : 2
-                        )
+        // `.focusable()` + `.onTapGesture` — NOT `Button(.plain)` — so tvOS
+        // doesn't draw its focused-state background fill behind the card.
+        // `.focusEffectDisabled()` cannot reach that fill (it lives inside
+        // the button style, not the focus-effect API). See `PosterCard` for
+        // the same pattern.
+        VStack(spacing: 14) {
+            headshot
+                .frame(width: 160, height: 160)
+                .clipShape(Circle())
+                .overlay(
+                    Circle().stroke(
+                        hasFocus ? Constants.Colors.accent : Constants.Colors.surface3,
+                        lineWidth: hasFocus ? 4 : 2
                     )
+                )
 
-                VStack(spacing: 4) {
-                    Text(person.name)
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .lineLimit(2)
+            VStack(spacing: 4) {
+                Text(person.name)
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.6))
+                        .lineLimit(3)
                         .multilineTextAlignment(.center)
-
-                    if let subtitle {
-                        Text(subtitle)
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.6))
-                            .lineLimit(3)
-                            .multilineTextAlignment(.center)
-                    }
                 }
-                .frame(width: 220)
             }
-            .scaleEffect(hasFocus ? 1.04 : 1.0)
-            .animation(.easeInOut(duration: 0.15), value: hasFocus)
+            .frame(width: 220)
         }
-        .buttonStyle(.plain)
-        .focusEffectDisabled()
+        .scaleEffect(hasFocus ? 1.04 : 1.0)
+        .animation(.easeInOut(duration: 0.15), value: hasFocus)
+        .focusable()
         .focused($hasFocus)
     }
 

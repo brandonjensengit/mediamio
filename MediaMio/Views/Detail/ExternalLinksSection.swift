@@ -17,8 +17,20 @@ struct ExternalLinksSection: View {
 
     @State private var presentedLink: ExternalURL?
 
+    /// IMDb/TMDB pills are hidden for now — QR handoff was the only way to
+    /// act on them (tvOS has no browser) and the extra focus targets made
+    /// vertical navigation from the description flaky. Re-enable by
+    /// removing this filter. Other providers (Rotten Tomatoes, TVDB, etc.)
+    /// still render.
+    private var visibleLinks: [ExternalURL] {
+        links.filter { link in
+            let name = link.name.lowercased()
+            return !name.contains("imdb") && !name.contains("tmdb")
+        }
+    }
+
     var body: some View {
-        if links.isEmpty && communityRating == nil && criticRating == nil {
+        if visibleLinks.isEmpty && communityRating == nil && criticRating == nil {
             EmptyView()
         } else {
             DetailSectionView(title: "Ratings & Links") {
@@ -30,7 +42,7 @@ struct ExternalLinksSection: View {
                         if let rating = criticRating {
                             RatingPill(label: "Critics", value: "\(Int(rating))%", icon: "checkmark.seal.fill")
                         }
-                        ForEach(links) { link in
+                        ForEach(visibleLinks) { link in
                             ExternalLinkPill(link: link) {
                                 presentedLink = link
                             }
