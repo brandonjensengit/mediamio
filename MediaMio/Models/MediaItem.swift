@@ -284,6 +284,13 @@ struct UserData: Codable, Hashable {
     let isFavorite: Bool?
     let played: Bool?
     let key: String?
+    /// Server-reported ISO-8601 timestamp of the user's last playback for
+    /// this item. Used to sort the Continue Watching row deterministically —
+    /// server-side `SortBy=DatePlayed` isn't honored by all Jellyfin
+    /// versions on the `/Items/Resume` endpoint, so we re-sort client-side.
+    /// Stored as `String?` to match the rest of MediaItem's date convention;
+    /// ISO-8601 sorts correctly lexicographically.
+    let lastPlayedDate: String?
 
     enum CodingKeys: String, CodingKey {
         case playbackPositionTicks = "PlaybackPositionTicks"
@@ -291,6 +298,7 @@ struct UserData: Codable, Hashable {
         case isFavorite = "IsFavorite"
         case played = "Played"
         case key = "Key"
+        case lastPlayedDate = "LastPlayedDate"
     }
 
     var playedPercentage: Double {

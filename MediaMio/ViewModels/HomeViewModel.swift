@@ -7,6 +7,7 @@
 
 import Foundation
 import Combine
+import SwiftUI
 
 /// Long-press actions a `PosterCard` / `EpisodeThumbCard` can emit.
 /// Scoped here (not in the card file) so both cards and the Home VM
@@ -32,8 +33,15 @@ class HomeViewModel: ObservableObject {
     private let authService: AuthenticationService
     private let apiClient: JellyfinAPIClient
     private let appState: AppState?
+    private let layoutStore: HomeLayoutStore
     weak var navigationCoordinator: NavigationCoordinator?
     weak var navigationManager: NavigationManager?
+
+    /// Cached server output before user layout is applied. Holding onto this
+    /// lets us re-apply preferences (after a hide/move from the inline menu
+    /// or Settings) without making another network round trip.
+    private var rawSections: [ContentSection] = []
+    private var layoutCancellable: AnyCancellable?
 
     var baseURL: String {
         authService.currentSession?.serverURL ?? ""
@@ -45,7 +53,8 @@ class HomeViewModel: ObservableObject {
         apiClient: JellyfinAPIClient,
         navigationCoordinator: NavigationCoordinator? = nil,
         navigationManager: NavigationManager? = nil,
-        appState: AppState? = nil
+        appState: AppState? = nil,
+        layoutStore: HomeLayoutStore = .shared
     ) {
         self.contentService = contentService
         self.authService = authService
@@ -53,6 +62,15 @@ class HomeViewModel: ObservableObject {
         self.navigationCoordinator = navigationCoordinator
         self.navigationManager = navigationManager
         self.appState = appState
+        self.layoutStore = layoutStore
+
+        // Re-apply layout without refetching when prefs change from elsewhere
+        // (Settings screen, inline context menu).
+        layoutCancellable = layoutStore.$preferences
+            .dropFirst() // skip the current value at subscription time
+            .sink { [weak self] _ in
+                self?.applyCurrentLayout()
+            }
     }
 
     // MARK: - Load Content
@@ -74,15 +92,20 @@ class HomeViewModel: ObservableObject {
 
             DebugLog.verbose("✅ Loaded \(loadedSections.count) sections")
 
-            // Update UI
-            self.sections = loadedSections
+            // Cache raw output and inform the layout store so the Settings
+            // screen can list every possible row (including hidden ones).
+            self.rawSections = loadedSections
+            layoutStore.updateKnownSections(loadedSections)
+
+            // Apply user layout (filter hidden + reorder), then publish.
+            applyCurrentLayout()
 
             // Set featured item (first item from continue watching or recently added)
-            if let firstSection = loadedSections.first,
+            if let firstSection = self.sections.first,
                let firstItem = firstSection.items.first {
                 self.featuredItem = firstItem
-            } else if loadedSections.count > 1,
-                      let firstItem = loadedSections[1].items.first {
+            } else if self.sections.count > 1,
+                      let firstItem = self.sections[1].items.first {
                 self.featuredItem = firstItem
             }
 
@@ -93,13 +116,13 @@ class HomeViewModel: ObservableObject {
             // so its prefix is effectively the most recent library additions.
             var heroItems: [MediaItem] = []
 
-            if let firstSection = loadedSections.first {
+            if let firstSection = self.sections.first {
                 heroItems.append(contentsOf: firstSection.items.prefix(3))
             }
 
-            if heroItems.count < 5 && loadedSections.count > 1 {
+            if heroItems.count < 5 && self.sections.count > 1 {
                 let remaining = 5 - heroItems.count
-                heroItems.append(contentsOf: loadedSections[1].items.prefix(remaining))
+                heroItems.append(contentsOf: self.sections[1].items.prefix(remaining))
             }
 
             self.featuredItems = heroItems
@@ -134,6 +157,29 @@ class HomeViewModel: ObservableObject {
     func refresh() async {
         await loadContent()
     }
+
+    // MARK: - Layout
+
+    /// Re-apply user layout preferences to the cached raw sections. Called
+    /// after every `loadContent` and whenever `HomeLayoutStore.preferences`
+    /// changes (e.g. user reorders via Settings).
+    ///
+    /// Each row is capped to 20 items — the "See All" button takes the user
+    /// into a full Library view for deeper browsing. Capping here (not in
+    /// `ContentService`) keeps the service returning raw data and makes the
+    /// Home surface's trimming policy explicit at the view-model layer.
+    private func applyCurrentLayout() {
+        let ordered = applyLayout(rawSections: rawSections,
+                                  preferences: layoutStore.preferences)
+        sections = ordered.map { section in
+            var trimmed = section
+            trimmed.items = Array(section.items.prefix(Self.homeRowItemCap))
+            return trimmed
+        }
+    }
+
+    /// Maximum items shown per Home row. Overflow is reachable via "See All".
+    private static let homeRowItemCap = 20
 
     // MARK: - Content Actions
 
@@ -182,11 +228,6 @@ class HomeViewModel: ObservableObject {
             // Fallback to old navigation coordinator
             navigationCoordinator?.navigate(to: item)
         }
-    }
-
-    func showSeeAll(for section: ContentSection) {
-        DebugLog.verbose("👀 See all for: \(section.title)")
-        navigationCoordinator?.navigate(to: section)
     }
 
     // MARK: - Context Menu Actions
@@ -276,5 +317,12 @@ class HomeViewModel: ObservableObject {
 
     var isEmpty: Bool {
         sections.isEmpty && !isLoading
+    }
+
+    /// True when the server returned content but the user has hidden every
+    /// row. Distinct from `isEmpty` (server returned nothing) because the
+    /// remediation is different — the user just needs to unhide a row.
+    var allRowsHidden: Bool {
+        !rawSections.isEmpty && sections.isEmpty && !isLoading
     }
 }

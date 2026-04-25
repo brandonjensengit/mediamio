@@ -266,7 +266,8 @@ struct ProgressBar: View {
             playCount: 0,
             isFavorite: false,
             played: false,
-            key: nil
+            key: nil,
+            lastPlayedDate: nil
         ),
         seriesName: nil,
         seriesId: nil,

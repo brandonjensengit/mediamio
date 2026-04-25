@@ -324,6 +324,11 @@ class JellyfinAPIClient: ObservableObject {
         limit: Int = 12,
         maxOfficialRating: String? = nil
     ) async throws -> ItemsResponse {
+        // `/Users/{id}/Items/Resume` already filters to unfinished items (it
+        // excludes `Played == true` and requires a non-zero playback
+        // position). Explicit `SortBy=DatePlayed&SortOrder=Descending`
+        // guarantees the most recently watched item is first — some server
+        // versions don't apply this sort by default.
         let endpoint = Constants.API.Endpoints.resumeItems(userId: userId)
         var queryItems = [
             URLQueryItem(name: "Limit", value: String(limit)),
@@ -331,7 +336,9 @@ class JellyfinAPIClient: ObservableObject {
             URLQueryItem(name: "ImageTypeLimit", value: "1"),
             URLQueryItem(name: "EnableImageTypes", value: "Primary,Backdrop,Thumb,Logo"),
             URLQueryItem(name: "EnableTotalRecordCount", value: "false"),
-            URLQueryItem(name: "MediaTypes", value: "Video")
+            URLQueryItem(name: "MediaTypes", value: "Video"),
+            URLQueryItem(name: "SortBy", value: "DatePlayed"),
+            URLQueryItem(name: "SortOrder", value: "Descending")
         ]
         if let maxRating = maxOfficialRating {
             queryItems.append(URLQueryItem(name: "MaxOfficialRating", value: maxRating))

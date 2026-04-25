@@ -13,6 +13,7 @@ struct SettingsView: View {
     @FocusState private var focusedField: SettingsField?
 
     enum SettingsField: Hashable {
+        case homeLayout
         case playback
         case streaming
         case subtitles
@@ -20,6 +21,16 @@ struct SettingsView: View {
         case parental
         case account
         case app
+    }
+
+    @ObservedObject private var layoutStore = HomeLayoutStore.shared
+
+    private var layoutSubtitle: String {
+        let visible = layoutStore.visibleCount
+        let hidden = layoutStore.hiddenCount
+        if visible == 0 && hidden == 0 { return "Reorder and hide rows" }
+        if hidden == 0 { return "\(visible) visible" }
+        return "\(visible) visible · \(hidden) hidden"
     }
 
     var body: some View {
@@ -87,6 +98,16 @@ struct SettingsView: View {
 
                     // Account & App Settings
                     VStack(spacing: 12) {
+                        NavigationLink(destination: HomeLayoutSettingsView()) {
+                            SettingsRow(
+                                icon: "square.stack.3d.up.fill",
+                                title: "Home Layout",
+                                subtitle: layoutSubtitle
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .focused($focusedField, equals: .homeLayout)
+
                         NavigationLink(destination: AccountSettingsView(authService: authService, settingsManager: settingsManager)) {
                             SettingsRow(
                                 icon: "person.circle.fill",

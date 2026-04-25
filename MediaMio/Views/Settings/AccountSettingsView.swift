@@ -121,6 +121,7 @@ struct AccountSettingsView: View {
             .buttonStyle(.plain)
         }
         .navigationTitle("Account")
+        .trackedPushedView()
         .alert("Sign Out", isPresented: $showSignOutAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Sign Out", role: .destructive) {

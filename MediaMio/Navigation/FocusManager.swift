@@ -30,17 +30,20 @@ final class FocusManager: ObservableObject {
     /// ring; we only persist position data here for restoration.
     let objectWillChange = ObservableObjectPublisher()
 
-    /// rowIndex → last focused itemIndex within that row.
-    private var lastIndexByRow: [Int: Int] = [:]
+    /// `SectionType.stableKey` → last focused itemIndex within that row.
+    /// Keyed by stableKey rather than positional index so reorder/hide
+    /// preserves restoration: "I was on Movies, position 4" survives the
+    /// row moving from index 1 to 3.
+    private var lastIndexByRow: [String: Int] = [:]
 
     /// Called by `ContentRow` whenever a poster card receives focus.
-    func focusedOnRow(_ rowIndex: Int, itemIndex: Int) {
-        lastIndexByRow[rowIndex] = itemIndex
+    func focusedOnRow(_ rowKey: String, itemIndex: Int) {
+        lastIndexByRow[rowKey] = itemIndex
     }
 
     /// Returns the last focused item index for a row (or 0 if never focused).
-    func lastFocusedItem(inRow rowIndex: Int) -> Int {
-        lastIndexByRow[rowIndex] ?? 0
+    func lastFocusedItem(inRow rowKey: String) -> Int {
+        lastIndexByRow[rowKey] ?? 0
     }
 
     /// Reset all stored positions (e.g. after a hard refresh).

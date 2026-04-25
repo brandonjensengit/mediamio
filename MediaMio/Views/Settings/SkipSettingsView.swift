@@ -166,6 +166,7 @@ struct SkipSettingsView: View {
             .buttonStyle(.plain)
         }
         .navigationTitle("Auto-Skip")
+        .trackedPushedView()
     }
 }
 

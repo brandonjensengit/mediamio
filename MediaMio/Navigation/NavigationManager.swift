@@ -33,9 +33,24 @@ class NavigationManager: ObservableObject {
     // on Detail. Nil = "use the item's resume data, if any".
     @Published var currentPlayerStartTicks: Int64?
 
-    // Focus memory for content rows
-    @Published var focusedRowIndex: Int = 0
-    @Published var focusedItemIndices: [Int: Int] = [:] // Row index → Item index
+    // Focus memory for content rows. Keyed by `SectionType.stableKey` so
+    // reorder/hide doesn't invalidate restoration positions.
+    @Published var focusedRowKey: String? = nil
+    @Published var focusedItemIndices: [String: Int] = [:] // Row stableKey → Item index
+
+    /// Number of pushed views currently on screen across all NavigationStacks.
+    /// Each pushed view should bump this on `.onAppear` and decrement on
+    /// `.onDisappear`. Used by the top-level Menu handler to detect "there's
+    /// nested nav that should pop first, don't switch tabs yet."
+    ///
+    /// We use a counter instead of the `NavigationPath`-based API because
+    /// existing settings NavigationLinks use the `destination:` syntax,
+    /// which doesn't publish into a bound path. Refactoring all of them is
+    /// out of scope; a counter is surgical.
+    @Published var pushedViewCount: Int = 0
+
+    func registerPushedView()   { pushedViewCount += 1 }
+    func unregisterPushedView() { pushedViewCount = max(0, pushedViewCount - 1) }
 
     // Scroll position preservation
     @Published var homeScrollPosition: CGFloat = 0
@@ -96,21 +111,21 @@ class NavigationManager: ObservableObject {
 
     // MARK: - Focus Memory
 
-    /// Remember focus position for a specific row
-    func rememberFocus(row: Int, itemIndex: Int) {
-        focusedItemIndices[row] = itemIndex
-        print("🎯 Remembered focus: Row \(row), Item \(itemIndex)")
+    /// Remember focus position for a specific row, keyed by stableKey.
+    func rememberFocus(rowKey: String, itemIndex: Int) {
+        focusedItemIndices[rowKey] = itemIndex
+        print("🎯 Remembered focus: Row \(rowKey), Item \(itemIndex)")
     }
 
-    /// Recall last focused item index for a row
-    func recallFocus(for row: Int) -> Int {
-        return focusedItemIndices[row] ?? 0
+    /// Recall last focused item index for a row.
+    func recallFocus(forRowKey rowKey: String) -> Int {
+        return focusedItemIndices[rowKey] ?? 0
     }
 
     /// Clear all focus memory
     func clearFocusMemory() {
         focusedItemIndices.removeAll()
-        focusedRowIndex = 0
+        focusedRowKey = nil
     }
 
     // MARK: - Tab Navigation

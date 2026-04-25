@@ -7,11 +7,15 @@
 
 import SwiftUI
 
-/// Horizontal scrolling row of media content with Netflix-level focus memory
+/// Horizontal scrolling row of media content with Netflix-level focus memory.
+/// Titles are intentionally non-focusable — row customization (move / hide)
+/// lives in Settings → Home Layout, not as an inline affordance.
 struct ContentRow: View {
     let section: ContentSection
     let baseURL: String
-    let rowIndex: Int
+    /// Stable identity for this row used by the focus memos. Derived from
+    /// `section.type.stableKey` at the call site.
+    let rowKey: String
     let navigationManager: NavigationManager?
     let focusManager: FocusManager?
     let onItemSelect: (MediaItem) -> Void
@@ -25,7 +29,7 @@ struct ContentRow: View {
     init(
         section: ContentSection,
         baseURL: String,
-        rowIndex: Int = 0,
+        rowKey: String? = nil,
         navigationManager: NavigationManager? = nil,
         focusManager: FocusManager? = nil,
         onItemSelect: @escaping (MediaItem) -> Void,
@@ -34,7 +38,7 @@ struct ContentRow: View {
     ) {
         self.section = section
         self.baseURL = baseURL
-        self.rowIndex = rowIndex
+        self.rowKey = rowKey ?? section.type.stableKey
         self.navigationManager = navigationManager
         self.focusManager = focusManager
         self.onItemSelect = onItemSelect
@@ -80,8 +84,8 @@ struct ContentRow: View {
                             .onChange(of: focusedItemId) { newValue in
                                 if newValue == item.id {
                                     // This item is now focused, save to both managers
-                                    navigationManager?.rememberFocus(row: rowIndex, itemIndex: index)
-                                    focusManager?.focusedOnRow(rowIndex, itemIndex: index)
+                                    navigationManager?.rememberFocus(rowKey: rowKey, itemIndex: index)
+                                    focusManager?.focusedOnRow(rowKey, itemIndex: index)
                                 }
                             }
                     }
@@ -98,13 +102,18 @@ struct ContentRow: View {
     // MARK: - Variant selection
 
     /// Resume rows use the 16:9 EpisodeThumbCard (streaming-app idiom).
-    /// Discovery rows (libraries, recently added) stay on the 2:3 PosterCard
-    /// where keyart does the selling.
+    /// Live TV / DVR libraries also render 16:9 because their items are
+    /// recordings or channel programs — Jellyfin only ships 16:9 thumb art
+    /// for them, so 2:3 PosterCard shows broken-looking placeholders.
+    /// Discovery rows for movies / tvshows / collections keep the 2:3
+    /// PosterCard where keyart does the selling.
     private var useThumbVariant: Bool {
         switch section.type {
         case .continueWatching:
             return true
-        case .recentlyAdded, .library, .recommended, .favorites:
+        case .library(_, _, let collectionType):
+            return collectionType == "livetv"
+        case .recentlyAdded, .recommended, .favorites:
             return false
         }
     }

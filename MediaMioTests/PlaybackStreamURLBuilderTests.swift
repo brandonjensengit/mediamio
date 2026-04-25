@@ -74,7 +74,8 @@ struct PlaybackStreamURLBuilderTests {
             taglines: nil, mediaSources: [mediaSource],
             criticRating: nil, providerIds: nil,
             externalUrls: nil, remoteTrailers: nil,
-            chapters: nil
+            chapters: nil,
+            parentLogoItemId: nil, parentLogoImageTag: nil
         )
     }
 

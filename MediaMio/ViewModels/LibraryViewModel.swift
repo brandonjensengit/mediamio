@@ -42,14 +42,14 @@ class LibraryViewModel: ObservableObject {
     }
 
     var libraryId: String? {
-        if case .library(let id, _) = section.type {
+        if case .library(let id, _, _) = section.type {
             return id
         }
         return nil
     }
 
     var itemTypes: [String]? {
-        if case .library(_, let name) = section.type {
+        if case .library(_, let name, _) = section.type {
             // Determine item types based on library name/type
             if name.lowercased().contains("movie") {
                 return ["Movie"]

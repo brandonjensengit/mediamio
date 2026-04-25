@@ -178,6 +178,7 @@ struct SubtitleSettingsView: View {
             .buttonStyle(.plain)
         }
         .navigationTitle("Subtitles")
+        .trackedPushedView()
     }
 }
 

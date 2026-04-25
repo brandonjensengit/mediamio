@@ -16,6 +16,10 @@ import SwiftUI
 
 struct TopNavBar: View {
     @Binding var selectedTab: Tab
+    /// Fires every tap on a tab chip, including taps on the already-selected
+    /// tab. Owners can use this to pop the tab's NavigationStack to root
+    /// (standard tvOS "tap-to-home" behavior).
+    var onTabTap: (Tab) -> Void = { _ in }
     @EnvironmentObject var authService: AuthenticationService
     @Namespace private var underlineNamespace
 
@@ -56,6 +60,10 @@ struct TopNavBar: View {
                         withAnimation(.easeInOut(duration: 0.25)) {
                             selectedTab = tab
                         }
+                        // Always fire the callback — even for taps on the
+                        // already-selected tab. Owners use this to pop the
+                        // tab's NavigationStack to root.
+                        onTabTap(tab)
                     }
                 )
             }

@@ -20,6 +20,7 @@ struct MainTabView: View {
     @StateObject private var navigationManager = NavigationManager()
     @StateObject private var homeViewModel: HomeViewModel
     @StateObject private var searchViewModel: SearchViewModel
+    @StateObject private var homeCoordinator = NavigationCoordinator()
     @StateObject private var libraryCoordinator = NavigationCoordinator()
 
     @ObservedObject private var env: AppEnvironment
@@ -39,20 +40,56 @@ struct MainTabView: View {
         ))
     }
 
+    /// Handles a tap on a tab chip. Always pops that tab's NavigationStack
+    /// to root so the user reliably gets "clean tab root" — matches the
+    /// common tvOS/iOS convention where tapping the selected tab re-roots.
+    /// `selectedTab` has already been flipped by TopNavBar's inline action
+    /// before this fires.
+    private func handleTabTap(_ tab: Tab) {
+        switch tab {
+        case .home:     homeCoordinator.navigationPath = NavigationPath()
+        case .library:  libraryCoordinator.navigationPath = NavigationPath()
+        case .search, .settings:
+            // Search and Settings still use older NavigationLink(destination:)
+            // push patterns that aren't bound to a coordinator path here —
+            // their stacks reset via the system when their NavigationStack
+            // re-mounts. No-op for now.
+            break
+        }
+    }
+
+    /// Returns the Menu-button action for the current state, or nil to let
+    /// the system do its default. Three cases:
+    ///   1. A pushed view is on screen → `nil` so the NavigationStack pops.
+    ///   2. No pushed view, tab != Home → switch to Home.
+    ///   3. No pushed view, tab == Home → `nil` so the system exits the app.
+    private var menuAction: (() -> Void)? {
+        if navigationManager.pushedViewCount > 0 {
+            return nil // let NavigationStack pop
+        }
+        if navigationManager.selectedTab != .home {
+            return { navigationManager.selectedTab = .home }
+        }
+        return nil
+    }
+
     var body: some View {
         ZStack {
             Constants.Colors.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                TopNavBar(selectedTab: $navigationManager.selectedTab)
-                    .environmentObject(env.authService)
+                TopNavBar(
+                    selectedTab: $navigationManager.selectedTab,
+                    onTabTap: { tab in handleTabTap(tab) }
+                )
+                .environmentObject(env.authService)
 
                 // All four tabs stay mounted so scroll position, focus
                 // memory, and in-flight loads survive tab switches (same
                 // contract tvOS's native TabView provides). `.disabled`
                 // on hidden tabs removes them from the focus engine.
                 ZStack {
-                    HomeTabView(viewModel: homeViewModel)
+                    HomeTabView(viewModel: homeViewModel, coordinator: homeCoordinator)
                         .opacity(navigationManager.selectedTab == .home ? 1 : 0)
                         .disabled(navigationManager.selectedTab != .home)
 
@@ -71,6 +108,15 @@ struct MainTabView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        // Tab-level Menu handling, three-tier:
+        //   1. Current tab's NavigationStack is pushed → pop one level.
+        //   2. Stack is at root AND tab != Home → switch to Home.
+        //   3. Stack is at root AND tab == Home → `perform: nil`, letting
+        //      the system do its default exit to the tvOS home screen.
+        // We handle pop manually (rather than letting NavigationStack do it)
+        // because .onExitCommand at this level intercepts Menu before the
+        // inner NavigationStacks see it.
+        .onExitCommand(perform: menuAction)
         .environmentObject(navigationManager)
         .accentColor(Constants.Colors.accent)
         .preferredColorScheme(.dark)
@@ -79,6 +125,7 @@ struct MainTabView: View {
             // init) because both objects are @StateObjects on this view and
             // can't reference each other at init time.
             homeViewModel.navigationManager = navigationManager
+            homeViewModel.navigationCoordinator = homeCoordinator
         }
         // Present detail view full-screen. We deliberately avoid `.sheet` /
         // `.presentationDetents([.large])` because tvOS renders that as an
@@ -115,10 +162,16 @@ struct MainTabView: View {
 
 struct HomeTabView: View {
     @ObservedObject var viewModel: HomeViewModel
+    @ObservedObject var coordinator: NavigationCoordinator
     @EnvironmentObject var navigationManager: NavigationManager
 
     var body: some View {
-        NavigationStack {
+        // Coordinator is held (not used) so the tab-tap handler in
+        // MainTabView can reset its path uniformly with Library. Home
+        // currently has no pushable destinations — items open via
+        // `fullScreenCover`, and "See All" was removed in favor of
+        // using the Library tab for deeper browsing.
+        NavigationStack(path: $coordinator.navigationPath) {
             HomeContentView(
                 viewModel: viewModel,
                 navigationManager: navigationManager

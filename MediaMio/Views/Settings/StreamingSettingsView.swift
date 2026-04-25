@@ -153,6 +153,7 @@ struct StreamingSettingsView: View {
             .buttonStyle(.plain)
         }
         .navigationTitle("Streaming & Network")
+        .trackedPushedView()
         .onAppear {
             print("⚙️ StreamingSettingsView appeared")
             print("📊 Current settings - Bitrate: \(settingsManager.bitrateDisplay), Mode: \(selectedStreamingMode.rawValue), Transcoding: \(settingsManager.allowTranscoding)")

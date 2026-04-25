@@ -143,6 +143,7 @@ struct AppSettingsView: View {
             .buttonStyle(.plain)
         }
         .navigationTitle("App Settings")
+        .trackedPushedView()
         .onAppear {
             calculateCacheSize()
         }
@@ -218,6 +219,7 @@ struct OpenSourceLicensesView: View {
             }
         }
         .navigationTitle("Open Source Licenses")
+        .trackedPushedView()
     }
 }
 

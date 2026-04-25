@@ -159,7 +159,8 @@ struct ContentRatingTests {
             premiereDate: nil, genres: nil, studios: nil, people: nil,
             taglines: nil, mediaSources: nil,
             criticRating: nil, providerIds: nil,
-            externalUrls: nil, remoteTrailers: nil, chapters: nil
+            externalUrls: nil, remoteTrailers: nil, chapters: nil,
+            parentLogoItemId: nil, parentLogoImageTag: nil
         )
     }
 }

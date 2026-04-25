@@ -50,7 +50,10 @@ class ContentService: ObservableObject {
         let continueWatching = await continueWatchingTask
         let libraries = try await librariesTask
 
-        let homeLibraries = libraries.filter { $0.isMovieLibrary || $0.isTVLibrary }
+        // Show every library the admin has configured — server order is the
+        // source of truth. Music / photos / mixed / livetv etc. all get rows
+        // on Home; `loadLibrarySection` handles the per-type item fetch.
+        let homeLibraries = libraries
 
         // Fan out per-library section loads in parallel, preserving server order.
         let librarySections: [ContentSection] = await withTaskGroup(of: (Int, ContentSection?).self) { group in
@@ -78,7 +81,14 @@ class ContentService: ObservableObject {
         return sections
     }
 
-    /// Load continue watching section
+    /// Load continue watching section.
+    ///
+    /// Items are returned in most-recently-watched order. The `/Items/Resume`
+    /// endpoint already filters out finished items, but the server's sort
+    /// isn't reliable across Jellyfin versions — we re-sort client-side by
+    /// `userData.lastPlayedDate` descending. Items missing the field fall to
+    /// the end (rare; only happens on items with progress reported by an
+    /// older client that didn't set the field).
     func loadContinueWatching() async throws -> ContentSection {
         guard let userId = userId else {
             throw APIError.authenticationFailed
@@ -91,9 +101,21 @@ class ContentService: ObservableObject {
             maxOfficialRating: controls.jellyfinMaxRating
         )
 
+        let filtered = controls.filter(response.items)
+        let sorted = filtered.sorted { lhs, rhs in
+            // Sort by ISO-8601 string descending. Missing dates rank lowest
+            // (sort to the end).
+            switch (lhs.userData?.lastPlayedDate, rhs.userData?.lastPlayedDate) {
+            case let (l?, r?): return l > r
+            case (_?, nil):    return true
+            case (nil, _?):    return false
+            case (nil, nil):   return false
+            }
+        }
+
         return ContentSection(
             title: "Continue Watching",
-            items: controls.filter(response.items),
+            items: sorted,
             type: .continueWatching
         )
     }
@@ -151,7 +173,7 @@ class ContentService: ObservableObject {
         return ContentSection(
             title: library.name,
             items: controls.filter(response.items),
-            type: .library(id: library.id, name: library.name)
+            type: .library(id: library.id, name: library.name, collectionType: library.collectionType)
         )
     }
 

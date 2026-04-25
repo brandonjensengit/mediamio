@@ -142,13 +142,6 @@ struct HomeContentView: View {
     @FocusState private var focusedField: String?
     @Namespace private var focusNamespace
 
-    private func isLibrarySection(_ section: ContentSection) -> Bool {
-        if case .library = section.type {
-            return true
-        }
-        return false
-    }
-
     var body: some View {
         ZStack {
             if viewModel.isLoading && !viewModel.hasContent {
@@ -162,6 +155,8 @@ struct HomeContentView: View {
                         await viewModel.refresh()
                     }
                 }
+            } else if viewModel.allRowsHidden {
+                AllRowsHiddenView()
             } else if viewModel.isEmpty {
                 EmptyStateView(
                     systemImage: "film.stack",
@@ -178,30 +173,10 @@ struct HomeContentView: View {
                                 .frame(height: 1)
                                 .id("top")
 
-                            // Hero Banner with auto-rotation (Netflix-style)
-                            // With focus tracking for Netflix-style navigation
-                            if viewModel.featuredItems.count > 1 {
-                                HeroBannerRotating(
-                                    items: viewModel.featuredItems,
-                                    baseURL: viewModel.baseURL,
-                                    onPlay: { viewModel.playItem($0) },
-                                    onPlayFromBeginning: { viewModel.playItemFromBeginning($0) },
-                                    onInfo: { viewModel.showItemDetails($0) }
-                                )
-                                .id("hero")
-                                .focused($focusedField, equals: "hero")
-                            } else if let featured = viewModel.featuredItem {
-                                // Single item fallback
-                                HeroBanner(
-                                    item: featured,
-                                    baseURL: viewModel.baseURL,
-                                    onPlay: { viewModel.playItem(featured) },
-                                    onPlayFromBeginning: { viewModel.playItemFromBeginning(featured) },
-                                    onInfo: { viewModel.showItemDetails(featured) }
-                                )
-                                .id("hero")
-                                .focused($focusedField, equals: "hero")
-                            }
+                            // Hero removed — Continue Watching is the first
+                            // thing the user sees. The VM still computes
+                            // `featuredItems` cheaply, so re-introducing a
+                            // hero later is a paste-back, not a rebuild.
 
                             // Content Sections with Netflix-level focus memory.
                             // `.focusSection()` groups all shelves into one
@@ -209,30 +184,26 @@ struct HomeContentView: View {
                             // CTA lands on the leftmost tile of the current
                             // row instead of jumping to a distant neighbor.
                             VStack(spacing: Constants.UI.sectionSpacing) {
-                                ForEach(Array(viewModel.sections.enumerated()), id: \.element.id) { index, section in
-                                    // Only show "See All" for library sections (Movies, TV Shows, etc)
-                                    // Hide for Continue Watching and Recently Added
+                                ForEach(viewModel.sections, id: \.type.stableKey) { section in
                                     ContentRow(
                                         section: section,
                                         baseURL: viewModel.baseURL,
-                                        rowIndex: index,
+                                        rowKey: section.type.stableKey,
                                         navigationManager: navigationManager,
                                         focusManager: focusManager,
                                         onItemSelect: { viewModel.selectItem($0) },
-                                        onSeeAll: isLibrarySection(section)
-                                            ? { viewModel.showSeeAll(for: section) }
-                                            : nil,
                                         onContextAction: { item, action in
                                             viewModel.handleContextAction(action, for: item)
                                         }
                                     )
-                                    .id("section-\(index)")
-                                    .focused($focusedField, equals: "row-\(index)")
+                                    .id("section-\(section.type.stableKey)")
+                                    .focused($focusedField, equals: section.type.stableKey)
                                 }
                             }
                             .focusSection()
                             .padding(.top, 40)
                             .padding(.bottom, 60)
+                            .animation(.snappy, value: viewModel.sections.map(\.type.stableKey))
                         }
                         .onAppear {
                             // Scroll to the hero once on initial appearance.
@@ -262,6 +233,56 @@ struct HomeContentView: View {
 }
 
 // MARK: - Empty State
+
+/// Shown when the user has hidden every Home row via the layout customizer.
+/// Distinct copy from "No Content Yet" because the remediation is different
+/// — they just need to unhide a row in Settings.
+struct AllRowsHiddenView: View {
+    @ObservedObject private var store = HomeLayoutStore.shared
+    @FocusState private var isRestoreFocused: Bool
+
+    var body: some View {
+        VStack(spacing: 30) {
+            Image(systemName: "eye.slash")
+                .font(.system(size: 80))
+                .foregroundColor(.white.opacity(0.5))
+
+            VStack(spacing: 12) {
+                Text("All Home Rows Are Hidden")
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+
+                Text("Restore a row to see content here.")
+                    .font(.title3)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 600)
+            }
+
+            // Restore the most-recently-seen hidden row so the user can
+            // recover with one click. Falls back to "Reset to Default" if
+            // for some reason there are no hidden rows tracked.
+            FocusableButton(title: "Restore First Hidden Row", style: .primary) {
+                if let firstHidden = store.knownRows.first(where: {
+                    store.preferences.hiddenRowKeys.contains($0.key)
+                }) {
+                    withAnimation(.snappy) { store.show(key: firstHidden.key) }
+                } else {
+                    withAnimation(.snappy) { store.reset() }
+                }
+            }
+            .focused($isRestoreFocused)
+            .frame(width: 400)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isRestoreFocused = true
+            }
+        }
+    }
+}
 
 // MARK: - Error View
 

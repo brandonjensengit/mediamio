@@ -83,7 +83,7 @@ class LibraryTabViewModel: ObservableObject {
             let section = ContentSection(
                 title: moviesLibrary.name,
                 items: [],
-                type: .library(id: moviesLibrary.id, name: moviesLibrary.name)
+                type: .library(id: moviesLibrary.id, name: moviesLibrary.name, collectionType: moviesLibrary.collectionType)
             )
 
             moviesViewModel = LibraryViewModel(
@@ -103,7 +103,7 @@ class LibraryTabViewModel: ObservableObject {
             let section = ContentSection(
                 title: tvLibrary.name,
                 items: [],
-                type: .library(id: tvLibrary.id, name: tvLibrary.name)
+                type: .library(id: tvLibrary.id, name: tvLibrary.name, collectionType: tvLibrary.collectionType)
             )
 
             tvShowsViewModel = LibraryViewModel(

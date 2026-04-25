@@ -58,6 +58,7 @@ struct ParentalControlsSettingsView: View {
             }
         }
         .navigationTitle("Parental Controls")
+        .trackedPushedView()
         .onDisappear {
             // Re-lock on leave so the next visit requires the PIN again.
             isUnlocked = false
@@ -381,6 +382,7 @@ private struct ChangePINSheet: View {
                 .buttonStyle(.plain)
             }
             .navigationTitle("Change PIN")
+            .trackedPushedView()
         }
     }
 

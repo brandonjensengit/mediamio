@@ -68,7 +68,7 @@ struct ContentSection: Identifiable, Hashable {
     enum SectionType: Hashable {
         case continueWatching
         case recentlyAdded
-        case library(id: String, name: String)
+        case library(id: String, name: String, collectionType: String?)
         case recommended
         case favorites
 
@@ -78,12 +78,31 @@ struct ContentSection: Identifiable, Hashable {
                 return "continue_watching"
             case .recentlyAdded:
                 return "recently_added"
-            case .library(_, let name):
+            case .library(_, let name, _):
                 return "library_\(name.lowercased())"
             case .recommended:
                 return "recommended"
             case .favorites:
                 return "favorites"
+            }
+        }
+
+        /// Persistence-safe identity for a section, stable across `loadContent`
+        /// calls. `ContentSection.id` is a fresh `UUID` each load and cannot
+        /// be persisted; this string is what `HomeLayoutPreferences`,
+        /// `@FocusState`, and `ForEach` should key on.
+        var stableKey: String {
+            switch self {
+            case .continueWatching:
+                return "system.continueWatching"
+            case .recentlyAdded:
+                return "system.recentlyAdded"
+            case .library(let id, _, _):
+                return "library.\(id)"
+            case .recommended:
+                return "system.recommended"
+            case .favorites:
+                return "system.favorites"
             }
         }
     }

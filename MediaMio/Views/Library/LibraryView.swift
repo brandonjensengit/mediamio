@@ -265,7 +265,7 @@ private struct LetterButton: View {
     let mockSection = ContentSection(
         title: "Movies",
         items: [],
-        type: .library(id: "1", name: "Movies")
+        type: .library(id: "1", name: "Movies", collectionType: "movies")
     )
 
     let authService = AuthenticationService()

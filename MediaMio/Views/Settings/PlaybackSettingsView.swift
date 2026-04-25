@@ -162,6 +162,7 @@ struct PlaybackSettingsView: View {
             .buttonStyle(.plain)
         }
         .navigationTitle("Playback")
+        .trackedPushedView()
         .onAppear {
             print("⚙️ PlaybackSettingsView appeared")
             print("📊 Current settings - Video: \(selectedVideoQuality.rawValue), Audio: \(selectedAudioQuality.rawValue), Auto-play: \(settingsManager.autoPlayNext)")

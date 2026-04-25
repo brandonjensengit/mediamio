@@ -308,7 +308,8 @@ struct PlaybackInfoBuilderTests {
             studios: nil, people: nil, taglines: nil,
             mediaSources: source.map { [$0] },
             criticRating: nil, providerIds: nil, externalUrls: nil,
-            remoteTrailers: nil, chapters: nil
+            remoteTrailers: nil, chapters: nil,
+            parentLogoItemId: nil, parentLogoImageTag: nil
         )
     }
 
@@ -343,7 +344,8 @@ struct PlaybackInfoBuilderTests {
             studios: nil, people: nil, taglines: nil,
             mediaSources: [source],
             criticRating: nil, providerIds: nil, externalUrls: nil,
-            remoteTrailers: nil, chapters: nil
+            remoteTrailers: nil, chapters: nil,
+            parentLogoItemId: nil, parentLogoImageTag: nil
         )
     }
 }

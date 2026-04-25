@@ -64,7 +64,8 @@ struct ChapterTests {
             taglines: nil, mediaSources: nil,
             criticRating: nil, providerIds: nil,
             externalUrls: nil, remoteTrailers: nil,
-            chapters: nil
+            chapters: nil,
+            parentLogoItemId: nil, parentLogoImageTag: nil
         )
         let url = item.chapterImageURL(
             baseURL: "https://jelly.example.com",
