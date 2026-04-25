@@ -244,29 +244,6 @@ final class VideoPlayerViewModel: ObservableObject {
         print("🎬 LOADING VIDEO — \(item.name) (\(mode.rawValue))")
         print("🔗 URL: \(url.absoluteString)")
 
-        // HEAD request to surface obvious errors (404/auth) before AVPlayer
-        // wraps them in opaque AVFoundationErrorDomain failures. Some
-        // servers reject HEAD; that's tolerated.
-        var headRequest = URLRequest(url: url)
-        headRequest.httpMethod = "HEAD"
-        headRequest.timeoutInterval = 5.0
-        headRequest.setValue(accessToken, forHTTPHeaderField: "X-Emby-Token")
-
-        do {
-            let (_, headResponse) = try await URLSession.shared.data(for: headRequest)
-            if let http = headResponse as? HTTPURLResponse {
-                print("✅ HEAD returned: \(http.statusCode)")
-                if http.statusCode != 200 && http.statusCode != 206 {
-                    errorMessage = "Server returned HTTP \(http.statusCode)"
-                    isLoading = false
-                    isLoadingVideo = false
-                    return
-                }
-            }
-        } catch {
-            print("⚠️ HEAD request failed (continuing anyway): \(error)")
-        }
-
         let asset = AVURLAsset(url: url, options: [
             "AVURLAssetHTTPHeaderFieldsKey": ["X-Emby-Token": accessToken]
         ])
@@ -312,6 +289,13 @@ final class VideoPlayerViewModel: ObservableObject {
 
         if playerItem.status == .failed {
             print("❌ Player item failed during initial load")
+            // The pre-flight HEAD probe used to surface 404/auth here. Now we
+            // rely on AVFoundation's own error surfacing — `errorLog()` carries
+            // a structured event ring that includes the upstream HTTP status
+            // and a server comment, which is enough to triage 404/401 etc.
+            if let lastErrorEvent = playerItem.errorLog()?.events.last {
+                print("   errorLog: domain=\(lastErrorEvent.errorDomain) status=\(lastErrorEvent.errorStatusCode) comment=\(lastErrorEvent.errorComment ?? "nil")")
+            }
             errorMessage = playerItem.error.map { "Playback failed: \($0.localizedDescription)" }
                 ?? "Video playback failed with unknown error"
             self.player = nil
@@ -330,14 +314,23 @@ final class VideoPlayerViewModel: ObservableObject {
                     }
                 }
             }
-
-            await sessionReporter?.reportStart(positionSeconds: currentTime, mode: mode)
-            await introController?.fetchMarkers()
             subtitleManager?.configure(player: avPlayer)
         }
 
         isLoading = false
         isLoadingVideo = false
+
+        // `reportStart` is an advisory POST whose response the client never
+        // reads, and `fetchMarkers` updates overlays that aren't visible at
+        // t=0 — neither belongs on the first-frame critical path. Detaching
+        // saves ~500–1000ms TTFP per Play (audit Finding 1).
+        if playerItem.status == .readyToPlay {
+            let reporter = sessionReporter
+            let intro = introController
+            let position = currentTime
+            Task { await reporter?.reportStart(positionSeconds: position, mode: mode) }
+            Task { await intro?.fetchMarkers() }
+        }
     }
 
     private func retryWithTranscode() async {
