@@ -21,23 +21,16 @@ final class AppEnvironment: ObservableObject {
     let contentService: ContentService
     let authService: AuthenticationService
 
-    private var cancellables: Set<AnyCancellable> = []
-
-    init(authService: AuthenticationService) {
+    // `apiClient` defaults to nil (fresh-instance fallback) so SwiftUI
+    // Previews keep working. Production injects the same instance that
+    // `AuthenticationService` was built with — the auth flow methods
+    // (`login`, `restoreSession`, `signInWithSavedToken`, `clearSession`)
+    // call `apiClient.configure(...)` directly, so this object no longer
+    // needs a Combine bridge mirroring `$currentSession` onto the client.
+    init(apiClient: JellyfinAPIClient? = nil, authService: AuthenticationService) {
         self.authService = authService
-        let client = JellyfinAPIClient()
+        let client = apiClient ?? JellyfinAPIClient()
         self.apiClient = client
         self.contentService = ContentService(apiClient: client, authService: authService)
-
-        // The `apiClient`'s `baseURL` + `accessToken` are a mirror of the
-        // current session. Subscribing keeps them in sync across login,
-        // logout, and server switch — previously every view site rebuilt
-        // a fresh `JellyfinAPIClient` and copied these fields by hand.
-        authService.$currentSession
-            .sink { [weak client] session in
-                client?.baseURL = session?.serverURL ?? ""
-                client?.accessToken = session?.accessToken ?? ""
-            }
-            .store(in: &cancellables)
     }
 }

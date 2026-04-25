@@ -150,6 +150,7 @@ struct MainTabView: View {
                 VideoPlayerView(
                     item: item,
                     authService: env.authService,
+                    apiClient: env.apiClient,
                     startPositionTicks: navigationManager.currentPlayerStartTicks
                 )
                 .environmentObject(navigationManager)
@@ -265,6 +266,7 @@ struct ItemDetailSheetWrapper: View {
                 VideoPlayerView(
                     item: item,
                     authService: env.authService,
+                    apiClient: env.apiClient,
                     startPositionTicks: navigationManager.currentPlayerStartTicks
                 )
                 .environmentObject(navigationManager)

@@ -9,6 +9,12 @@ import SwiftUI
 
 struct LibraryTabView: View {
     @StateObject private var viewModel: LibraryTabViewModel
+    @EnvironmentObject private var navigationManager: NavigationManager
+    /// Survives tab-switches because this view stays mounted in the
+    /// ZStack — flipping back to Library does NOT re-fetch. The
+    /// `ErrorView` retry button calls `loadLibraries()` directly, bypassing
+    /// this flag, so a failed initial load can still be retried.
+    @State private var hasLoaded = false
 
     init(
         contentService: ContentService,
@@ -59,8 +65,19 @@ struct LibraryTabView: View {
                 }
             }
         }
-        .task {
+        // Library lives in `MainTabView`'s ZStack alongside Home, Search, and
+        // Settings — all four tabs stay mounted so scroll/focus survive tab
+        // switches. Without this gate, the `.task` fires at cold launch even
+        // when Home is selected, paying for an unused /Items/Libraries fetch.
+        // `.task(id:)` re-runs whenever the selected tab changes; we only
+        // load when we're the active tab and haven't already loaded.
+        .task(id: navigationManager.selectedTab) {
+            guard navigationManager.selectedTab == .library else { return }
+            guard !hasLoaded else { return }
             await viewModel.loadLibraries()
+            if viewModel.errorMessage == nil {
+                hasLoaded = true
+            }
         }
     }
 }

@@ -24,6 +24,25 @@ class JellyfinAPIClient: ObservableObject {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 60
+        // Reuse up to 4 HTTP/2 streams per host. Jellyfin home loads can fan
+        // out 8+ parallel /Items requests; without this, each one negotiates
+        // a fresh connection on cold start and tail latency dominates TTFP.
+        config.httpMaximumConnectionsPerHost = 4
+        // Honor server-side Cache-Control / ETag. Jellyfin sends those on
+        // /Items and image endpoints; a tab-back to Home can short-circuit
+        // to 304s instead of full re-decodes.
+        config.requestCachePolicy = .useProtocolCachePolicy
+        // 16MB memory, 64MB on disk. Holds enough JSON to skip repeat
+        // library/section fetches on tab-back without bloating the device.
+        config.urlCache = URLCache(
+            memoryCapacity: 16 * 1024 * 1024,
+            diskCapacity: 64 * 1024 * 1024,
+            directory: nil
+        )
+        // Block briefly waiting for connectivity instead of erroring out the
+        // moment Wi-Fi flickers — covers the "Apple TV briefly drops 5GHz on
+        // wake" case where the user would otherwise see a transient failure.
+        config.waitsForConnectivity = true
         self.session = URLSession(configuration: config)
         self.decoder = JSONDecoder()
         self.encoder = JSONEncoder()
@@ -66,6 +85,13 @@ class JellyfinAPIClient: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.httpBody = body
+
+        // Mutations (PlayedItems / FavoriteItems POST + DELETE, etc.) must
+        // never satisfy from cache — go straight to network so the server
+        // sees the write request and returns the fresh UserData.
+        if method != "GET" {
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+        }
 
         // Add headers
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

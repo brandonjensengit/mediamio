@@ -17,16 +17,15 @@ class AuthenticationService: ObservableObject {
     private let keychain = KeychainHelper.shared
     let savedServers: SavedServersStore
 
-    // Takes `SavedServersStore?` rather than a direct default so Swift 6's
-    // strict concurrency doesn't try to evaluate `SavedServersStore()` in
-    // the caller's nonisolated context. The nil fallback happens inside
-    // this init's MainActor-isolated body, which is always legal.
-    init(savedServers: SavedServersStore? = nil) {
+    // `apiClient` and `savedServers` default to nil with a fresh-instance
+    // fallback so SwiftUI Previews can keep using `AuthenticationService()`
+    // unchanged. Production paths inject the shared instances built in
+    // `MediaMioApp.init`. The nil fallback runs inside this MainActor-
+    // isolated body, dodging Swift 6's nonisolated-default-arg evaluation.
+    init(apiClient: JellyfinAPIClient? = nil, savedServers: SavedServersStore? = nil) {
         let store = savedServers ?? SavedServersStore()
         self.savedServers = store
-
-        // Initialize API client
-        self.apiClient = JellyfinAPIClient()
+        self.apiClient = apiClient ?? JellyfinAPIClient()
 
         // Seed the saved-servers store from the legacy single-blob slot on
         // first launch after the upgrade, so users don't get signed out.
@@ -111,6 +110,11 @@ class AuthenticationService: ObservableObject {
         isAuthenticated = false
         keychain.clearCredentials()
         UserDefaults.standard.removeObject(forKey: Constants.UserDefaultsKeys.rememberMe)
+        // Reset the shared client so any in-flight or post-logout request
+        // uses an empty token rather than the just-revoked one. Previously
+        // an `AppEnvironment` Combine bridge handled this — that bridge is
+        // gone now that the client is unified.
+        apiClient.configure(baseURL: "", accessToken: "")
     }
 
     // MARK: - Server Connection

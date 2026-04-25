@@ -208,7 +208,12 @@ struct VideoPlayerView: View {
     @StateObject private var viewModel: VideoPlayerViewModel
     @StateObject private var settingsManager = SettingsManager()
 
-    init(item: MediaItem, authService: AuthenticationService, startPositionTicks: Int64? = nil) {
+    init(
+        item: MediaItem,
+        authService: AuthenticationService,
+        apiClient: JellyfinAPIClient,
+        startPositionTicks: Int64? = nil
+    ) {
         self.item = item
         self.authService = authService
         self.startPositionTicks = startPositionTicks
@@ -217,6 +222,7 @@ struct VideoPlayerView: View {
         _viewModel = StateObject(wrappedValue: VideoPlayerViewModel(
             item: item,
             authService: authService,
+            apiClient: apiClient,
             initialStartPositionTicks: startPositionTicks
         ))
     }
@@ -341,7 +347,8 @@ struct ErrorPlayerView: View {
 
     VideoPlayerView(
         item: mockItem,
-        authService: AuthenticationService()
+        authService: AuthenticationService(),
+        apiClient: JellyfinAPIClient()
     )
     .environmentObject(NavigationManager())
 }

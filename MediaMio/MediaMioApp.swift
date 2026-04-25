@@ -16,13 +16,17 @@ struct MediaMioApp: App {
     @StateObject private var appState = AppState()
 
     init() {
-        // Shared store passed into AuthenticationService so both the auth
-        // flow and the server-entry picker observe the same instance.
+        // One JellyfinAPIClient lives at the app root and is injected into
+        // every consumer (AuthenticationService, AppEnvironment, and from
+        // there into screens that need it). Sharing the URLSession means a
+        // single HTTP/2 connection pool, single URLCache, and one source of
+        // truth for `baseURL` / `accessToken` on session change.
+        let client = JellyfinAPIClient()
         let store = SavedServersStore()
-        let auth = AuthenticationService(savedServers: store)
+        let auth = AuthenticationService(apiClient: client, savedServers: store)
         _authService = StateObject(wrappedValue: auth)
         _savedServers = StateObject(wrappedValue: store)
-        _appEnv = StateObject(wrappedValue: AppEnvironment(authService: auth))
+        _appEnv = StateObject(wrappedValue: AppEnvironment(apiClient: client, authService: auth))
     }
 
     var body: some Scene {

@@ -58,6 +58,7 @@ final class VideoPlayerViewModel: ObservableObject {
     /// `@Published` so the Playback Info panel re-renders after the fetch.
     @Published private(set) var item: MediaItem
     private let authService: AuthenticationService
+    private let apiClient: JellyfinAPIClient
     private let settingsManager = SettingsManager()
 
     var baseURL: String { authService.currentSession?.serverURL ?? "" }
@@ -104,10 +105,12 @@ final class VideoPlayerViewModel: ObservableObject {
     init(
         item: MediaItem,
         authService: AuthenticationService,
+        apiClient: JellyfinAPIClient,
         initialStartPositionTicks: Int64? = nil
     ) {
         self.item = item
         self.authService = authService
+        self.apiClient = apiClient
         // Chapter jumps seed the resume-position via the same pending-seek
         // slot already used for bitrate reloads. `getResumePosition()` drains
         // this first, so it takes precedence over any server-provided resume
@@ -221,15 +224,17 @@ final class VideoPlayerViewModel: ObservableObject {
     /// `getItemDetails` already brought them in).
     private func refetchFullItemIfNeeded() async {
         guard item.mediaSources?.isEmpty ?? true else { return }
-        guard !userId.isEmpty, !baseURL.isEmpty, !accessToken.isEmpty else {
-            DebugLog.playback("⚠️ Cannot refetch item: missing session (userId/baseURL/token empty)")
+        guard !userId.isEmpty else {
+            DebugLog.playback("⚠️ Cannot refetch item: missing userId")
             return
         }
 
-        let api = JellyfinAPIClient()
-        api.configure(baseURL: baseURL, accessToken: accessToken)
+        // Reuses the app-level `JellyfinAPIClient` so this fetch shares the
+        // existing HTTP/2 connection pool and URLCache rather than opening a
+        // second pool every Play. The injected client is already configured
+        // by the auth flow — no per-call configure() needed.
         do {
-            let full = try await api.getItemDetails(userId: userId, itemId: item.id)
+            let full = try await apiClient.getItemDetails(userId: userId, itemId: item.id)
             let sourceCount = full.mediaSources?.count ?? 0
             let streamCount = full.mediaSources?.first?.mediaStreams?.count ?? 0
             DebugLog.playback("🔁 Refetched '\(full.name)' with \(sourceCount) MediaSource(s), \(streamCount) MediaStream(s)")
@@ -253,6 +258,17 @@ final class VideoPlayerViewModel: ObservableObject {
         let asset = AVURLAsset(url: url, options: [
             "AVURLAssetHTTPHeaderFieldsKey": ["X-Emby-Token": accessToken]
         ])
+        // Preload the keys AVPlayerItem will block on anyway. Doing it
+        // before construction lets the load happen concurrently with our
+        // own setup work below (service binding, KVO, time observers),
+        // shaving ~100–300ms off the `waitForPlayerItemReady` gate. On
+        // failure we log and keep going — `AVPlayerItem.status == .failed`
+        // still surfaces the underlying error to the existing error path.
+        do {
+            _ = try await asset.load(.isPlayable, .duration, .tracks)
+        } catch {
+            DebugLog.playback("⚠️ AVURLAsset key preload failed: \(error.localizedDescription). Continuing — AVPlayerItem will surface its own error.")
+        }
         let playerItem = AVPlayerItem(asset: asset)
         playerItem.preferredForwardBufferDuration = 10.0
         playerItem.preferredMaximumResolution = Self.preferredMaximumResolution()
@@ -260,12 +276,9 @@ final class VideoPlayerViewModel: ObservableObject {
         let avPlayer = AVPlayer(playerItem: playerItem)
         avPlayer.appliesMediaSelectionCriteriaAutomatically = true
 
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
-            try AVAudioSession.sharedInstance().setActive(true)
-        } catch {
-            DebugLog.playback("⚠️ AVAudioSession configuration failed: \(error)")
-        }
+        // Flip the shared audio session into playback mode. Cheap on
+        // subsequent Plays — AudioManager caches the category transition.
+        AudioManager.shared.enterPlaybackMode()
 
         self.player = avPlayer
         observeDefaultRate(on: avPlayer)
@@ -511,6 +524,10 @@ final class VideoPlayerViewModel: ObservableObject {
         lifecycleController?.stop()
         lifecycleController = nil
         cleanupAVResources()
+        // Notify other apps that the playback session ended so any audio
+        // they had ducked can resume. Category stays cached for the next
+        // Play so we don't repay the `setCategory` cost.
+        AudioManager.shared.exitPlaybackMode()
     }
 
     private func cleanupAVResources() {
