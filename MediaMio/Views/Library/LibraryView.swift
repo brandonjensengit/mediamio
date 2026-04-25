@@ -268,8 +268,8 @@ private struct LetterButton: View {
         type: .library(id: "1", name: "Movies", collectionType: "movies")
     )
 
-    let authService = AuthenticationService()
     let apiClient = JellyfinAPIClient()
+    let authService = AuthenticationService(apiClient: apiClient)
     let contentService = ContentService(apiClient: apiClient, authService: authService)
     let viewModel = LibraryViewModel(
         section: mockSection,

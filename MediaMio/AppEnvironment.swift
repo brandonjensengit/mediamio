@@ -21,16 +21,14 @@ final class AppEnvironment: ObservableObject {
     let contentService: ContentService
     let authService: AuthenticationService
 
-    // `apiClient` defaults to nil (fresh-instance fallback) so SwiftUI
-    // Previews keep working. Production injects the same instance that
-    // `AuthenticationService` was built with — the auth flow methods
-    // (`login`, `restoreSession`, `signInWithSavedToken`, `clearSession`)
-    // call `apiClient.configure(...)` directly, so this object no longer
-    // needs a Combine bridge mirroring `$currentSession` onto the client.
-    init(apiClient: JellyfinAPIClient? = nil, authService: AuthenticationService) {
+    // `apiClient` is required so the "exactly one client at init time"
+    // contract from the perf audit holds. The auth flow methods (`login`,
+    // `restoreSession`, `signInWithSavedToken`, `clearSession`) all call
+    // `apiClient.configure(...)` directly, so this object does not need a
+    // Combine bridge mirroring `$currentSession` onto the client.
+    init(apiClient: JellyfinAPIClient, authService: AuthenticationService) {
         self.authService = authService
-        let client = apiClient ?? JellyfinAPIClient()
-        self.apiClient = client
-        self.contentService = ContentService(apiClient: client, authService: authService)
+        self.apiClient = apiClient
+        self.contentService = ContentService(apiClient: apiClient, authService: authService)
     }
 }

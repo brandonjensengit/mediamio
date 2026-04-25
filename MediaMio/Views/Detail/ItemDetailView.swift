@@ -813,8 +813,8 @@ struct EpisodeCard: View {
         parentLogoImageTag: nil
     )
 
-    let authService = AuthenticationService()
     let apiClient = JellyfinAPIClient()
+    let authService = AuthenticationService(apiClient: apiClient)
     let viewModel = ItemDetailViewModel(item: mockItem, apiClient: apiClient, authService: authService)
 
     ItemDetailView(viewModel: viewModel)

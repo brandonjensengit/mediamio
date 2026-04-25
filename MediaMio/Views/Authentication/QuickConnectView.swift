@@ -255,5 +255,5 @@ struct QuickConnectView: View {
 
 #Preview {
     QuickConnectView(serverURL: "http://192.168.1.100:8096", rememberMe: true)
-        .environmentObject(AuthenticationService())
+        .environmentObject(AuthenticationService(apiClient: JellyfinAPIClient()))
 }

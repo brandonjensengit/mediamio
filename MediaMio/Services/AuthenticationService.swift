@@ -17,15 +17,17 @@ class AuthenticationService: ObservableObject {
     private let keychain = KeychainHelper.shared
     let savedServers: SavedServersStore
 
-    // `apiClient` and `savedServers` default to nil with a fresh-instance
-    // fallback so SwiftUI Previews can keep using `AuthenticationService()`
-    // unchanged. Production paths inject the shared instances built in
-    // `MediaMioApp.init`. The nil fallback runs inside this MainActor-
-    // isolated body, dodging Swift 6's nonisolated-default-arg evaluation.
-    init(apiClient: JellyfinAPIClient? = nil, savedServers: SavedServersStore? = nil) {
+    // `apiClient` is required so the perf audit's "exactly one client at
+    // init time" contract holds — production injects the singleton built in
+    // `MediaMioApp.init`. SwiftUI Previews construct one locally at the call
+    // site (which is MainActor-isolated, so the nonisolated-default-arg
+    // restriction doesn't bite). `savedServers` keeps its nil-fallback for
+    // Preview ergonomics — `SavedServersStore` is cheap and the audit
+    // doesn't constrain its construction.
+    init(apiClient: JellyfinAPIClient, savedServers: SavedServersStore? = nil) {
         let store = savedServers ?? SavedServersStore()
         self.savedServers = store
-        self.apiClient = apiClient ?? JellyfinAPIClient()
+        self.apiClient = apiClient
 
         // Seed the saved-servers store from the legacy single-blob slot on
         // first launch after the upgrade, so users don't get signed out.

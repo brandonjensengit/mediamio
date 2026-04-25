@@ -194,5 +194,5 @@ struct SettingsRow: View {
 
 #Preview {
     SettingsView()
-        .environmentObject(AuthenticationService())
+        .environmentObject(AuthenticationService(apiClient: JellyfinAPIClient()))
 }

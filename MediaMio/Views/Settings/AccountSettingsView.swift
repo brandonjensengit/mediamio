@@ -172,7 +172,7 @@ struct AccountSettingsView: View {
 #Preview {
     NavigationStack {
         AccountSettingsView(
-            authService: AuthenticationService(),
+            authService: AuthenticationService(apiClient: JellyfinAPIClient()),
             settingsManager: SettingsManager()
         )
     }

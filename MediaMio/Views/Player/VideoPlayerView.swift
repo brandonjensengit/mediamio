@@ -345,10 +345,11 @@ struct ErrorPlayerView: View {
         parentLogoImageTag: nil
     )
 
+    let previewApiClient = JellyfinAPIClient()
     VideoPlayerView(
         item: mockItem,
-        authService: AuthenticationService(),
-        apiClient: JellyfinAPIClient()
+        authService: AuthenticationService(apiClient: previewApiClient),
+        apiClient: previewApiClient
     )
     .environmentObject(NavigationManager())
 }

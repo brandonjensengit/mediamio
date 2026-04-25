@@ -361,6 +361,6 @@ private struct DiscoveredServerRow: View {
 
 #Preview {
     ServerEntryView()
-        .environmentObject(AuthenticationService())
+        .environmentObject(AuthenticationService(apiClient: JellyfinAPIClient()))
         .environmentObject(SavedServersStore())
 }

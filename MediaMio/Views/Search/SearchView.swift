@@ -349,8 +349,8 @@ struct RecentSearchRow: View {
 // MARK: - Preview
 
 #Preview {
-    let authService = AuthenticationService()
     let apiClient = JellyfinAPIClient()
+    let authService = AuthenticationService(apiClient: apiClient)
     let contentService = ContentService(apiClient: apiClient, authService: authService)
     let coordinator = NavigationCoordinator()
     let viewModel = SearchViewModel(
