@@ -148,7 +148,7 @@ final class VideoPlayerViewModel: ObservableObject {
     /// audio quality mid-playback. Preserves `currentTime` as the resume
     /// position so the new stream picks up where the old one left off.
     func reloadWithCurrentSettings() async {
-        print("🔄 Reloading stream with updated settings (position: \(formatTime(currentTime)), wasPlaying: \(isPlaying))")
+        DebugLog.playback("🔄 Reloading stream with updated settings (position: \(formatTime(currentTime)), wasPlaying: \(isPlaying))")
         let resumeFromCurrent = currentTime
         let wasPlaying = isPlaying
         cleanupAVResources()
@@ -173,16 +173,16 @@ final class VideoPlayerViewModel: ObservableObject {
     private var autoPlayPolicy = AutoPlayPolicy()
 
     nonisolated deinit {
-        print("🗑️ VideoPlayerViewModel deinit")
+        DebugLog.playback("🗑️ VideoPlayerViewModel deinit")
     }
 
     // MARK: - Loading
 
     func loadVideoURL() async {
-        print("🎬 loadVideoURL() — item: \(item.name)")
+        DebugLog.playback("🎬 loadVideoURL() — item: \(item.name)")
 
         guard !isLoadingVideo else {
-            print("⚠️ Video already loading, skipping duplicate request")
+            DebugLog.playback("⚠️ Video already loading, skipping duplicate request")
             return
         }
         isLoadingVideo = true
@@ -222,7 +222,7 @@ final class VideoPlayerViewModel: ObservableObject {
     private func refetchFullItemIfNeeded() async {
         guard item.mediaSources?.isEmpty ?? true else { return }
         guard !userId.isEmpty, !baseURL.isEmpty, !accessToken.isEmpty else {
-            print("⚠️ Cannot refetch item: missing session (userId/baseURL/token empty)")
+            DebugLog.playback("⚠️ Cannot refetch item: missing session (userId/baseURL/token empty)")
             return
         }
 
@@ -232,17 +232,23 @@ final class VideoPlayerViewModel: ObservableObject {
             let full = try await api.getItemDetails(userId: userId, itemId: item.id)
             let sourceCount = full.mediaSources?.count ?? 0
             let streamCount = full.mediaSources?.first?.mediaStreams?.count ?? 0
-            print("🔁 Refetched '\(full.name)' with \(sourceCount) MediaSource(s), \(streamCount) MediaStream(s)")
+            DebugLog.playback("🔁 Refetched '\(full.name)' with \(sourceCount) MediaSource(s), \(streamCount) MediaStream(s)")
             self.item = full
         } catch {
-            print("⚠️ getItemDetails failed for '\(item.name)': \(error). Continuing with sparse item — playback will likely fall back to transcode.")
+            DebugLog.playback("⚠️ getItemDetails failed for '\(item.name)': \(error). Continuing with sparse item — playback will likely fall back to transcode.")
         }
     }
 
     /// Shared startup path used by both initial load and transcode failover.
     private func startPlayback(url: URL, mode: PlaybackMode) async {
-        print("🎬 LOADING VIDEO — \(item.name) (\(mode.rawValue))")
-        print("🔗 URL: \(url.absoluteString)")
+        DebugLog.playback("🎬 LOADING VIDEO — \(item.name) (\(mode.rawValue))")
+        // Transcode URLs include the access token in the query string —
+        // never log the absolute URL outside DEBUG. Host alone is enough
+        // to triage "wrong server" vs other failure modes.
+        DebugLog.playback("🔗 URL host: \(url.host ?? "?")")
+        #if DEBUG
+        DebugLog.playback("🔗 Full URL: \(url.absoluteString)")
+        #endif
 
         let asset = AVURLAsset(url: url, options: [
             "AVURLAssetHTTPHeaderFieldsKey": ["X-Emby-Token": accessToken]
@@ -258,7 +264,7 @@ final class VideoPlayerViewModel: ObservableObject {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
             try AVAudioSession.sharedInstance().setActive(true)
         } catch {
-            print("⚠️ AVAudioSession configuration failed: \(error)")
+            DebugLog.playback("⚠️ AVAudioSession configuration failed: \(error)")
         }
 
         self.player = avPlayer
@@ -288,13 +294,13 @@ final class VideoPlayerViewModel: ObservableObject {
         await waitForPlayerItemReady(playerItem: playerItem)
 
         if playerItem.status == .failed {
-            print("❌ Player item failed during initial load")
+            DebugLog.playback("❌ Player item failed during initial load")
             // The pre-flight HEAD probe used to surface 404/auth here. Now we
             // rely on AVFoundation's own error surfacing — `errorLog()` carries
             // a structured event ring that includes the upstream HTTP status
             // and a server comment, which is enough to triage 404/401 etc.
             if let lastErrorEvent = playerItem.errorLog()?.events.last {
-                print("   errorLog: domain=\(lastErrorEvent.errorDomain) status=\(lastErrorEvent.errorStatusCode) comment=\(lastErrorEvent.errorComment ?? "nil")")
+                DebugLog.playback("   errorLog: domain=\(lastErrorEvent.errorDomain) status=\(lastErrorEvent.errorStatusCode) comment=\(lastErrorEvent.errorComment ?? "nil")")
             }
             errorMessage = playerItem.error.map { "Playback failed: \($0.localizedDescription)" }
                 ?? "Video playback failed with unknown error"
@@ -306,7 +312,7 @@ final class VideoPlayerViewModel: ObservableObject {
 
         if playerItem.status == .readyToPlay {
             if let resumePosition = getResumePosition() {
-                print("⏩ Seeking to resume position: \(formatTime(resumePosition))")
+                DebugLog.playback("⏩ Seeking to resume position: \(formatTime(resumePosition))")
                 let seekTime = CMTime(seconds: resumePosition, preferredTimescale: 600)
                 await withCheckedContinuation { continuation in
                     avPlayer.seek(to: seekTime, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
@@ -334,7 +340,7 @@ final class VideoPlayerViewModel: ObservableObject {
     }
 
     private func retryWithTranscode() async {
-        print("🔄 Retrying playback with transcode mode...")
+        DebugLog.playback("🔄 Retrying playback with transcode mode...")
         cleanupAVResources()
 
         // Build a transcode-only URL. Reuse PlaybackStreamURLBuilder by
@@ -466,11 +472,11 @@ final class VideoPlayerViewModel: ObservableObject {
     }
 
     func cleanup() {
-        print("🧹 Cleaning up VideoPlayerViewModel")
+        DebugLog.playback("🧹 Cleaning up VideoPlayerViewModel")
 
         let progressPercent = (duration > 0) ? (currentTime / duration) * 100.0 : 0.0
         let wasCompleted = progressPercent >= 90.0
-        print("📊 Final position: \(formatTime(currentTime)) / \(formatTime(duration)) (\(String(format: "%.1f", progressPercent))%)")
+        DebugLog.playback("📊 Final position: \(formatTime(currentTime)) / \(formatTime(duration)) (\(String(format: "%.1f", progressPercent))%)")
 
         let mode = failoverController.currentMode ?? .directPlay
         let position = currentTime
@@ -592,11 +598,11 @@ final class VideoPlayerViewModel: ObservableObject {
                 guard let self = self else { return }
                 switch status {
                 case .readyToPlay:
-                    print("✅ Player item is ready to play")
+                    DebugLog.playback("✅ Player item is ready to play")
                     Task { @MainActor in
                         guard let player = self.player else { return }
                         if let resumePosition = self.getResumePosition() {
-                            print("⏩ [Status Observer] Seeking to resume: \(self.formatTime(resumePosition))")
+                            DebugLog.playback("⏩ [Status Observer] Seeking to resume: \(self.formatTime(resumePosition))")
                             let seekTime = CMTime(seconds: resumePosition, preferredTimescale: 600)
                             await withCheckedContinuation { continuation in
                                 player.seek(to: seekTime, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
@@ -614,11 +620,11 @@ final class VideoPlayerViewModel: ObservableObject {
                     }
                 case .failed:
                     if let error = playerItem.error {
-                        print("❌ Player item failed: \(error.localizedDescription)")
+                        DebugLog.playback("❌ Player item failed: \(error.localizedDescription)")
                         self.errorMessage = error.localizedDescription
                     }
                 case .unknown:
-                    print("⏳ Player item status unknown")
+                    DebugLog.playback("⏳ Player item status unknown")
                 @unknown default:
                     break
                 }
@@ -634,7 +640,7 @@ final class VideoPlayerViewModel: ObservableObject {
         player?.publisher(for: \.error)
             .sink { [weak self] error in
                 if let error = error {
-                    print("❌ Player error: \(error.localizedDescription)")
+                    DebugLog.playback("❌ Player error: \(error.localizedDescription)")
                     self?.errorMessage = error.localizedDescription
                 }
             }
@@ -668,7 +674,7 @@ final class VideoPlayerViewModel: ObservableObject {
         NotificationCenter.default.publisher(for: .AVPlayerItemFailedToPlayToEndTime, object: playerItem)
             .sink { [weak self] notification in
                 if let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error {
-                    print("❌ Failed to play to end time: \(error.localizedDescription)")
+                    DebugLog.playback("❌ Failed to play to end time: \(error.localizedDescription)")
                     self?.errorMessage = error.localizedDescription
                 }
             }
@@ -697,7 +703,7 @@ final class VideoPlayerViewModel: ObservableObject {
                 return
             case .unknown:
                 if elapsed > 30.0 {
-                    print("⚠️ Still loading after 30s, but continuing (HLS may still work)")
+                    DebugLog.playback("⚠️ Still loading after 30s, but continuing (HLS may still work)")
                     return
                 }
             @unknown default:
