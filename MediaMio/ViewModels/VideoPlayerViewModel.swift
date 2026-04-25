@@ -483,10 +483,27 @@ final class VideoPlayerViewModel: ObservableObject {
         let position = currentTime
         let reporter = sessionReporter
 
+        // Without a background task, the player-view tear-down can race the
+        // OS suspending the app and the in-flight POST gets cancelled silently
+        // — the precise reason a previous Avatar:TLAB session never showed up
+        // in Continue Watching even though the position was correct.
+        let bgTaskName = "playback-stop"
+        var bgTask: UIBackgroundTaskIdentifier = .invalid
+        bgTask = UIApplication.shared.beginBackgroundTask(withName: bgTaskName) {
+            UIApplication.shared.endBackgroundTask(bgTask)
+            bgTask = .invalid
+        }
+
         Task {
             await reporter?.reportStopped(positionSeconds: position, completed: wasCompleted, mode: mode)
             if wasCompleted {
                 await reporter?.markAsWatched()
+            }
+            await MainActor.run {
+                if bgTask != .invalid {
+                    UIApplication.shared.endBackgroundTask(bgTask)
+                    bgTask = .invalid
+                }
             }
         }
 
