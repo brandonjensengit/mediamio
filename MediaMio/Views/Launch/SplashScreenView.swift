@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import os
 
 struct SplashScreenView: View {
     @Binding var isActive: Bool
@@ -15,6 +16,13 @@ struct SplashScreenView: View {
     @State private var opacity: Double = 0
     @State private var minimumTimeElapsed = false
     @State private var loadingState: LoadingState = .loading
+
+    /// Paired begin/end tokens for the splash-timing signpost interval. The
+    /// `id` is shared across the wrapper interval and the two intermediate
+    /// events ("Content Loaded", "Minimum Floor") so Instruments groups them
+    /// onto a single row in Points of Interest.
+    @State private var splashSignpostID: OSSignpostID?
+    @State private var splashSignpostInterval: OSSignpostIntervalState?
 
     enum LoadingState: Equatable {
         case loading
@@ -62,6 +70,15 @@ struct SplashScreenView: View {
             }
         }
         .onAppear {
+            // Begin splash-timing interval. Capture the id once so the two
+            // intermediate events ("Content Loaded", "Minimum Floor") and the
+            // matching `endInterval` all share the same Instruments row.
+            let id = SplashSignposts.signposter.makeSignpostID()
+            splashSignpostID = id
+            splashSignpostInterval = SplashSignposts.signposter.beginInterval(
+                "Splash", id: id, "onAppear"
+            )
+
             // Play startup sound immediately
             AudioManager.shared.playStartupSound()
 
@@ -76,6 +93,9 @@ struct SplashScreenView: View {
         }
         .onChange(of: appState.contentLoaded) { _, isLoaded in
             if isLoaded {
+                if let id = splashSignpostID {
+                    SplashSignposts.signposter.emitEvent("Content Loaded", id: id)
+                }
                 checkIfReadyToTransition()
             }
         }
@@ -87,6 +107,9 @@ struct SplashScreenView: View {
             try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
             await MainActor.run {
                 minimumTimeElapsed = true
+                if let id = splashSignpostID {
+                    SplashSignposts.signposter.emitEvent("Minimum Floor", id: id)
+                }
                 checkIfReadyToTransition()
             }
         }
@@ -106,6 +129,10 @@ struct SplashScreenView: View {
         }
 
         loadingState = .success
+        if let interval = splashSignpostInterval {
+            SplashSignposts.signposter.endInterval("Splash", interval, "dismiss")
+            splashSignpostInterval = nil
+        }
         withAnimation(.easeOut(duration: 0.5)) {
             isActive = false
         }
