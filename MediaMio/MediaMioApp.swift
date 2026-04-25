@@ -44,7 +44,16 @@ struct MediaMioApp: App {
                         MainTabView(env: appEnv, appState: appState)
                             .id(authService.currentSession.map { "\($0.serverURL)|\($0.user.id)" } ?? "anon")
                     } else {
-                        ServerEntryView()
+                        // Wrap the unauth gate in a NavigationStack so
+                        // ServerEntryView can push LoginView (and from there
+                        // QuickConnectView) instead of layering full-screen
+                        // covers. Modal covers swallow the Siri Remote Menu
+                        // button on tvOS, and nested covers (LoginView →
+                        // QuickConnect) don't reliably present — pushes
+                        // dismiss naturally on Menu and don't stack-fight.
+                        NavigationStack {
+                            ServerEntryView()
+                        }
                     }
                 }
 

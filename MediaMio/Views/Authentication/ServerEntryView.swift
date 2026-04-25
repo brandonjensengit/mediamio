@@ -73,21 +73,22 @@ struct ServerEntryView: View {
                 showingLogin = true
             }
         }
-        .fullScreenCover(isPresented: $showingLogin) {
-            Group {
-                if let serverInfo = serverInfo {
-                    LoginView(
-                        serverURL: serverURL,
-                        serverName: serverInfo.serverName
-                    )
-                    .environmentObject(authService)
-                    .onAppear {
-                        print("🔐 LoginView appeared for: \(serverInfo.serverName)")
-                    }
-                } else {
-                    Text("Error: Server info not available")
-                        .foregroundColor(.red)
-                }
+        // Push LoginView onto the surrounding NavigationStack instead of
+        // layering a full-screen cover. The cover variant trapped the Siri
+        // Remote Menu button (cover doesn't dismiss on Menu) and caused
+        // LoginView's on-screen Back / Use Quick Connect buttons to behave
+        // unpredictably when ServerEntryView itself was already inside a
+        // NavigationLink push (the Settings → Account → Add Server path).
+        .navigationDestination(isPresented: $showingLogin) {
+            if let serverInfo = serverInfo {
+                LoginView(
+                    serverURL: serverURL,
+                    serverName: serverInfo.serverName
+                )
+                .environmentObject(authService)
+            } else {
+                Text("Error: Server info not available")
+                    .foregroundColor(.red)
             }
         }
     }

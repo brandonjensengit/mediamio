@@ -161,7 +161,13 @@ struct LoginView: View {
             // password login on the result — the check is fire-and-forget.
             quickConnectAvailable = await authService.isQuickConnectAvailable(serverURL: serverURL)
         }
-        .fullScreenCover(isPresented: $showQuickConnect) {
+        // Push QuickConnectView onto the surrounding NavigationStack
+        // instead of layering a second full-screen cover on top of
+        // LoginView's own. Nested covers don't reliably present on tvOS
+        // and the Menu button can't dismiss either layer; a stack push
+        // gives both Menu and the on-screen Back a single consistent way
+        // to navigate back to LoginView.
+        .navigationDestination(isPresented: $showQuickConnect) {
             QuickConnectView(serverURL: serverURL, rememberMe: rememberMe, serverName: serverName)
                 .environmentObject(authService)
         }
