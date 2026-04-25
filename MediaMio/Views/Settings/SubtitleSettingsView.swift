@@ -2,10 +2,64 @@
 //  SubtitleSettingsView.swift
 //  MediaMio
 //
-//  Subtitle settings: language, appearance, live preview
+//  Subtitle settings: mode, language, size, color, background, edge
+//  style + a live preview that re-renders as you tweak each picker.
+//  Card-style layout matching `AccountSettingsView`.
 //
 
 import SwiftUI
+
+private struct LanguageOption {
+    let code: String
+    let name: String
+}
+
+private let subtitleLanguageOptions: [LanguageOption] = [
+    .init(code: "none", name: "None"),
+    .init(code: "eng",  name: "English"),
+    .init(code: "spa",  name: "Spanish"),
+    .init(code: "fra",  name: "French"),
+    .init(code: "deu",  name: "German"),
+    .init(code: "ita",  name: "Italian"),
+    .init(code: "jpn",  name: "Japanese"),
+    .init(code: "kor",  name: "Korean")
+]
+
+private struct ColorOption {
+    let key: String
+    let name: String
+    let swatch: Color
+}
+
+private let subtitleColorOptions: [ColorOption] = [
+    .init(key: "white",  name: "White",  swatch: .white),
+    .init(key: "yellow", name: "Yellow", swatch: .yellow),
+    .init(key: "cyan",   name: "Cyan",   swatch: .cyan),
+    .init(key: "green",  name: "Green",  swatch: .green)
+]
+
+private struct BackgroundOption {
+    let key: String
+    let name: String
+}
+
+private let subtitleBackgroundOptions: [BackgroundOption] = [
+    .init(key: "none",            name: "None"),
+    .init(key: "semitransparent", name: "Semi-Transparent"),
+    .init(key: "black",           name: "Black")
+]
+
+private struct EdgeStyleOption {
+    let key: String
+    let name: String
+}
+
+private let subtitleEdgeStyleOptions: [EdgeStyleOption] = [
+    .init(key: "none",       name: "None"),
+    .init(key: "dropShadow", name: "Drop Shadow"),
+    .init(key: "outline",    name: "Outline"),
+    .init(key: "raised",     name: "Raised")
+]
 
 struct SubtitleSettingsView: View {
     @ObservedObject var settingsManager: SettingsManager
@@ -18,167 +72,138 @@ struct SubtitleSettingsView: View {
         SubtitleMode(rawValue: settingsManager.subtitleMode) ?? .off
     }
 
+    private var languageLabel: String {
+        subtitleLanguageOptions.first(where: { $0.code == settingsManager.defaultSubtitleLanguage })?.name
+            ?? settingsManager.defaultSubtitleLanguage.uppercased()
+    }
+
+    private var colorLabel: String {
+        subtitleColorOptions.first(where: { $0.key == settingsManager.subtitleColor })?.name
+            ?? settingsManager.subtitleColor.capitalized
+    }
+
+    private var backgroundLabel: String {
+        subtitleBackgroundOptions.first(where: { $0.key == settingsManager.subtitleBackground })?.name
+            ?? settingsManager.subtitleBackground.capitalized
+    }
+
+    private var edgeStyleLabel: String {
+        subtitleEdgeStyleOptions.first(where: { $0.key == settingsManager.subtitleEdgeStyle })?.name
+            ?? settingsManager.subtitleEdgeStyle.capitalized
+    }
+
     var body: some View {
-        ZStack {
-            Constants.Colors.background.ignoresSafeArea()
-
-            Form {
-                // Subtitle Mode
-                Section {
-                    Picker("Subtitle Mode", selection: $settingsManager.subtitleMode) {
-                        ForEach(SubtitleMode.allCases) { mode in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(mode.rawValue)
-                                    .foregroundColor(.white)  // ALWAYS white
-                                Text(mode.description)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .tag(mode.rawValue)
-                            .listRowBackground(Constants.Colors.surface1)
+        SettingsCardScreen(title: "Subtitles") {
+            SettingsSection("Mode", footer: selectedMode.description) {
+                SettingsPickerNavRow(
+                    icon: "captions.bubble.fill",
+                    title: "Subtitle Mode",
+                    value: selectedMode.rawValue
+                ) {
+                    SettingsOptionPickerView(
+                        title: "Subtitle Mode",
+                        selection: $settingsManager.subtitleMode,
+                        options: SubtitleMode.allCases.map {
+                            SettingsPickerOption(value: $0.rawValue, title: $0.rawValue, subtitle: $0.description)
                         }
-                    }
-                    .pickerStyle(.navigationLink)
-                    .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Constants.Colors.accent)
-                    .listRowBackground(Constants.Colors.surface1)
-                } header: {
-                    Text("Mode")
-                        .foregroundColor(.white)
-                } footer: {
-                    Text(selectedMode.description)
-                        .foregroundColor(.secondary)
-                }
-
-                // Default Language
-                Section {
-                    Picker("Default Language", selection: $settingsManager.defaultSubtitleLanguage) {
-                        Text("None").tag("none")
-                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("English").tag("eng")
-                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("Spanish").tag("spa")
-                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("French").tag("fra")
-                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("German").tag("deu")
-                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("Italian").tag("ita")
-                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("Japanese").tag("jpn")
-                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("Korean").tag("kor")
-                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                    }
-                    .pickerStyle(.navigationLink)
-                    .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Constants.Colors.accent)
-                    .listRowBackground(Constants.Colors.surface1)
-                } header: {
-                    Text("Language")
-                        .foregroundColor(.white)
-                }
-
-                // Appearance
-                Section {
-                    Picker("Size", selection: $settingsManager.subtitleSize) {
-                        ForEach(SubtitleSize.allCases) { size in
-                            Text(size.rawValue).tag(size.rawValue)
-                                .foregroundColor(.white)  // ALWAYS white
-                                .listRowBackground(Constants.Colors.surface1)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .foregroundColor(.white)  // ALWAYS white
-
-                    Picker("Color", selection: $settingsManager.subtitleColor) {
-                        HStack {
-                            Circle().fill(.white).frame(width: 20, height: 20)
-                            Text("White").foregroundColor(.white)
-                        }
-                        .tag("white")
-                        .listRowBackground(Constants.Colors.surface1)
-
-                        HStack {
-                            Circle().fill(.yellow).frame(width: 20, height: 20)
-                            Text("Yellow").foregroundColor(.white)
-                        }
-                        .tag("yellow")
-                        .listRowBackground(Constants.Colors.surface1)
-
-                        HStack {
-                            Circle().fill(.cyan).frame(width: 20, height: 20)
-                            Text("Cyan").foregroundColor(.white)
-                        }
-                        .tag("cyan")
-                        .listRowBackground(Constants.Colors.surface1)
-
-                        HStack {
-                            Circle().fill(.green).frame(width: 20, height: 20)
-                            Text("Green").foregroundColor(.white)
-                        }
-                        .tag("green")
-                        .listRowBackground(Constants.Colors.surface1)
-                    }
-                    .pickerStyle(.navigationLink)
-                    .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Constants.Colors.accent)
-
-                    .listRowBackground(Constants.Colors.surface1)
-                    Picker("Background", selection: $settingsManager.subtitleBackground) {
-                        Text("None").tag("none")
-                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("Semi-Transparent").tag("semitransparent")
-                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("Black").tag("black")
-                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                    }
-                    .pickerStyle(.navigationLink)
-                    .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Constants.Colors.accent)
-
-                    .listRowBackground(Constants.Colors.surface1)
-                    Picker("Edge Style", selection: $settingsManager.subtitleEdgeStyle) {
-                        Text("None").tag("none")
-                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("Drop Shadow").tag("dropShadow")
-                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("Outline").tag("outline")
-                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("Raised").tag("raised")
-                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                    }
-                    .pickerStyle(.navigationLink)
-                    .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Constants.Colors.accent)
-                    .listRowBackground(Constants.Colors.surface1)
-                } header: {
-                    Text("Appearance")
-                        .foregroundColor(.white)
-                }
-
-                // Live Preview
-                Section {
-                    SubtitlePreview(
-                        size: selectedSize,
-                        color: settingsManager.subtitleColor,
-                        background: settingsManager.subtitleBackground,
-                        edgeStyle: settingsManager.subtitleEdgeStyle
                     )
-                    .frame(height: 250)
-                    .cornerRadius(12)
-                } header: {
-                    Text("Preview")
-                        .foregroundColor(.white)
-                } footer: {
-                    Text("This is how your subtitles will appear during playback")
-                        .foregroundColor(.secondary)
                 }
             }
-            .buttonStyle(.plain)
+
+            SettingsSection("Language") {
+                SettingsPickerNavRow(
+                    icon: "globe",
+                    title: "Default Language",
+                    value: languageLabel
+                ) {
+                    SettingsOptionPickerView(
+                        title: "Default Language",
+                        selection: $settingsManager.defaultSubtitleLanguage,
+                        options: subtitleLanguageOptions.map {
+                            SettingsPickerOption(value: $0.code, title: $0.name)
+                        }
+                    )
+                }
+            }
+
+            SettingsSection("Appearance") {
+                SettingsPickerNavRow(
+                    icon: "textformat.size",
+                    title: "Size",
+                    value: selectedSize.rawValue
+                ) {
+                    SettingsOptionPickerView(
+                        title: "Size",
+                        selection: $settingsManager.subtitleSize,
+                        options: SubtitleSize.allCases.map {
+                            SettingsPickerOption(value: $0.rawValue, title: $0.rawValue)
+                        }
+                    )
+                }
+
+                SettingsPickerNavRow(
+                    icon: "paintpalette.fill",
+                    title: "Color",
+                    value: colorLabel
+                ) {
+                    SettingsOptionPickerView(
+                        title: "Color",
+                        selection: $settingsManager.subtitleColor,
+                        options: subtitleColorOptions.map { option in
+                            SettingsPickerOption(
+                                value: option.key,
+                                title: option.name,
+                                leading: AnyView(
+                                    Circle()
+                                        .fill(option.swatch)
+                                        .frame(width: 32, height: 32)
+                                        .overlay(Circle().stroke(.white.opacity(0.2), lineWidth: 1))
+                                )
+                            )
+                        }
+                    )
+                }
+
+                SettingsPickerNavRow(
+                    icon: "rectangle.fill",
+                    title: "Background",
+                    value: backgroundLabel
+                ) {
+                    SettingsOptionPickerView(
+                        title: "Background",
+                        selection: $settingsManager.subtitleBackground,
+                        options: subtitleBackgroundOptions.map {
+                            SettingsPickerOption(value: $0.key, title: $0.name)
+                        }
+                    )
+                }
+
+                SettingsPickerNavRow(
+                    icon: "scribble",
+                    title: "Edge Style",
+                    value: edgeStyleLabel
+                ) {
+                    SettingsOptionPickerView(
+                        title: "Edge Style",
+                        selection: $settingsManager.subtitleEdgeStyle,
+                        options: subtitleEdgeStyleOptions.map {
+                            SettingsPickerOption(value: $0.key, title: $0.name)
+                        }
+                    )
+                }
+            }
+
+            SettingsSection("Preview", footer: "How your subtitles will look during playback.") {
+                SubtitlePreview(
+                    size: selectedSize,
+                    color: settingsManager.subtitleColor,
+                    background: settingsManager.subtitleBackground,
+                    edgeStyle: settingsManager.subtitleEdgeStyle
+                )
+                .frame(height: 280)
+                .clipShape(RoundedRectangle(cornerRadius: Constants.UI.cardCornerRadius))
+            }
         }
-        .navigationTitle("Subtitles")
-        .trackedPushedView()
     }
 }
 
@@ -192,7 +217,6 @@ struct SubtitlePreview: View {
 
     var body: some View {
         ZStack {
-            // Background scene
             Color.black
                 .overlay(
                     Image(systemName: "tv")
@@ -203,7 +227,6 @@ struct SubtitlePreview: View {
             VStack {
                 Spacer()
 
-                // Sample subtitle text
                 Text("This is how your subtitles will look")
                     .font(.system(size: 28 * size.scaleFactor, weight: .semibold))
                     .foregroundColor(colorFromString(color))

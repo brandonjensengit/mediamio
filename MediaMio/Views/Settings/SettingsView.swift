@@ -2,7 +2,10 @@
 //  SettingsView.swift
 //  MediaMio
 //
-//  Main settings screen with navigation to all settings categories
+//  Settings tab root. Lists every settings sub-page as a card row,
+//  grouped into "Media" and "App" sections. Card vocabulary and inline
+//  heading match `AccountSettingsView` so the heading typography stays
+//  consistent as the user pushes deeper into the stack.
 //
 
 import SwiftUI
@@ -34,114 +37,95 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        ZStack {
-            Constants.Colors.background.ignoresSafeArea()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 32) {
-                    // Media Settings
-                    VStack(spacing: 12) {
-                        NavigationLink(destination: PlaybackSettingsView(settingsManager: settingsManager)) {
-                            SettingsRow(
-                                icon: "play.circle.fill",
-                                title: "Playback",
-                                subtitle: settingsManager.playbackSummary
-                            )
-                        }
-                        .buttonStyle(.cardChrome)
-                        .focused($focusedField, equals: .playback)
-
-                        NavigationLink(destination: StreamingSettingsView(settingsManager: settingsManager)) {
-                            SettingsRow(
-                                icon: "antenna.radiowaves.left.and.right",
-                                title: "Streaming & Network",
-                                subtitle: settingsManager.streamingSummary
-                            )
-                        }
-                        .buttonStyle(.cardChrome)
-                        .focused($focusedField, equals: .streaming)
-
-                        NavigationLink(destination: SubtitleSettingsView(settingsManager: settingsManager)) {
-                            SettingsRow(
-                                icon: "captions.bubble.fill",
-                                title: "Subtitles",
-                                subtitle: settingsManager.subtitleSummary
-                            )
-                        }
-                        .buttonStyle(.cardChrome)
-                        .focused($focusedField, equals: .subtitles)
-
-                        NavigationLink(destination: SkipSettingsView(settingsManager: settingsManager)) {
-                            SettingsRow(
-                                icon: "forward.fill",
-                                title: "Auto-Skip",
-                                subtitle: settingsManager.skipSummary
-                            )
-                        }
-                        .buttonStyle(.cardChrome)
-                        .focused($focusedField, equals: .skip)
-
-                        NavigationLink(destination: ParentalControlsSettingsView(settingsManager: settingsManager)) {
-                            SettingsRow(
-                                icon: "lock.shield.fill",
-                                title: "Parental Controls",
-                                subtitle: settingsManager.parentalControlsSummary
-                            )
-                        }
-                        .buttonStyle(.cardChrome)
-                        .focused($focusedField, equals: .parental)
-                    }
-
-                    Rectangle()
-                        .fill(Constants.Colors.divider)
-                        .frame(height: 1)
-
-                    // Account & App Settings
-                    VStack(spacing: 12) {
-                        NavigationLink(destination: HomeLayoutSettingsView()) {
-                            SettingsRow(
-                                icon: "square.stack.3d.up.fill",
-                                title: "Home Layout",
-                                subtitle: layoutSubtitle
-                            )
-                        }
-                        .buttonStyle(.cardChrome)
-                        .focused($focusedField, equals: .homeLayout)
-
-                        NavigationLink(destination: AccountSettingsView(authService: authService, settingsManager: settingsManager)) {
-                            SettingsRow(
-                                icon: "person.circle.fill",
-                                title: "Account",
-                                subtitle: authService.currentSession?.user.name ?? "Not signed in"
-                            )
-                        }
-                        .buttonStyle(.cardChrome)
-                        .focused($focusedField, equals: .account)
-
-                        NavigationLink(destination: AppSettingsView(settingsManager: settingsManager)) {
-                            SettingsRow(
-                                icon: "gear",
-                                title: "App Settings",
-                                subtitle: "Interface, storage, and more"
-                            )
-                        }
-                        .buttonStyle(.cardChrome)
-                        .focused($focusedField, equals: .app)
-                    }
+        SettingsCardScreen(title: "Settings") {
+            SettingsSection("Media") {
+                NavigationLink(destination: PlaybackSettingsView(settingsManager: settingsManager)) {
+                    SettingsRow(
+                        icon: "play.circle.fill",
+                        title: "Playback",
+                        subtitle: settingsManager.playbackSummary
+                    )
                 }
-                .padding(.horizontal, 80)
-                .padding(.vertical, 40)
+                .buttonStyle(.cardChrome)
+                .focused($focusedField, equals: .playback)
+
+                NavigationLink(destination: StreamingSettingsView(settingsManager: settingsManager)) {
+                    SettingsRow(
+                        icon: "antenna.radiowaves.left.and.right",
+                        title: "Streaming & Network",
+                        subtitle: settingsManager.streamingSummary
+                    )
+                }
+                .buttonStyle(.cardChrome)
+                .focused($focusedField, equals: .streaming)
+
+                NavigationLink(destination: SubtitleSettingsView(settingsManager: settingsManager)) {
+                    SettingsRow(
+                        icon: "captions.bubble.fill",
+                        title: "Subtitles",
+                        subtitle: settingsManager.subtitleSummary
+                    )
+                }
+                .buttonStyle(.cardChrome)
+                .focused($focusedField, equals: .subtitles)
+
+                NavigationLink(destination: SkipSettingsView(settingsManager: settingsManager)) {
+                    SettingsRow(
+                        icon: "forward.fill",
+                        title: "Auto-Skip",
+                        subtitle: settingsManager.skipSummary
+                    )
+                }
+                .buttonStyle(.cardChrome)
+                .focused($focusedField, equals: .skip)
+
+                NavigationLink(destination: ParentalControlsSettingsView(settingsManager: settingsManager)) {
+                    SettingsRow(
+                        icon: "lock.shield.fill",
+                        title: "Parental Controls",
+                        subtitle: settingsManager.parentalControlsSummary
+                    )
+                }
+                .buttonStyle(.cardChrome)
+                .focused($focusedField, equals: .parental)
+            }
+
+            SettingsSection("App") {
+                NavigationLink(destination: HomeLayoutSettingsView()) {
+                    SettingsRow(
+                        icon: "square.stack.3d.up.fill",
+                        title: "Home Layout",
+                        subtitle: layoutSubtitle
+                    )
+                }
+                .buttonStyle(.cardChrome)
+                .focused($focusedField, equals: .homeLayout)
+
+                NavigationLink(destination: AccountSettingsView(authService: authService, settingsManager: settingsManager)) {
+                    SettingsRow(
+                        icon: "person.circle.fill",
+                        title: "Account",
+                        subtitle: authService.currentSession?.user.name ?? "Not signed in"
+                    )
+                }
+                .buttonStyle(.cardChrome)
+                .focused($focusedField, equals: .account)
+
+                NavigationLink(destination: AppSettingsView(settingsManager: settingsManager)) {
+                    SettingsRow(
+                        icon: "gear",
+                        title: "App Settings",
+                        subtitle: "Interface, storage, and more"
+                    )
+                }
+                .buttonStyle(.cardChrome)
+                .focused($focusedField, equals: .app)
             }
         }
-        .navigationTitle("Settings")
         .onAppear {
-            print("⚙️ SettingsView appeared")
             focusedField = .playback
             if let user = authService.currentSession?.user {
                 settingsManager.updateUserInfo(name: user.name, imageURL: nil)
-                print("✅ Settings loaded for user: \(user.name)")
-            } else {
-                print("⚠️ No user session found in Settings")
             }
         }
     }

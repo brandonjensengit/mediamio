@@ -2,10 +2,32 @@
 //  StreamingSettingsView.swift
 //  MediaMio
 //
-//  Streaming settings: bitrate, quality, network options
+//  Streaming + network settings: streaming mode, max bitrate, video
+//  codec, transcoding allowance, low-bandwidth and local-network
+//  preferences. Card-style layout matching `AccountSettingsView`.
 //
 
 import SwiftUI
+
+private struct BitrateOption {
+    let bps: Int
+    let title: String
+}
+
+/// 10 explicit ladder rungs from mobile-class up to 4K Maximum.
+/// Lives at file scope so the picker subtitle helper can reuse it.
+private let bitrateOptions: [BitrateOption] = [
+    .init(bps:   2_000_000, title: "2 Mbps · Mobile"),
+    .init(bps:   5_000_000, title: "5 Mbps · SD"),
+    .init(bps:  10_000_000, title: "10 Mbps · 720p"),
+    .init(bps:  20_000_000, title: "20 Mbps · 1080p"),
+    .init(bps:  40_000_000, title: "40 Mbps · 1080p HD"),
+    .init(bps:  60_000_000, title: "60 Mbps · 1080p High"),
+    .init(bps:  80_000_000, title: "80 Mbps · 1080p Remux"),
+    .init(bps: 120_000_000, title: "120 Mbps · 4K (Recommended)"),
+    .init(bps: 150_000_000, title: "150 Mbps · 4K High"),
+    .init(bps: 200_000_000, title: "200 Mbps · 4K Maximum")
+]
 
 struct StreamingSettingsView: View {
     @ObservedObject var settingsManager: SettingsManager
@@ -14,149 +36,112 @@ struct StreamingSettingsView: View {
         StreamingMode(rawValue: settingsManager.streamingMode) ?? .auto
     }
 
-    private var bitrateDescription: String {
-        let mbps = Double(settingsManager.maxBitrate) / 1_000_000.0
-        let current = "Current: \(String(format: "%.0f", mbps)) Mbps. "
+    private var selectedCodec: VideoCodec {
+        VideoCodec(rawValue: settingsManager.videoCodec) ?? .h264
+    }
 
+    private var bitrateValueLabel: String {
+        bitrateOptions.first(where: { $0.bps == settingsManager.maxBitrate })?.title
+            ?? "\(settingsManager.maxBitrate / 1_000_000) Mbps"
+    }
+
+    private var bitrateFooter: String {
+        let mbps = Double(settingsManager.maxBitrate) / 1_000_000.0
+        let prefix = "Current: \(String(format: "%.0f", mbps)) Mbps. "
         switch settingsManager.maxBitrate {
         case 0..<10_000_000:
-            return current + "⚠️ Very Low - Only for slow connections. May be blurry."
+            return prefix + "Very low — only for slow connections. Will look soft on the TV."
         case 10_000_000..<20_000_000:
-            return current + "⚠️ Low - For mobile/slow WiFi. May be blurry on TV."
+            return prefix + "Low — fine for mobile / slow Wi-Fi. May look soft on the TV."
         case 20_000_000..<40_000_000:
-            return current + "📱 Good - Fine for 720p, may be blurry for 1080p."
+            return prefix + "Good for 720p, marginal for 1080p."
         case 40_000_000..<80_000_000:
-            return current + "✅ High - Good for 1080p HD content."
+            return prefix + "Good for 1080p HD content."
         case 80_000_000..<120_000_000:
-            return current + "✅ Very High - Excellent for 1080p, good for 4K."
+            return prefix + "Excellent for 1080p, good for 4K."
         default:
-            return current + "🎬 Maximum - Best quality for 4K and remux files."
+            return prefix + "Best quality for 4K and remux files."
         }
     }
 
     var body: some View {
-        ZStack {
-            Constants.Colors.background.ignoresSafeArea()
-
-            Form {
-                // Streaming Mode
-                Section {
-                    Picker("Streaming Mode", selection: $settingsManager.streamingMode) {
-                        ForEach(StreamingMode.allCases) { mode in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(mode.rawValue)
-                                    .font(.title3)
-                                    .foregroundColor(.white)  // ALWAYS white
-                                Text(mode.description)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .tag(mode.rawValue)
-                            .listRowBackground(Constants.Colors.surface1)
+        SettingsCardScreen(title: "Streaming") {
+            SettingsSection("Mode", footer: selectedStreamingMode.description) {
+                SettingsPickerNavRow(
+                    icon: "antenna.radiowaves.left.and.right",
+                    title: "Streaming Mode",
+                    value: selectedStreamingMode.rawValue
+                ) {
+                    SettingsOptionPickerView(
+                        title: "Streaming Mode",
+                        selection: $settingsManager.streamingMode,
+                        options: StreamingMode.allCases.map {
+                            SettingsPickerOption(value: $0.rawValue, title: $0.rawValue, subtitle: $0.description)
                         }
-                    }
-                    .pickerStyle(.navigationLink)
-                    .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Constants.Colors.accent)
-                    .listRowBackground(Constants.Colors.surface1)
-                } header: {
-                    Text("Mode")
-                        .foregroundColor(.white)
-                } footer: {
-                    Text(selectedStreamingMode.description)
-                        .foregroundColor(.secondary)
-                }
-
-                // Bitrate Settings
-                Section {
-                    Picker("Maximum Bitrate", selection: $settingsManager.maxBitrate) {
-                        Text("2 Mbps - Mobile").tag(2_000_000).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("5 Mbps - SD").tag(5_000_000).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("10 Mbps - 720p").tag(10_000_000).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("20 Mbps - 1080p").tag(20_000_000).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("40 Mbps - 1080p HD").tag(40_000_000).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("60 Mbps - 1080p High").tag(60_000_000).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("80 Mbps - 1080p Remux").tag(80_000_000).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("120 Mbps - 4K (Recommended)").tag(120_000_000).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("150 Mbps - 4K High").tag(150_000_000).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("200 Mbps - 4K Maximum").tag(200_000_000).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                    }
-                    .pickerStyle(.navigationLink)
-                    .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Constants.Colors.accent)
-                    .listRowBackground(Constants.Colors.surface1)
-                } header: {
-                    Text("Quality")
-                        .foregroundColor(.white)
-                } footer: {
-                    Text(bitrateDescription)
-                        .foregroundColor(.secondary)
-                }
-
-                // Video Codec
-                Section {
-                    Picker("Preferred Codec", selection: $settingsManager.videoCodec) {
-                        ForEach(VideoCodec.allCases) { codec in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(codec.rawValue)
-                                    .foregroundColor(.white)  // ALWAYS white
-                                Text(codec.description)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .tag(codec.rawValue)
-                            .listRowBackground(Constants.Colors.surface1)
-                        }
-                    }
-                    .pickerStyle(.navigationLink)
-                    .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Constants.Colors.accent)
-                    .listRowBackground(Constants.Colors.surface1)
-                } header: {
-                    Text("Video Codec")
-                        .foregroundColor(.white)
-                }
-
-                // Transcoding
-                Section {
-                    Toggle("Allow Transcoding", isOn: $settingsManager.allowTranscoding)
-                        .foregroundColor(.white)  // ALWAYS white
-                        .tint(Constants.Colors.accent)
-                        .listRowBackground(Color.clear)
-                } header: {
-                    Text("Transcoding")
-                        .foregroundColor(.white)
-                } footer: {
-                    Text("When enabled, server can convert video format if needed")
-                        .foregroundColor(.secondary)
-                }
-
-                // Network
-                Section {
-                    Toggle("Low Bandwidth Mode", isOn: $settingsManager.lowBandwidthMode)
-                        .foregroundColor(.white)  // ALWAYS white
-                        .tint(Constants.Colors.accent)
-                        .listRowBackground(Color.clear)
-
-                    Toggle("Prefer Local Network", isOn: $settingsManager.preferLocalNetwork)
-                        .foregroundColor(.white)  // ALWAYS white
-                        .tint(Constants.Colors.accent)
-                        .listRowBackground(Color.clear)
-                } header: {
-                    Text("Network")
-                        .foregroundColor(.white)
-                } footer: {
-                    Text("Optimize streaming for slow connections and prefer local network when available")
-                        .foregroundColor(.secondary)
+                    )
                 }
             }
-            .buttonStyle(.plain)
-        }
-        .navigationTitle("Streaming & Network")
-        .trackedPushedView()
-        .onAppear {
-            print("⚙️ StreamingSettingsView appeared")
-            print("📊 Current settings - Bitrate: \(settingsManager.bitrateDisplay), Mode: \(selectedStreamingMode.rawValue), Transcoding: \(settingsManager.allowTranscoding)")
+
+            SettingsSection("Quality", footer: bitrateFooter) {
+                SettingsPickerNavRow(
+                    icon: "speedometer",
+                    title: "Maximum Bitrate",
+                    value: bitrateValueLabel
+                ) {
+                    SettingsOptionPickerView(
+                        title: "Maximum Bitrate",
+                        footer: "Higher values look better on fast connections but can stutter on slow ones.",
+                        selection: $settingsManager.maxBitrate,
+                        options: bitrateOptions.map {
+                            SettingsPickerOption(value: $0.bps, title: $0.title)
+                        }
+                    )
+                }
+            }
+
+            SettingsSection("Video Codec", footer: selectedCodec.description) {
+                SettingsPickerNavRow(
+                    icon: "rectangle.stack.fill",
+                    title: "Preferred Codec",
+                    value: selectedCodec.rawValue
+                ) {
+                    SettingsOptionPickerView(
+                        title: "Preferred Codec",
+                        selection: $settingsManager.videoCodec,
+                        options: VideoCodec.allCases.map {
+                            SettingsPickerOption(value: $0.rawValue, title: $0.rawValue, subtitle: $0.description)
+                        }
+                    )
+                }
+            }
+
+            SettingsSection(
+                "Transcoding",
+                footer: "When enabled, the server can convert video on the fly if your device can't play the original."
+            ) {
+                SettingsToggleRow(
+                    icon: "arrow.triangle.2.circlepath",
+                    title: "Allow Transcoding",
+                    isOn: $settingsManager.allowTranscoding
+                )
+            }
+
+            SettingsSection(
+                "Network",
+                footer: "Optimize for slow connections and prefer a local route to the server when one is available."
+            ) {
+                SettingsToggleRow(
+                    icon: "wifi.exclamationmark",
+                    title: "Low Bandwidth Mode",
+                    isOn: $settingsManager.lowBandwidthMode
+                )
+
+                SettingsToggleRow(
+                    icon: "house.fill",
+                    title: "Prefer Local Network",
+                    isOn: $settingsManager.preferLocalNetwork
+                )
+            }
         }
     }
 }

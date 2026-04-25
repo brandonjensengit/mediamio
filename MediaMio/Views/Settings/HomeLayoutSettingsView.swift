@@ -13,6 +13,10 @@
 //  the idiomatic tvOS primitive for this shape and plays nicely with
 //  NavigationStack back-navigation.
 //
+//  Card-style layout matching `AccountSettingsView` — same heading, section
+//  labels, and surface1 / surface3-on-focus row chrome as the rest of the
+//  Settings stack.
+//
 
 import SwiftUI
 
@@ -35,27 +39,19 @@ struct HomeLayoutSettingsView: View {
     }
 
     var body: some View {
-        ZStack {
-            Constants.Colors.background.ignoresSafeArea()
-
+        Group {
             if store.knownRows.isEmpty {
                 emptyState
             } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 40) {
-                        visibleSection
-                        if !hiddenRows.isEmpty {
-                            hiddenSection
-                        }
-                        resetSection
+                SettingsCardScreen(title: "Home Layout") {
+                    visibleSection
+                    if !hiddenRows.isEmpty {
+                        hiddenSection
                     }
-                    .padding(.horizontal, 80)
-                    .padding(.vertical, 40)
+                    resetSection
                 }
             }
         }
-        .navigationTitle("Home Layout")
-        .trackedPushedView()
         .confirmationDialog(
             actionTarget?.title ?? "Row Actions",
             isPresented: Binding(
@@ -104,23 +100,22 @@ struct HomeLayoutSettingsView: View {
 
     @ViewBuilder
     private var visibleSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            sectionHeader("Visible Rows")
-            VStack(spacing: 12) {
-                ForEach(Array(visibleRows.enumerated()), id: \.element.id) { idx, row in
-                    Button {
-                        actionTarget = row
-                    } label: {
-                        rowLabel(
-                            title: row.title,
-                            accessory: "\(idx + 1) of \(visibleRows.count)",
-                            trailingIcon: "ellipsis.circle"
-                        )
-                    }
-                    .buttonStyle(.plain)
+        SettingsSection(
+            "Visible Rows",
+            footer: "Select a row to reorder or hide it. Hidden rows return at the bottom of the list when restored."
+        ) {
+            ForEach(Array(visibleRows.enumerated()), id: \.element.id) { idx, row in
+                Button {
+                    actionTarget = row
+                } label: {
+                    HomeLayoutRow(
+                        title: row.title,
+                        accessory: "\(idx + 1) of \(visibleRows.count)",
+                        trailingIcon: "ellipsis.circle"
+                    )
                 }
+                .buttonStyle(.cardChrome)
             }
-            sectionFooter("Select a row to reorder or hide it. Hidden rows return at the bottom of the list when restored.")
         }
     }
 
@@ -128,24 +123,20 @@ struct HomeLayoutSettingsView: View {
 
     @ViewBuilder
     private var hiddenSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            sectionHeader("Hidden Rows")
-            VStack(spacing: 12) {
-                ForEach(hiddenRows) { row in
-                    Button {
-                        withAnimation(.snappy) { store.show(key: row.key) }
-                    } label: {
-                        rowLabel(
-                            title: row.title,
-                            accessory: "Hidden",
-                            trailingIcon: "plus.circle.fill",
-                            dimmed: true
-                        )
-                    }
-                    .buttonStyle(.plain)
+        SettingsSection("Hidden Rows", footer: "Select a hidden row to restore it.") {
+            ForEach(hiddenRows) { row in
+                Button {
+                    withAnimation(.snappy) { store.show(key: row.key) }
+                } label: {
+                    HomeLayoutRow(
+                        title: row.title,
+                        accessory: "Hidden",
+                        trailingIcon: "plus.circle.fill",
+                        dimmed: true
+                    )
                 }
+                .buttonStyle(.cardChrome)
             }
-            sectionFooter("Select a hidden row to restore it.")
         }
     }
 
@@ -153,19 +144,18 @@ struct HomeLayoutSettingsView: View {
 
     @ViewBuilder
     private var resetSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        SettingsSection(footer: "Restores the server's row order and unhides every row.") {
             Button {
                 showResetAlert = true
             } label: {
-                rowLabel(
+                HomeLayoutRow(
                     title: "Reset to Default",
                     accessory: nil,
                     trailingIcon: "arrow.counterclockwise",
                     destructive: true
                 )
             }
-            .buttonStyle(.plain)
-            sectionFooter("Restores the server's row order and unhides every row.")
+            .buttonStyle(.cardChrome)
         }
     }
 
@@ -173,69 +163,26 @@ struct HomeLayoutSettingsView: View {
 
     @ViewBuilder
     private var emptyState: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "square.stack.3d.up")
-                .font(.system(size: 80))
-                .foregroundColor(.white.opacity(0.4))
-            Text("Home rows aren't loaded yet")
-                .font(.title3)
-                .foregroundColor(.white)
-            Text("Open the Home tab to populate this list.")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: 600, alignment: .center)
-        .padding(60)
-    }
+        ZStack {
+            Constants.Colors.background.ignoresSafeArea()
 
-    // MARK: - Building blocks
-
-    private func sectionHeader(_ text: String) -> some View {
-        Text(text.uppercased())
-            .font(.caption)
-            .fontWeight(.semibold)
-            .foregroundColor(.white.opacity(0.5))
-            .tracking(1.2)
-    }
-
-    private func sectionFooter(_ text: String) -> some View {
-        Text(text)
-            .font(.footnote)
-            .foregroundColor(.white.opacity(0.5))
-    }
-
-    private func rowLabel(title: String,
-                          accessory: String?,
-                          trailingIcon: String,
-                          dimmed: Bool = false,
-                          destructive: Bool = false) -> some View {
-        HStack(spacing: 16) {
-            Text(title)
-                .font(.title3)
-                .fontWeight(.semibold)
-                .foregroundColor(destructive ? .orange : (dimmed ? .white.opacity(0.6) : .white))
-
-            Spacer()
-
-            if let accessory {
-                Text(accessory)
-                    .font(.subheadline)
+            VStack(spacing: 24) {
+                Image(systemName: "square.stack.3d.up")
+                    .font(.system(size: 80))
                     .foregroundColor(.white.opacity(0.4))
+                Text("Home rows aren't loaded yet")
+                    .font(.title3)
+                    .foregroundColor(.white)
+                Text("Open the Home tab to populate this list.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
             }
-
-            Image(systemName: trailingIcon)
-                .font(.title3)
-                .foregroundColor(destructive ? .orange : Constants.Colors.accent)
+            .frame(maxWidth: 600, alignment: .center)
+            .padding(60)
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 20)
-        .frame(minHeight: 80)
-        .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: Constants.UI.cardCornerRadius)
-                .fill(Constants.Colors.surface1)
-        )
+        .navigationBarHidden(true)
+        .trackedPushedView()
     }
 
     // MARK: - Helpers
@@ -260,6 +207,49 @@ struct HomeLayoutSettingsView: View {
             result.append(row)
         }
         return result
+    }
+}
+
+// MARK: - Row chrome
+
+/// Mirrors `SettingsRow` chrome but renders without a leading SF Symbol —
+/// the row's identity here is the row title itself, not a category icon.
+private struct HomeLayoutRow: View {
+    let title: String
+    let accessory: String?
+    let trailingIcon: String
+    var dimmed: Bool = false
+    var destructive: Bool = false
+
+    @Environment(\.isFocused) private var isFocused
+
+    var body: some View {
+        HStack(spacing: 16) {
+            Text(title)
+                .font(.title3)
+                .fontWeight(.semibold)
+                .foregroundColor(destructive ? .orange : (dimmed ? .white.opacity(0.6) : .white))
+
+            Spacer()
+
+            if let accessory {
+                Text(accessory)
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.4))
+            }
+
+            Image(systemName: trailingIcon)
+                .font(.title3)
+                .foregroundColor(destructive ? .orange : Constants.Colors.accent)
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 20)
+        .frame(maxWidth: .infinity, minHeight: 120, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: Constants.UI.cardCornerRadius)
+                .fill(isFocused ? Constants.Colors.surface3 : Constants.Colors.surface1)
+        )
+        .chromeFocus()
     }
 }
 

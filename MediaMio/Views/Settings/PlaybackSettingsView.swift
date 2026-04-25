@@ -2,7 +2,9 @@
 //  PlaybackSettingsView.swift
 //  MediaMio
 //
-//  Playback settings: video quality, audio, auto-play behavior
+//  Playback settings: video / audio quality, auto-play, resume, track
+//  memory. Card-style layout matching `AccountSettingsView` — pickers
+//  push a generic option-picker sub-screen, toggles live inline.
 //
 
 import SwiftUI
@@ -22,151 +24,123 @@ struct PlaybackSettingsView: View {
         ResumeBehavior(rawValue: settingsManager.resumeBehavior) ?? .alwaysAsk
     }
 
+    private var countdownLabel: String {
+        switch settingsManager.autoPlayCountdown {
+        case 0: return "Off"
+        default: return "\(settingsManager.autoPlayCountdown) seconds"
+        }
+    }
+
     var body: some View {
-        ZStack {
-            Constants.Colors.background.ignoresSafeArea()
-
-            Form {
-                // Video Quality
-                Section {
-                    Picker("Video Quality", selection: $settingsManager.videoQuality) {
-                        ForEach(VideoQuality.allCases) { quality in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(quality.rawValue)
-                                    .font(.title3)
-                                    .foregroundColor(.white)  // ALWAYS white
-                                Text(quality.description)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .tag(quality.rawValue)
-                            .listRowBackground(Constants.Colors.surface1)
+        SettingsCardScreen(title: "Playback") {
+            SettingsSection("Video", footer: selectedVideoQuality.description) {
+                SettingsPickerNavRow(
+                    icon: "tv.fill",
+                    title: "Video Quality",
+                    value: selectedVideoQuality.rawValue
+                ) {
+                    SettingsOptionPickerView(
+                        title: "Video Quality",
+                        selection: $settingsManager.videoQuality,
+                        options: VideoQuality.allCases.map {
+                            SettingsPickerOption(value: $0.rawValue, title: $0.rawValue, subtitle: $0.description)
                         }
-                    }
-                    .pickerStyle(.navigationLink)
-                    .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Constants.Colors.accent)
-                    .listRowBackground(Constants.Colors.surface1)
-                } header: {
-                    Text("Video")
-                        .foregroundColor(.white)
-                } footer: {
-                    Text(selectedVideoQuality.description)
-                        .foregroundColor(.secondary)
-                }
-
-                // Audio Quality
-                Section {
-                    Picker("Audio Quality", selection: $settingsManager.audioQuality) {
-                        ForEach(AudioQuality.allCases) { quality in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(quality.rawValue)
-                                    .font(.title3)
-                                    .foregroundColor(.white)  // ALWAYS white
-                                Text(quality.description)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .tag(quality.rawValue)
-                            .listRowBackground(Constants.Colors.surface1)
-                        }
-                    }
-                    .pickerStyle(.navigationLink)
-                    .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Constants.Colors.accent)
-                    .listRowBackground(Constants.Colors.surface1)
-                } header: {
-                    Text("Audio")
-                        .foregroundColor(.white)
-                } footer: {
-                    Text(selectedAudioQuality.description)
-                        .foregroundColor(.secondary)
-                }
-
-                // Playback Behavior
-                Section {
-                    Toggle("Auto-Play Next Episode", isOn: $settingsManager.autoPlayNext)
-                        .foregroundColor(.white)  // ALWAYS white
-                        .tint(Constants.Colors.accent)
-                        .listRowBackground(Constants.Colors.surface1)
-
-                    if settingsManager.autoPlayNext {
-                        Picker("Countdown", selection: $settingsManager.autoPlayCountdown) {
-                            Text("5 seconds").tag(5).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                            Text("10 seconds").tag(10).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                            Text("15 seconds").tag(15).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                            Text("Off").tag(0).foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        }
-                        .foregroundColor(.white)  // ALWAYS white
-                        .accentColor(Constants.Colors.accent)
-                        .listRowBackground(Constants.Colors.surface1)
-                    }
-
-                    Toggle("Auto-Play Hero Trailers", isOn: $settingsManager.autoPlayTrailers)
-                        .foregroundColor(.white)
-                        .tint(Constants.Colors.accent)
-                        .listRowBackground(Constants.Colors.surface1)
-                } header: {
-                    Text("Auto-Play")
-                        .foregroundColor(.white)
-                } footer: {
-                    if settingsManager.autoPlayNext && settingsManager.autoPlayCountdown > 0 {
-                        Text("Next episode will start after \(settingsManager.autoPlayCountdown) seconds. Hero trailers start muted on focus dwell.")
-                            .foregroundColor(.secondary)
-                    } else {
-                        Text("Hero trailers start muted on focus dwell.")
-                            .foregroundColor(.secondary)
-                    }
-                }
-
-                // Resume Behavior
-                Section {
-                    Picker("Resume Behavior", selection: $settingsManager.resumeBehavior) {
-                        ForEach(ResumeBehavior.allCases) { behavior in
-                            Text(behavior.rawValue).tag(behavior.rawValue)
-                                .foregroundColor(.white)  // ALWAYS white
-                                .listRowBackground(Constants.Colors.surface1)
-                        }
-                    }
-                    .pickerStyle(.navigationLink)
-                    .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Constants.Colors.accent)
-                    .listRowBackground(Constants.Colors.surface1)
-                } header: {
-                    Text("Resume")
-                        .foregroundColor(.white)
-                } footer: {
-                    Text("Choose how to handle partially watched content")
-                        .foregroundColor(.secondary)
-                }
-
-                // Remember Preferences
-                Section {
-                    Toggle("Remember Audio Track", isOn: $settingsManager.rememberAudioTrack)
-                        .foregroundColor(.white)  // ALWAYS white
-                        .tint(Constants.Colors.accent)
-                        .listRowBackground(Constants.Colors.surface1)
-
-                    Toggle("Remember Subtitle Track", isOn: $settingsManager.rememberSubtitleTrack)
-                        .foregroundColor(.white)  // ALWAYS white
-                        .tint(Constants.Colors.accent)
-                        .listRowBackground(Constants.Colors.surface1)
-                } header: {
-                    Text("Track Memory")
-                        .foregroundColor(.white)
-                } footer: {
-                    Text("Remember your audio and subtitle preferences for each show")
-                        .foregroundColor(.secondary)
+                    )
                 }
             }
-            .buttonStyle(.plain)
+
+            SettingsSection("Audio", footer: selectedAudioQuality.description) {
+                SettingsPickerNavRow(
+                    icon: "speaker.wave.2.fill",
+                    title: "Audio Quality",
+                    value: selectedAudioQuality.rawValue
+                ) {
+                    SettingsOptionPickerView(
+                        title: "Audio Quality",
+                        selection: $settingsManager.audioQuality,
+                        options: AudioQuality.allCases.map {
+                            SettingsPickerOption(value: $0.rawValue, title: $0.rawValue, subtitle: $0.description)
+                        }
+                    )
+                }
+            }
+
+            SettingsSection("Auto-Play", footer: autoPlayFooter) {
+                SettingsToggleRow(
+                    icon: "play.rectangle.on.rectangle.fill",
+                    title: "Auto-Play Next Episode",
+                    isOn: $settingsManager.autoPlayNext
+                )
+
+                if settingsManager.autoPlayNext {
+                    SettingsPickerNavRow(
+                        icon: "timer",
+                        title: "Countdown",
+                        value: countdownLabel
+                    ) {
+                        SettingsOptionPickerView(
+                            title: "Countdown",
+                            footer: "How long the next-episode prompt waits before auto-starting playback.",
+                            selection: $settingsManager.autoPlayCountdown,
+                            options: [
+                                SettingsPickerOption(value: 5,  title: "5 seconds"),
+                                SettingsPickerOption(value: 10, title: "10 seconds"),
+                                SettingsPickerOption(value: 15, title: "15 seconds"),
+                                SettingsPickerOption(value: 0,  title: "Off",
+                                                     subtitle: "Show the prompt without a countdown.")
+                            ]
+                        )
+                    }
+                }
+
+                SettingsToggleRow(
+                    icon: "sparkles.tv.fill",
+                    title: "Auto-Play Hero Trailers",
+                    subtitle: "Hero trailers start muted on focus dwell.",
+                    isOn: $settingsManager.autoPlayTrailers
+                )
+            }
+
+            SettingsSection("Resume", footer: "Choose how partially watched content is handled when you reopen it.") {
+                SettingsPickerNavRow(
+                    icon: "play.circle.fill",
+                    title: "Resume Behavior",
+                    value: selectedResumeBehavior.rawValue
+                ) {
+                    SettingsOptionPickerView(
+                        title: "Resume Behavior",
+                        selection: $settingsManager.resumeBehavior,
+                        options: ResumeBehavior.allCases.map {
+                            SettingsPickerOption(value: $0.rawValue, title: $0.rawValue)
+                        }
+                    )
+                }
+            }
+
+            SettingsSection("Track Memory", footer: "Remember the audio and subtitle tracks you pick on each show.") {
+                SettingsToggleRow(
+                    icon: "waveform",
+                    title: "Remember Audio Track",
+                    isOn: $settingsManager.rememberAudioTrack
+                )
+
+                SettingsToggleRow(
+                    icon: "captions.bubble.fill",
+                    title: "Remember Subtitle Track",
+                    isOn: $settingsManager.rememberSubtitleTrack
+                )
+            }
         }
-        .navigationTitle("Playback")
-        .trackedPushedView()
-        .onAppear {
-            print("⚙️ PlaybackSettingsView appeared")
-            print("📊 Current settings - Video: \(selectedVideoQuality.rawValue), Audio: \(selectedAudioQuality.rawValue), Auto-play: \(settingsManager.autoPlayNext)")
+    }
+
+    private var autoPlayFooter: String {
+        if settingsManager.autoPlayNext && settingsManager.autoPlayCountdown > 0 {
+            return "Next episode starts after \(settingsManager.autoPlayCountdown) seconds."
         }
+        if settingsManager.autoPlayNext {
+            return "Next episode is queued without a countdown."
+        }
+        return "A 'Play Next' prompt will appear at the end of each episode."
     }
 }
 

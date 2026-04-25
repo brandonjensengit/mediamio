@@ -2,148 +2,151 @@
 //  AppSettingsView.swift
 //  MediaMio
 //
-//  App settings: theme, cache management, about
+//  App-level settings: theme, ratings + spoiler protection, cache
+//  ceiling + clear-now action, version / build, open-source licenses,
+//  and a "reset everything" knob. Card-style layout matching
+//  `AccountSettingsView`.
 //
 
 import SwiftUI
 
+private struct CacheCeilingOption {
+    let mb: Int
+    let label: String
+}
+
+private let cacheCeilingOptions: [CacheCeilingOption] = [
+    .init(mb: 100,  label: "100 MB"),
+    .init(mb: 500,  label: "500 MB"),
+    .init(mb: 1000, label: "1 GB"),
+    .init(mb: 2000, label: "2 GB"),
+    .init(mb: 5000, label: "5 GB")
+]
+
 struct AppSettingsView: View {
     @ObservedObject var settingsManager: SettingsManager
-    @State private var cacheSize: String = "Calculating..."
+    @State private var cacheSize: String = "Calculating…"
     @State private var showClearCacheAlert = false
 
+    private var selectedTheme: AppTheme {
+        AppTheme(rawValue: settingsManager.theme) ?? .dark
+    }
+
+    private var cacheCeilingLabel: String {
+        cacheCeilingOptions.first(where: { $0.mb == settingsManager.cacheSize })?.label
+            ?? "\(settingsManager.cacheSize) MB"
+    }
+
     var body: some View {
-        ZStack {
-            Constants.Colors.background.ignoresSafeArea()
-
-            Form {
-                // Interface
-                Section {
-                    Picker("Theme", selection: $settingsManager.theme) {
-                        ForEach(AppTheme.allCases) { theme in
-                            Text(theme.rawValue).tag(theme.rawValue)
-                                .foregroundColor(.white)  // ALWAYS white
-                                .listRowBackground(Constants.Colors.surface1)
+        SettingsCardScreen(title: "App Settings") {
+            SettingsSection("Interface", footer: "Spoiler protection hides episode thumbnails and descriptions until watched.") {
+                SettingsPickerNavRow(
+                    icon: "paintbrush.fill",
+                    title: "Theme",
+                    value: selectedTheme.rawValue
+                ) {
+                    SettingsOptionPickerView(
+                        title: "Theme",
+                        selection: $settingsManager.theme,
+                        options: AppTheme.allCases.map {
+                            SettingsPickerOption(value: $0.rawValue, title: $0.rawValue)
                         }
-                    }
-                    .pickerStyle(.segmented)
-                    .foregroundColor(.white)  // ALWAYS white
-
-                    Toggle("Show Ratings", isOn: $settingsManager.showRatings)
-                        .foregroundColor(.white)  // ALWAYS white
-                        .tint(Constants.Colors.accent)
-                        .listRowBackground(Constants.Colors.surface1)
-
-                    Toggle("Spoiler Protection", isOn: $settingsManager.spoilerProtection)
-                        .foregroundColor(.white)  // ALWAYS white
-                        .tint(Constants.Colors.accent)
-                        .listRowBackground(Constants.Colors.surface1)
-                } header: {
-                    Text("Interface")
-                        .foregroundColor(.white)
-                } footer: {
-                    Text("Spoiler protection hides episode thumbnails and descriptions until watched")
-                        .foregroundColor(.secondary)
+                    )
                 }
 
-                // Storage & Cache
-                Section {
-                    HStack {
-                        Text("Cache Size")
-                            .foregroundColor(.white)
-                        Spacer()
-                        Text(cacheSize)
-                            .foregroundColor(.secondary)
-                    }
+                SettingsToggleRow(
+                    icon: "star.fill",
+                    title: "Show Ratings",
+                    isOn: $settingsManager.showRatings
+                )
 
-                    Picker("Maximum Cache Size", selection: $settingsManager.cacheSize) {
-                        Text("100 MB").tag(100)
-                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("500 MB").tag(500)
-                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("1 GB").tag(1000)
-                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("2 GB").tag(2000)
-                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                        Text("5 GB").tag(5000)
-                            .foregroundColor(.white).listRowBackground(Constants.Colors.surface1)
-                    }
-                    .pickerStyle(.navigationLink)
-                    .foregroundColor(.white)  // ALWAYS white
-                    .accentColor(Constants.Colors.accent)
-                    .listRowBackground(Constants.Colors.surface1)
+                SettingsToggleRow(
+                    icon: "eye.slash.fill",
+                    title: "Spoiler Protection",
+                    isOn: $settingsManager.spoilerProtection
+                )
+            }
 
-                    Button(action: {
-                        showClearCacheAlert = true
-                    }) {
-                        HStack {
-                            Image(systemName: "trash")
-                                .foregroundColor(.red)
-                            Text("Clear Cache")
-                                .foregroundColor(.red)
+            SettingsSection("Storage", footer: "Cached images and data reduce loading time and bandwidth.") {
+                SettingsValueRow(
+                    icon: "internaldrive.fill",
+                    title: "Cache Size",
+                    value: cacheSize
+                )
+
+                SettingsPickerNavRow(
+                    icon: "tray.full.fill",
+                    title: "Maximum Cache Size",
+                    value: cacheCeilingLabel
+                ) {
+                    SettingsOptionPickerView(
+                        title: "Maximum Cache Size",
+                        selection: $settingsManager.cacheSize,
+                        options: cacheCeilingOptions.map {
+                            SettingsPickerOption(value: $0.mb, title: $0.label)
                         }
-                    }
-                } header: {
-                    Text("Storage")
-                        .foregroundColor(.white)
-                } footer: {
-                    Text("Cached images and data help reduce loading times and bandwidth usage")
-                        .foregroundColor(.secondary)
+                    )
                 }
 
-                // About
-                Section {
-                    HStack {
-                        Text("Version")
-                            .foregroundColor(.white)
-                        Spacer()
-                        Text(getAppVersion())
-                            .foregroundColor(.secondary)
-                    }
-
-                    HStack {
-                        Text("Build")
-                            .foregroundColor(.white)
-                        Spacer()
-                        Text(getBuildNumber())
-                            .foregroundColor(.secondary)
-                    }
-
-                    NavigationLink(destination: OpenSourceLicensesView()) {
-                        SettingsRowWithFocus(
-                            title: "Open Source Licenses"
-                        )
-                    }
-                    .buttonStyle(.plain)
-                } header: {
-                    Text("About")
-                        .foregroundColor(.white)
-                }
-
-                // Debug
-                Section {
-                    Button(action: {
-                        settingsManager.resetToDefaults()
-                    }) {
-                        HStack {
-                            Image(systemName: "arrow.counterclockwise")
-                                .foregroundColor(.orange)
-                            Text("Reset All Settings")
-                                .foregroundColor(.orange)
-                        }
-                    }
-                } header: {
-                    Text("Debug")
-                        .foregroundColor(.white)
-                } footer: {
-                    Text("Reset all settings to their default values")
-                        .foregroundColor(.secondary)
+                SettingsActionRow(
+                    icon: "trash.fill",
+                    title: "Clear Cache",
+                    subtitle: "Delete all cached images and data",
+                    tint: .red
+                ) {
+                    showClearCacheAlert = true
                 }
             }
-            .buttonStyle(.plain)
+
+            SettingsSection("About") {
+                SettingsValueRow(
+                    icon: "app.fill",
+                    title: "Version",
+                    value: getAppVersion()
+                )
+
+                SettingsValueRow(
+                    icon: "hammer.fill",
+                    title: "Build",
+                    value: getBuildNumber()
+                )
+
+                NavigationLink {
+                    OpenSourceLicensesView()
+                } label: {
+                    SettingsCardRow {
+                        HStack(spacing: 24) {
+                            Image(systemName: "doc.text.fill")
+                                .font(.system(size: 36))
+                                .foregroundColor(Constants.Colors.accent)
+                                .frame(width: 64, height: 64)
+
+                            Text("Open Source Licenses")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
+                                .font(.title3)
+                                .foregroundColor(.white.opacity(0.4))
+                        }
+                    }
+                }
+                .buttonStyle(.cardChrome)
+            }
+
+            SettingsSection("Debug", footer: "Restores every setting to its default value.") {
+                SettingsActionRow(
+                    icon: "arrow.counterclockwise",
+                    title: "Reset All Settings",
+                    tint: .orange
+                ) {
+                    settingsManager.resetToDefaults()
+                }
+            }
         }
-        .navigationTitle("App Settings")
-        .trackedPushedView()
         .onAppear {
             calculateCacheSize()
         }
@@ -153,7 +156,7 @@ struct AppSettingsView: View {
                 clearCache()
             }
         } message: {
-            Text("This will delete all cached images and data. This may temporarily slow down loading times.")
+            Text("This will delete all cached images and data. Loading times may briefly slow down.")
         }
     }
 
@@ -167,11 +170,10 @@ struct AppSettingsView: View {
 
     private func calculateCacheSize() {
         DispatchQueue.global(qos: .utility).async {
-            let urlCache = URLCache.shared
-            let bytes = urlCache.currentDiskUsage
-
+            let bytes = URLCache.shared.currentDiskUsage
+            let formatted = ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
             DispatchQueue.main.async {
-                cacheSize = ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+                cacheSize = formatted
             }
         }
     }
@@ -179,7 +181,6 @@ struct AppSettingsView: View {
     private func clearCache() {
         URLCache.shared.removeAllCachedResponses()
         calculateCacheSize()
-        print("✅ Cache cleared")
     }
 }
 
@@ -187,43 +188,35 @@ struct AppSettingsView: View {
 
 struct OpenSourceLicensesView: View {
     var body: some View {
-        ZStack {
-            Constants.Colors.background.ignoresSafeArea()
+        SettingsCardScreen(title: "Open Source") {
+            SettingsSection {
+                LicenseCard(
+                    name: "MediaMio",
+                    description: "Jellyfin client for Apple TV",
+                    license: "MIT License"
+                )
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 30) {
-                    LicenseSection(
-                        name: "MediaMio",
-                        description: "Jellyfin client for Apple TV",
-                        license: "MIT License"
-                    )
+                LicenseCard(
+                    name: "SwiftUI",
+                    description: "Apple's declarative UI framework",
+                    license: "Apple Software License"
+                )
 
-                    LicenseSection(
-                        name: "SwiftUI",
-                        description: "Apple's declarative UI framework",
-                        license: "Apple Software License"
-                    )
-
-                    LicenseSection(
-                        name: "AVFoundation",
-                        description: "Apple's audio/video framework",
-                        license: "Apple Software License"
-                    )
-
-                    Text("This app is built with love using SwiftUI and connects to your self-hosted Jellyfin server.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(.top, 20)
-                }
-                .padding(60)
+                LicenseCard(
+                    name: "AVFoundation",
+                    description: "Apple's audio / video framework",
+                    license: "Apple Software License"
+                )
             }
+
+            SettingsSectionFooter(
+                text: "Built with SwiftUI and connects to your self-hosted Jellyfin server."
+            )
         }
-        .navigationTitle("Open Source Licenses")
-        .trackedPushedView()
     }
 }
 
-struct LicenseSection: View {
+private struct LicenseCard: View {
     let name: String
     let description: String
     let license: String
@@ -237,13 +230,20 @@ struct LicenseSection: View {
 
             Text(description)
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundColor(.white.opacity(0.6))
 
             Text(license)
                 .font(.caption)
                 .foregroundColor(Constants.Colors.accent)
                 .padding(.top, 4)
         }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: Constants.UI.cardCornerRadius)
+                .fill(Constants.Colors.surface1)
+        )
     }
 }
 
