@@ -712,7 +712,7 @@ struct SeasonButton: View {
                 .background(isSelected ? Constants.Colors.accent : Constants.Colors.surface2)
                 .cornerRadius(8)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.cardChrome)
         .chromeFocus(isFocused: isFocused)
     }
 }
@@ -771,7 +771,7 @@ struct EpisodeCard: View {
             }
             .contentFocus(isFocused: isFocused)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.cardChrome)
     }
 }
 

@@ -48,7 +48,7 @@ struct SettingsView: View {
                                 subtitle: settingsManager.playbackSummary
                             )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.cardChrome)
                         .focused($focusedField, equals: .playback)
 
                         NavigationLink(destination: StreamingSettingsView(settingsManager: settingsManager)) {
@@ -58,7 +58,7 @@ struct SettingsView: View {
                                 subtitle: settingsManager.streamingSummary
                             )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.cardChrome)
                         .focused($focusedField, equals: .streaming)
 
                         NavigationLink(destination: SubtitleSettingsView(settingsManager: settingsManager)) {
@@ -68,7 +68,7 @@ struct SettingsView: View {
                                 subtitle: settingsManager.subtitleSummary
                             )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.cardChrome)
                         .focused($focusedField, equals: .subtitles)
 
                         NavigationLink(destination: SkipSettingsView(settingsManager: settingsManager)) {
@@ -78,7 +78,7 @@ struct SettingsView: View {
                                 subtitle: settingsManager.skipSummary
                             )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.cardChrome)
                         .focused($focusedField, equals: .skip)
 
                         NavigationLink(destination: ParentalControlsSettingsView(settingsManager: settingsManager)) {
@@ -88,7 +88,7 @@ struct SettingsView: View {
                                 subtitle: settingsManager.parentalControlsSummary
                             )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.cardChrome)
                         .focused($focusedField, equals: .parental)
                     }
 
@@ -105,7 +105,7 @@ struct SettingsView: View {
                                 subtitle: layoutSubtitle
                             )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.cardChrome)
                         .focused($focusedField, equals: .homeLayout)
 
                         NavigationLink(destination: AccountSettingsView(authService: authService, settingsManager: settingsManager)) {
@@ -115,7 +115,7 @@ struct SettingsView: View {
                                 subtitle: authService.currentSession?.user.name ?? "Not signed in"
                             )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.cardChrome)
                         .focused($focusedField, equals: .account)
 
                         NavigationLink(destination: AppSettingsView(settingsManager: settingsManager)) {
@@ -125,7 +125,7 @@ struct SettingsView: View {
                                 subtitle: "Interface, storage, and more"
                             )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.cardChrome)
                         .focused($focusedField, equals: .app)
                     }
                 }

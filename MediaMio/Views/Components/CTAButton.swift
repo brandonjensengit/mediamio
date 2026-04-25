@@ -65,7 +65,7 @@ struct CTAButton: View {
             .background(style.backgroundColor)
             .cornerRadius(Constants.UI.cornerRadius)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.cardChrome)
         .chromeFocus()
     }
 }

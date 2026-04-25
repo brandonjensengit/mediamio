@@ -406,7 +406,7 @@ struct HeroBannerButton: View {
         Button(action: action) {
             HeroBannerButtonLabel(title: title, icon: icon, style: style)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.cardChrome)
         .onChange(of: isFocused) { focused in
             onFocusChange?(focused)
         }

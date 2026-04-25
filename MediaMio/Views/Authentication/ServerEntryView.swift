@@ -8,9 +8,22 @@
 import SwiftUI
 
 struct ServerEntryView: View {
+    /// Two presentation contexts:
+    ///   - `.initial` — the unauth root gate. Shows the saved-profiles list
+    ///     so a returning user can tap their tile.
+    ///   - `.addServer` — pushed inside Settings while a session is active.
+    ///     Saved profiles are hidden (the Account screen already lists them);
+    ///     header copy reframes the screen as "add another server."
+    enum Mode {
+        case initial
+        case addServer
+    }
+
     @EnvironmentObject var authService: AuthenticationService
     @EnvironmentObject var savedServers: SavedServersStore
     @StateObject private var discovery = ServerDiscoveryService()
+
+    let mode: Mode
 
     @State private var showingLogin = false
     @State private var serverURL: String = ""
@@ -19,8 +32,14 @@ struct ServerEntryView: View {
     @State private var serverInfo: ServerInfo? = nil
     @State private var isConnected: Bool = false
 
-    init() {
-        if let lastURL = UserDefaults.standard.string(forKey: Constants.UserDefaultsKeys.lastServerURL) {
+    init(mode: Mode = .initial) {
+        self.mode = mode
+
+        // Pre-fill the URL field on the initial gate only. In add-server mode
+        // we want a clean field — the user is explicitly reaching for a
+        // different host than the one they're already signed in to.
+        if mode == .initial,
+           let lastURL = UserDefaults.standard.string(forKey: Constants.UserDefaultsKeys.lastServerURL) {
             _serverURL = State(initialValue: lastURL)
         }
     }
@@ -107,9 +126,9 @@ struct ServerEntryView: View {
         // `play.rectangle.fill` SF glyph + "Premium Jellyfin Client"
         // subtitle — the wordmark is the brand; the tagline was noise.
         VStack(spacing: 14) {
-            GloxxWordmark(size: 88)
+            GloxxWordmark(size: mode == .initial ? 88 : 64)
 
-            Text("Sign in to your server")
+            Text(mode == .initial ? "Sign in to your server" : "Add another server")
                 .font(.title3)
                 .foregroundColor(.white.opacity(0.55))
         }
@@ -120,7 +139,11 @@ struct ServerEntryView: View {
 
     @ViewBuilder
     private var savedProfilesSection: some View {
-        if !savedProfiles.isEmpty {
+        // The Account settings screen already enumerates saved profiles,
+        // so suppress this list when we're presented as an "Add another
+        // server" sub-screen — duplicating it would just be a round-trip
+        // back to where the user came from.
+        if mode == .initial, !savedProfiles.isEmpty {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(spacing: 12) {
                     Image(systemName: "person.2.fill")
@@ -174,7 +197,11 @@ struct ServerEntryView: View {
     private var manualEntrySection: some View {
         VStack(spacing: 30) {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Or Enter Server Address")
+                // The "Or" framing only makes sense in `.initial` mode where
+                // a saved-profiles or discovered-servers list sits above
+                // this field. In add-server mode this is the only entry
+                // point on screen, so the prefix would be a non-sequitur.
+                Text(mode == .initial ? "Or Enter Server Address" : "Server Address")
                     .font(.title3)
                     .foregroundColor(.secondary)
 
@@ -316,7 +343,7 @@ private struct SavedProfileRow: View {
             .cornerRadius(Constants.UI.cornerRadius)
             .chromeFocus(isFocused: envFocused)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.cardChrome)
     }
 }
 
@@ -355,7 +382,7 @@ private struct DiscoveredServerRow: View {
             .cornerRadius(Constants.UI.cornerRadius)
             .chromeFocus(isFocused: envFocused)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.cardChrome)
     }
 }
 

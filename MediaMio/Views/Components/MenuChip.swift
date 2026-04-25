@@ -49,7 +49,7 @@ struct MenuChip: View {
             .background(Constants.Colors.surface1)
             .cornerRadius(10)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.cardChrome)
         .chromeFocus()
     }
 }

@@ -331,7 +331,7 @@ struct RecentSearchRow: View {
                 .cornerRadius(Constants.UI.cornerRadius)
                 .chromeFocus(isFocused: isFocused)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.cardChrome)
 
             Button {
                 onRemove()

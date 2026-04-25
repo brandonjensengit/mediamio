@@ -81,7 +81,7 @@ private struct ChapterTile: View {
             }
             .contentFocus(isFocused: hasFocus)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.cardChrome)
         .focused($hasFocus)
     }
 

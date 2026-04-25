@@ -78,6 +78,31 @@ private struct ContentFocusEnvironmentModifier: ViewModifier {
     }
 }
 
+// MARK: - Card button style
+//
+// `.buttonStyle(.plain)` looks suppressed but tvOS still paints a tinted
+// fill behind the label on focus — visible as a lighter halo bleeding
+// around any rounded background fills inside the label (most obvious on
+// our settings rows where the card uses `surface3` and the system fill
+// is one shade brighter). `.focusEffectDisabled()` doesn't reach it
+// because the fill lives inside the ButtonStyle, not the focus-effect
+// API. This style returns the label untouched, so our `chromeFocus()` /
+// `contentFocus()` modifiers are the only focus chrome on screen.
+
+struct CardChromeButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+    }
+}
+
+extension ButtonStyle where Self == CardChromeButtonStyle {
+    /// Use on every `Button` / `NavigationLink` whose label already owns
+    /// its focus visuals via `chromeFocus()` or `contentFocus()`. Replaces
+    /// `.buttonStyle(.plain)` at those callsites — `.plain` leaks a system
+    /// focus fill that's incompatible with our card chrome.
+    static var cardChrome: CardChromeButtonStyle { CardChromeButtonStyle() }
+}
+
 // MARK: - View sugar
 
 extension View {

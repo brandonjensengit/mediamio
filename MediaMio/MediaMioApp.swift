@@ -35,7 +35,14 @@ struct MediaMioApp: App {
                 // Main app loads in background
                 Group {
                     if authService.isAuthenticated {
+                        // Keying on (serverURL, userId) forces MainTabView to
+                        // remount when the user switches accounts/servers from
+                        // Settings. That throws away the prior session's
+                        // HomeViewModel / SearchViewModel state — otherwise the
+                        // user would see the previous server's shelves bleed
+                        // through until each VM was manually reset.
                         MainTabView(env: appEnv, appState: appState)
+                            .id(authService.currentSession.map { "\($0.serverURL)|\($0.user.id)" } ?? "anon")
                     } else {
                         ServerEntryView()
                     }
