@@ -9,6 +9,15 @@ import Foundation
 import Combine
 import UIKit
 
+extension Notification.Name {
+    /// Posted by `JellyfinAPIClient` when any request returns 401. The
+    /// in-memory access token has been cleared by the time observers fire,
+    /// so concurrent in-flight requests don't keep hammering the server
+    /// with the just-revoked token. `AuthenticationService` observes this
+    /// to forget the saved profile and bounce the user to the picker.
+    static let jellyfinSessionExpired = Notification.Name("JellyfinSessionExpired")
+}
+
 @MainActor
 class JellyfinAPIClient: ObservableObject {
     @Published var baseURL: String = ""
@@ -202,6 +211,20 @@ class JellyfinAPIClient: ObservableObject {
                 break
             case 401:
                 print("❌ Authentication failed (401)")
+                // Clear the token *before* notifying so any in-flight retries
+                // or concurrent requests see an empty token and don't pile up
+                // additional 401s. Only post the notification on the first
+                // 401 (when the token was actually populated) — subsequent
+                // in-flight 401s see `accessToken == ""` and skip the post,
+                // keeping the observer side idempotent in practice.
+                let hadToken = !accessToken.isEmpty
+                accessToken = ""
+                if hadToken {
+                    NotificationCenter.default.post(
+                        name: .jellyfinSessionExpired,
+                        object: nil
+                    )
+                }
                 throw APIError.authenticationFailed
             default:
                 print("❌ HTTP error: \(httpResponse.statusCode)")

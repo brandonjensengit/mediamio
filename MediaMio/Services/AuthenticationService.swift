@@ -33,8 +33,37 @@ class AuthenticationService: ObservableObject {
         // first launch after the upgrade, so users don't get signed out.
         store.migrateLegacySingleBlobIfNeeded()
 
+        // Watch for 401 from any downstream request. The audit's "trust
+        // keychain on warm launch" path relies on this observer to catch
+        // server-side-revoked tokens at first-request time instead of at
+        // sign-in time (we no longer pre-validate via /Users/{id}).
+        // Lifetime: same as the service (no removeObserver in deinit —
+        // this is a singleton owned by `MediaMioApp` for the app lifetime).
+        NotificationCenter.default.addObserver(
+            forName: .jellyfinSessionExpired,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.handleSessionExpired()
+            }
+        }
+
         // Try to restore session from keychain
         restoreSession()
+    }
+
+    /// Server-side token revocation handler. Forgets the current saved
+    /// profile (so the picker doesn't auto-retry the dead token) then
+    /// drops the in-memory session — `isAuthenticated = false` flips the
+    /// app-root `Group` over to `ServerEntryView`. Idempotent: a flurry
+    /// of concurrent in-flight 401s on the same dead token only causes
+    /// one effective sign-out because subsequent calls find
+    /// `currentSession == nil` and return early.
+    private func handleSessionExpired() {
+        guard let session = currentSession else { return }
+        savedServers.forget(serverURL: session.serverURL, userId: session.user.id)
+        clearSession()
     }
 
     // MARK: - Session Management
@@ -169,15 +198,13 @@ class AuthenticationService: ObservableObject {
 
     /// Reuse a stored (server, user) access token to skip the password
     /// prompt. Called when the user taps an entry in the saved-profiles
-    /// picker — the stored token is validated against `GET /Users/{id}`
-    /// before we flip `isAuthenticated`, so a silently-revoked token can't
-    /// leave the app in a "signed in" state that blows up on every
-    /// subsequent request.
-    ///
-    /// On `APIError.authenticationFailed` (401), the stored token is
-    /// cleared — it's been revoked server-side and would only keep failing.
-    /// Other errors (network, server unreachable) leave the token alone so
-    /// the user can retry without losing their profile.
+    /// picker. Trusts the keychain — no `GET /Users/{id}` pre-validation.
+    /// If the token has been revoked server-side, the first downstream
+    /// request will return 401, `JellyfinAPIClient` will post
+    /// `.jellyfinSessionExpired`, and `handleSessionExpired` will forget
+    /// the saved profile and route the user back to the picker. Trade-off:
+    /// ~200–400ms of empty shelves before sign-out fires, in exchange for
+    /// saving one RTT on every warm launch (audit Finding 9).
     func signInWithSavedToken(server: SavedServer, user: SavedUser) async throws {
         guard let token = savedServers.token(for: server, user: user) else {
             throw APIError.authenticationFailed
@@ -185,26 +212,29 @@ class AuthenticationService: ObservableObject {
 
         apiClient.configure(baseURL: server.url, accessToken: token)
 
-        do {
-            let freshUser = try await apiClient.getCurrentUser(userId: user.id)
+        // Build the User from saved data (no roundtrip). `serverId` is left
+        // empty — matches `restoreSession()`, which has the same constraint
+        // (we don't have it cached locally; downstream code that needs it
+        // reads `currentSession.serverId` only for telemetry today).
+        let userModel = User(
+            id: user.id,
+            name: user.name,
+            serverId: "",
+            hasPassword: true,
+            hasConfiguredPassword: true
+        )
 
-            let session = UserSession(
-                user: freshUser,
-                accessToken: token,
-                serverURL: server.url,
-                serverId: freshUser.serverId
-            )
+        let session = UserSession(
+            user: userModel,
+            accessToken: token,
+            serverURL: server.url,
+            serverId: ""
+        )
 
-            // `saveSession` rewrites the legacy single-blob Keychain slot
-            // so a subsequent launch's `restoreSession()` still finds this
-            // user. It also bumps the `lastUsedAt` timestamps in the store.
-            try saveSession(session, rememberMe: true, serverName: server.name)
-        } catch APIError.authenticationFailed {
-            // Token is no longer valid on the server — drop it so the user
-            // gets cleanly bounced to the password prompt next time.
-            savedServers.forget(serverURL: server.url, userId: user.id)
-            throw APIError.authenticationFailed
-        }
+        // `saveSession` rewrites the legacy single-blob Keychain slot
+        // so a subsequent launch's `restoreSession()` still finds this
+        // user. It also bumps the `lastUsedAt` timestamps in the store.
+        try saveSession(session, rememberMe: true, serverName: server.name)
     }
 
     // MARK: - Quick Connect

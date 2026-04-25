@@ -4,16 +4,17 @@
 //
 //  Created by Claude Code
 //
-//  Phase 2 / Item B — 16:9 landscape tile for the Continue Watching shelf.
-//  PosterCard stays for discovery shelves (movies, libraries) where the
-//  2:3 keyart is the right language; this card is the streaming-app
-//  idiom for "resume where you left off". Jellyfin gives us the 16:9
-//  still via `MediaItem.landscapeImageURL`; the 4pt progress bar across
-//  the bottom matches Apple TV / Netflix / Disney+ conventions.
+//  16:9 landscape tile for the Continue Watching shelf. PosterCard stays
+//  for discovery shelves (movies, libraries) where the 2:3 keyart is the
+//  right language; this card is the streaming-app idiom for "resume where
+//  you left off". Jellyfin gives us the 16:9 still via
+//  `MediaItem.landscapeImageURL`; the 4pt progress bar across the bottom
+//  matches Apple TV / Netflix / Disney+ conventions.
 //
-//  Phase 2 / Item F: wraps the tile in a `Button(.card)` so the native
-//  tvOS focus lift + parallax + specular shine replace our hand-rolled
-//  scale/shadow tier. Same long-press context menu as PosterCard.
+//  Same focus-chrome trade-off as PosterCard: `.focusable() + .onTapGesture`
+//  (no `Button` wrapper) to avoid the plain-button focused-state background
+//  fill, at the cost of the free `.card` parallax/shine. See PosterCard's
+//  docstring for the rationale.
 //
 
 import SwiftUI

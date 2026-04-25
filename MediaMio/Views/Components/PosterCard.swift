@@ -9,14 +9,17 @@ import SwiftUI
 
 /// Poster card component for displaying media items with tvOS focus effects.
 ///
-/// Phase 2 / Item F: wrapped in a `Button` with `.buttonStyle(.card)` so the
-/// native tvOS focus lift + parallax + specular shine kicks in for free.
-/// Replaces the previous `.focusable() + .onTapGesture` pattern, which
-/// bypassed every one of those free affordances.
+/// Uses `.focusable() + .focused() + .onTapGesture` (no `Button` wrapper) so
+/// tvOS doesn't draw the plain-button focused-state background fill that
+/// `.focusEffectDisabled()` cannot reach (the fill lives inside the button
+/// style, not the focus-effect API). The trade-off is giving up the free
+/// `.card` parallax + specular shine — getting both (free chrome AND no
+/// background fill) would need a `UIViewRepresentable` wrapping a UIKit
+/// `UIButton.Configuration` set to `.card`, which is its own investigation.
 ///
 /// `onContextAction` is optional — when nil, the long-press menu is empty
 /// and tvOS skips it. Home wires a handler; Library / Search / Detail pass
-/// nil until their own Phase-F polish lands.
+/// nil by design.
 struct PosterCard: View {
     let item: MediaItem
     let baseURL: String
