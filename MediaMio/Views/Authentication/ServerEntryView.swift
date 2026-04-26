@@ -79,11 +79,17 @@ struct ServerEntryView: View {
         // LoginView's on-screen Back / Use Quick Connect buttons to behave
         // unpredictably when ServerEntryView itself was already inside a
         // NavigationLink push (the Settings → Account → Add Server path).
+        //
+        // We pass `onBack` explicitly so LoginView's Back button can flip
+        // *our* `showingLogin` binding directly. `\.dismiss` from inside
+        // LoginView resolves to an ambiguous scope on tvOS 18 when the
+        // LoginView is itself a navigationDestination of a pushed parent.
         .navigationDestination(isPresented: $showingLogin) {
             if let serverInfo = serverInfo {
                 LoginView(
                     serverURL: serverURL,
-                    serverName: serverInfo.serverName
+                    serverName: serverInfo.serverName,
+                    onBack: { showingLogin = false }
                 )
                 .environmentObject(authService)
             } else {
