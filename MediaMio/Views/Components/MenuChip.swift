@@ -33,23 +33,40 @@ struct MenuChip: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
-                if let leadingIcon {
-                    Image(systemName: leadingIcon)
-                }
-                Text(title)
-                if let trailingIcon {
-                    Image(systemName: trailingIcon)
-                }
-            }
-            .font(.headline)
-            .foregroundColor(.white)
-            .padding(.horizontal, 24)
-            .padding(.vertical, 12)
-            .background(Constants.Colors.surface1)
-            .cornerRadius(10)
+            // chromeFocus must run INSIDE the button label so it can read
+            // `@Environment(\.isFocused)` for the focused Button. Outside
+            // the Button it reads the parent layout context (always false).
+            MenuChipLabel(
+                title: title,
+                leadingIcon: leadingIcon,
+                trailingIcon: trailingIcon
+            )
         }
         .buttonStyle(.cardChrome)
+    }
+}
+
+private struct MenuChipLabel: View {
+    let title: String
+    let leadingIcon: String?
+    let trailingIcon: String?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            if let leadingIcon {
+                Image(systemName: leadingIcon)
+            }
+            Text(title)
+            if let trailingIcon {
+                Image(systemName: trailingIcon)
+            }
+        }
+        .font(.headline)
+        .foregroundColor(.white)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 12)
+        .background(Constants.Colors.surface1)
+        .cornerRadius(10)
         .chromeFocus()
     }
 }

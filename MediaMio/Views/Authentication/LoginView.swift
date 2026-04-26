@@ -237,20 +237,30 @@ private struct QuickConnectNavLink: View {
             QuickConnectView(serverURL: serverURL, rememberMe: rememberMe, serverName: serverName)
                 .environmentObject(authService)
         } label: {
-            HStack(spacing: 12) {
-                Text("Use Quick Connect")
-            }
-            .font(.title2)
-            .fontWeight(.semibold)
-            .foregroundColor(isEnabled ? .white : .white.opacity(0.4))
-            .frame(maxWidth: .infinity)
-            .frame(height: Constants.UI.buttonHeight)
-            .background(Constants.Colors.surface2)
-            .cornerRadius(Constants.UI.cornerRadius)
+            // chromeFocus inside the label so it reads the
+            // NavigationLink's focus state via @Environment(\.isFocused).
+            QuickConnectLinkLabel(isEnabled: isEnabled)
         }
         .buttonStyle(.cardChrome)
-        .chromeFocus()
         .disabled(!isEnabled)
+    }
+}
+
+private struct QuickConnectLinkLabel: View {
+    let isEnabled: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text("Use Quick Connect")
+        }
+        .font(.title2)
+        .fontWeight(.semibold)
+        .foregroundColor(isEnabled ? .white : .white.opacity(0.4))
+        .frame(maxWidth: .infinity)
+        .frame(height: Constants.UI.buttonHeight)
+        .background(Constants.Colors.surface2)
+        .cornerRadius(Constants.UI.cornerRadius)
+        .chromeFocus()
     }
 }
 

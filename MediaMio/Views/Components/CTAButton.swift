@@ -51,21 +51,38 @@ struct CTAButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
-                if let icon {
-                    Image(systemName: icon)
-                }
-                Text(title)
-            }
-            .font(.title2)
-            .fontWeight(.semibold)
-            .foregroundColor(style.foregroundColor)
-            .frame(maxWidth: .infinity)
-            .frame(height: Constants.UI.buttonHeight)
-            .background(style.backgroundColor)
-            .cornerRadius(Constants.UI.cornerRadius)
+            // chromeFocus must live INSIDE the button label — `@Environment(\.isFocused)`
+            // is set on descendants of the focusable Button, not on its ancestors.
+            // Placed outside `.buttonStyle(...)` it reads the parent context's
+            // focus (always false on a layout view), so the scale/lift/shadow
+            // never fired and the button looked identical focused vs unfocused.
+            CTAButtonLabel(title: title, icon: icon, style: style)
         }
         .buttonStyle(.cardChrome)
+    }
+}
+
+/// Extracted so `chromeFocus()` runs inside the button label and reads
+/// the Button's focus state via `@Environment(\.isFocused)`.
+private struct CTAButtonLabel: View {
+    let title: String
+    let icon: String?
+    let style: CTAButton.Style
+
+    var body: some View {
+        HStack(spacing: 12) {
+            if let icon {
+                Image(systemName: icon)
+            }
+            Text(title)
+        }
+        .font(.title2)
+        .fontWeight(.semibold)
+        .foregroundColor(style.foregroundColor)
+        .frame(maxWidth: .infinity)
+        .frame(height: Constants.UI.buttonHeight)
+        .background(style.backgroundColor)
+        .cornerRadius(Constants.UI.cornerRadius)
         .chromeFocus()
     }
 }
