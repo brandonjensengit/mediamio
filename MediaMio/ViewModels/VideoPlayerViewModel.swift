@@ -356,13 +356,10 @@ final class VideoPlayerViewModel: ObservableObject {
         DebugLog.playback("🔄 Retrying playback with transcode mode...")
         cleanupAVResources()
 
-        // Build a transcode-only URL. Reuse PlaybackStreamURLBuilder by
-        // forcing the streaming-mode setting up the call chain isn't
-        // possible without mutating user settings, so we build the URL
-        // directly here using the same parameters the builder would use in
-        // the .transcode arm. Cheapest correct path: re-run the builder —
-        // it will pick transcode again because we've already fallen through
-        // direct play / direct stream / remux.
+        // The builder is stateless — calling `build()` again would just
+        // produce the same Remux/DirectStream URL the failover already
+        // rejected. `buildForcedTranscode()` is the explicit
+        // bypass-bestMode path for runtime fallback.
         let builder = PlaybackStreamURLBuilder(
             item: item,
             baseURL: baseURL,
@@ -370,7 +367,7 @@ final class VideoPlayerViewModel: ObservableObject {
             deviceId: getDeviceId(),
             settingsManager: settingsManager
         )
-        guard let result = builder.build() else {
+        guard let result = builder.buildForcedTranscode() else {
             errorMessage = "Failed to retry playback"
             return
         }

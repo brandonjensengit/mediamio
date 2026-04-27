@@ -81,6 +81,19 @@ struct PlaybackStreamURLBuilder {
         }
     }
 
+    /// Skip the bestMode auto-pick and produce a transcode URL directly.
+    /// Used by the failover path: when a DirectPlay/Stream/Remux attempt
+    /// got AVPlayer to `.readyToPlay` but couldn't actually decode video,
+    /// re-running `build()` produces the same failing URL because the
+    /// builder is stateless and still sees the source as remux-eligible.
+    /// This entry point is the only safe way to force transcode at runtime
+    /// without mutating user settings.
+    func buildForcedTranscode() -> Result? {
+        print("🔁 Forcing transcode mode (failover override)")
+        guard let url = buildTranscodeURL() else { return nil }
+        return Result(url: url, mode: .transcode)
+    }
+
     // MARK: - Mode dispatchers
 
     private func buildAuto(bestMode: PlaybackMode, fileSizeGB: Double) -> Result? {

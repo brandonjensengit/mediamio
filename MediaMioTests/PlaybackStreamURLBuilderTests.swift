@@ -278,4 +278,34 @@ struct PlaybackStreamURLBuilderTests {
         let q2 = Self.queryItems(builder.build()!.url)
         #expect(q1["PlaySessionId"] != q2["PlaySessionId"])
     }
+
+    // MARK: - Forced transcode (failover override)
+
+    @Test func buildForcedTranscode_overridesAutoBestModePick() {
+        // The exact bug this guards against: an HEVC/MKV source the
+        // builder would otherwise route to Remux (which would silently
+        // black-screen due to HEVC-in-MPEG-TS HLS) must, when
+        // `buildForcedTranscode` is called, produce a transcode URL
+        // regardless of the auto verdict. Before this method existed,
+        // `retryWithTranscode` re-ran `build()` and got the same Remux
+        // URL back, defeating the failover.
+        let item = Self.makeItem(container: "mkv", videoCodec: "hevc", audioCodec: "eac3")
+        let builder = Self.makeBuilder(item: item, streamingMode: .auto)
+
+        // Sanity: confirm `build()` would otherwise pick Remux.
+        #expect(builder.build()?.mode == .remux)
+
+        guard let result = builder.buildForcedTranscode() else {
+            Issue.record("buildForcedTranscode returned nil")
+            return
+        }
+        let q = Self.queryItems(result.url)
+
+        #expect(result.mode == .transcode)
+        // Transcode contract: a real video codec (not "copy"), explicit
+        // bitrate, and the encode-style subtitle method.
+        #expect(q["VideoCodec"] != "copy")
+        #expect(q["VideoBitrate"] != nil)
+        #expect(q["SubtitleMethod"] == "Encode")
+    }
 }

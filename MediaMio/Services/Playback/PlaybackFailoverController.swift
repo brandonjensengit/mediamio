@@ -16,15 +16,22 @@
 //
 //    1. `playerItem.status == .failed`        → fallback immediately
 //    2. `failedToPlayToEndTimeNotification`   → fallback immediately
-//    3. `playerItem.status == .readyToPlay`   → cancel; we're fine
-//    4. Watchdog (15s) ONLY fires if status is still `.unknown` AND
+//    3. `playerItem.status == .readyToPlay`   AND a video track is present
+//                                              → cancel; we're fine
+//    4. `playerItem.status == .readyToPlay`   AND no video track 3s later
+//                                              → fallback (silent video
+//       decode failure — e.g. HEVC packaged in MPEG-TS HLS, which AVPlayer
+//       accepts as `.readyToPlay` but cannot actually render. Audio plays,
+//       black screen. Caught by `tracks.assetTrack.mediaType` having no
+//       `.video` entry.)
+//    5. Watchdog (15s) ONLY fires if status is still `.unknown` AND
 //       buffer is empty AND not likely to keep up — the genuinely-stuck
 //       case the old timer was actually trying to catch.
 //
 //  Constraint: this controller only handles **initial-load** failover. Once
-//  playback has reached `.readyToPlay`, mid-playback errors are the
-//  orchestrator's problem (and a separate UX — you can't silently restart
-//  a viewing session under the user).
+//  playback has reached `.readyToPlay` AND a video track is confirmed,
+//  mid-playback errors are the orchestrator's problem (and a separate UX —
+//  you can't silently restart a viewing session under the user).
 //
 
 import AVFoundation
@@ -44,6 +51,16 @@ final class PlaybackFailoverController {
         let watchdogElapsed: Bool
         let currentMode: PlaybackMode?
         let hasFallbackAttempted: Bool
+        /// True iff `playerItem.tracks` contains an enabled track with
+        /// `assetTrack.mediaType == .video`. Used to detect the silent
+        /// HEVC-in-MPEG-TS HLS failure where status reaches `.readyToPlay`
+        /// but the video plane never receives frames.
+        let hasVideoTrack: Bool
+        /// Set by `schedulePostReadyCheck`. Distinct from `watchdogElapsed`
+        /// (which is the long initial-load watchdog) so the decision
+        /// function can tell "we're checking too early, keep waiting" from
+        /// "we waited and still no video, pull the plug."
+        let postReadyWatchdogElapsed: Bool
     }
 
     enum Decision: Equatable {
@@ -60,7 +77,14 @@ final class PlaybackFailoverController {
     /// emits .failed but is also never going to play" case.
     static let watchdogSeconds: TimeInterval = 15
 
+    /// How long to wait after `.readyToPlay` for a video track to appear
+    /// before declaring this a silent-decode failure. AVPlayer normally
+    /// populates `playerItem.tracks` synchronously with the readyToPlay
+    /// flip; 3 seconds is grace for HLS variant selection on slow networks.
+    static let postReadyWatchdogSeconds: TimeInterval = 3
+
     private var fallbackCheckTask: Task<Void, Never>?
+    private var postReadyCheckTask: Task<Void, Never>?
     private var statusSubscription: AnyCancellable?
     private var errorSubscription: AnyCancellable?
     private var hasFallbackAttempted: Bool = false
@@ -79,7 +103,10 @@ final class PlaybackFailoverController {
         print("🛡️ Failover armed (mode: \(currentMode?.rawValue ?? "unknown"))")
 
         // Status flips cover the fast path: .failed fires within milliseconds
-        // for 404 / codec errors / malformed manifests.
+        // for 404 / codec errors / malformed manifests. On `.readyToPlay`,
+        // we DON'T immediately cancel — we evaluate (which checks for a
+        // video track) and, if tracks haven't populated yet, schedule the
+        // post-ready check.
         statusSubscription = playerItem.publisher(for: \.status)
             .receive(on: DispatchQueue.main)
             .sink { [weak self, weak playerItem] status in
@@ -87,9 +114,10 @@ final class PlaybackFailoverController {
                 self.evaluate(playerItem: item,
                               hasErrorNotification: false,
                               watchdogElapsed: false,
+                              postReadyWatchdogElapsed: false,
                               onFallback: onFallback)
                 if status == .readyToPlay {
-                    self.cancel()
+                    self.schedulePostReadyCheck(playerItem: item, onFallback: onFallback)
                 }
             }
 
@@ -104,6 +132,7 @@ final class PlaybackFailoverController {
                 self.evaluate(playerItem: item,
                               hasErrorNotification: true,
                               watchdogElapsed: false,
+                              postReadyWatchdogElapsed: false,
                               onFallback: onFallback)
             }
 
@@ -117,6 +146,28 @@ final class PlaybackFailoverController {
             self.evaluate(playerItem: item,
                           hasErrorNotification: false,
                           watchdogElapsed: true,
+                          postReadyWatchdogElapsed: false,
+                          onFallback: onFallback)
+        }
+    }
+
+    /// Scheduled when status flips to `.readyToPlay` but tracks haven't yet
+    /// confirmed a video stream. If video shows up before this fires, the
+    /// next `evaluate()` cycle will hit standDown and cancel us. If 3
+    /// seconds pass with no video track, the silent-decode-failure fallback
+    /// kicks in.
+    private func schedulePostReadyCheck(playerItem: AVPlayerItem,
+                                        onFallback: @escaping () async -> Void) {
+        postReadyCheckTask?.cancel()
+        postReadyCheckTask = Task { @MainActor [weak self, weak playerItem] in
+            try? await Task.sleep(nanoseconds: UInt64(Self.postReadyWatchdogSeconds * 1_000_000_000))
+            guard let self = self,
+                  let item = playerItem,
+                  !Task.isCancelled else { return }
+            self.evaluate(playerItem: item,
+                          hasErrorNotification: false,
+                          watchdogElapsed: false,
+                          postReadyWatchdogElapsed: true,
                           onFallback: onFallback)
         }
     }
@@ -124,6 +175,8 @@ final class PlaybackFailoverController {
     func cancel() {
         fallbackCheckTask?.cancel()
         fallbackCheckTask = nil
+        postReadyCheckTask?.cancel()
+        postReadyCheckTask = nil
         statusSubscription = nil
         errorSubscription = nil
     }
@@ -137,7 +190,16 @@ final class PlaybackFailoverController {
         if snapshot.status == .failed { return .fallback }
         if snapshot.hasErrorNotification { return .fallback }
 
-        if snapshot.status == .readyToPlay { return .standDown }
+        if snapshot.status == .readyToPlay {
+            // The healthy case: we have a real video track, we're done.
+            if snapshot.hasVideoTrack { return .standDown }
+            // The silent-decode-failure case: status said ready, audio is
+            // probably playing, but no video track ever materialised.
+            if snapshot.postReadyWatchdogElapsed { return .fallback }
+            // Tracks haven't populated yet; the post-ready check is in
+            // flight. Don't decide yet.
+            return .wait
+        }
 
         // Genuinely stuck: timer elapsed, buffer empty, player isn't
         // expecting to keep up. (`isPlaybackLikelyToKeepUp` is AVFoundation's
@@ -159,7 +221,12 @@ final class PlaybackFailoverController {
     private func evaluate(playerItem: AVPlayerItem,
                           hasErrorNotification: Bool,
                           watchdogElapsed: Bool,
+                          postReadyWatchdogElapsed: Bool,
                           onFallback: @escaping () async -> Void) {
+        let hasVideoTrack = playerItem.tracks.contains {
+            $0.assetTrack?.mediaType == .video
+        }
+
         let snapshot = Snapshot(
             status: playerItem.status,
             hasErrorNotification: hasErrorNotification,
@@ -167,12 +234,14 @@ final class PlaybackFailoverController {
             isPlaybackLikelyToKeepUp: playerItem.isPlaybackLikelyToKeepUp,
             watchdogElapsed: watchdogElapsed,
             currentMode: currentMode,
-            hasFallbackAttempted: hasFallbackAttempted
+            hasFallbackAttempted: hasFallbackAttempted,
+            hasVideoTrack: hasVideoTrack,
+            postReadyWatchdogElapsed: postReadyWatchdogElapsed
         )
 
         switch Self.decide(snapshot) {
         case .fallback:
-            print("🔄 Failover triggered (status: \(playerItem.status.rawValue), errorNotif: \(hasErrorNotification), watchdog: \(watchdogElapsed))")
+            print("🔄 Failover triggered (status: \(playerItem.status.rawValue), errorNotif: \(hasErrorNotification), watchdog: \(watchdogElapsed), postReadyWatchdog: \(postReadyWatchdogElapsed), hasVideoTrack: \(hasVideoTrack))")
             hasFallbackAttempted = true
             // Cancel observers up-front so a late-arriving signal doesn't
             // call onFallback again before the guard above takes effect.
@@ -180,10 +249,20 @@ final class PlaybackFailoverController {
             errorSubscription = nil
             fallbackCheckTask?.cancel()
             fallbackCheckTask = nil
+            postReadyCheckTask?.cancel()
+            postReadyCheckTask = nil
             Task { @MainActor in
                 await onFallback()
             }
-        case .standDown, .wait:
+        case .standDown:
+            // Healthy `.readyToPlay` with a real video track is the
+            // definitive "we're done watching" state. Tear everything
+            // down so a late status flip or notification can't reopen
+            // the failover path.
+            if snapshot.status == .readyToPlay && snapshot.hasVideoTrack {
+                cancel()
+            }
+        case .wait:
             break
         }
     }

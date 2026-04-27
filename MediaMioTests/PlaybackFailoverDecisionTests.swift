@@ -30,7 +30,9 @@ struct PlaybackFailoverDecisionTests {
         likelyToKeepUp: Bool = false,
         watchdogElapsed: Bool = false,
         mode: PlaybackMode? = .directPlay,
-        attempted: Bool = false
+        attempted: Bool = false,
+        hasVideoTrack: Bool = true,
+        postReadyWatchdogElapsed: Bool = false
     ) -> PlaybackFailoverController.Snapshot {
         .init(
             status: status,
@@ -39,7 +41,9 @@ struct PlaybackFailoverDecisionTests {
             isPlaybackLikelyToKeepUp: likelyToKeepUp,
             watchdogElapsed: watchdogElapsed,
             currentMode: mode,
-            hasFallbackAttempted: attempted
+            hasFallbackAttempted: attempted,
+            hasVideoTrack: hasVideoTrack,
+            postReadyWatchdogElapsed: postReadyWatchdogElapsed
         )
     }
 
@@ -57,9 +61,9 @@ struct PlaybackFailoverDecisionTests {
         #expect(PlaybackFailoverController.decide(s) == .standDown)
     }
 
-    @Test("readyToPlay always stands down")
-    func standsDownOnReadyToPlay() {
-        let s = snapshot(status: .readyToPlay, mode: .directPlay)
+    @Test("readyToPlay with a video track stands down — the healthy case")
+    func standsDownOnReadyToPlayWithVideoTrack() {
+        let s = snapshot(status: .readyToPlay, mode: .directPlay, hasVideoTrack: true)
         #expect(PlaybackFailoverController.decide(s) == .standDown)
     }
 
@@ -144,6 +148,54 @@ struct PlaybackFailoverDecisionTests {
                          likelyToKeepUp: false,
                          watchdogElapsed: true,
                          mode: .transcode)
+        #expect(PlaybackFailoverController.decide(s) == .standDown)
+    }
+
+    // MARK: - Silent video-decode failure (HEVC-in-MPEG-TS HLS)
+
+    @Test("readyToPlay with no video track — keep waiting until post-ready watchdog elapses")
+    func waitsForPostReadyWhenVideoTrackMissing() {
+        let s = snapshot(status: .readyToPlay,
+                         mode: .remux,
+                         hasVideoTrack: false,
+                         postReadyWatchdogElapsed: false)
+        #expect(PlaybackFailoverController.decide(s) == .wait)
+    }
+
+    @Test("readyToPlay with no video track AND post-ready watchdog elapsed → fallback (silent decode failure)")
+    func fallsBackOnPostReadyWithoutVideoTrack() {
+        let s = snapshot(status: .readyToPlay,
+                         mode: .remux,
+                         hasVideoTrack: false,
+                         postReadyWatchdogElapsed: true)
+        #expect(PlaybackFailoverController.decide(s) == .fallback)
+    }
+
+    @Test("readyToPlay with video track AND post-ready watchdog elapsed → still stand down")
+    func videoTrackPresentBeatsPostReadyWatchdog() {
+        let s = snapshot(status: .readyToPlay,
+                         mode: .remux,
+                         hasVideoTrack: true,
+                         postReadyWatchdogElapsed: true)
+        #expect(PlaybackFailoverController.decide(s) == .standDown)
+    }
+
+    @Test("Silent decode failure but already in transcode → stand down (no further fallback)")
+    func silentDecodeFailureInTranscodeStandsDown() {
+        let s = snapshot(status: .readyToPlay,
+                         mode: .transcode,
+                         hasVideoTrack: false,
+                         postReadyWatchdogElapsed: true)
+        #expect(PlaybackFailoverController.decide(s) == .standDown)
+    }
+
+    @Test("Silent decode failure but fallback already attempted → stand down")
+    func silentDecodeFailureAfterAttemptStandsDown() {
+        let s = snapshot(status: .readyToPlay,
+                         mode: .remux,
+                         attempted: true,
+                         hasVideoTrack: false,
+                         postReadyWatchdogElapsed: true)
         #expect(PlaybackFailoverController.decide(s) == .standDown)
     }
 }
