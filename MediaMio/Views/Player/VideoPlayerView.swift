@@ -17,6 +17,11 @@ struct SimpleVideoPlayerRepresentable: UIViewControllerRepresentable {
     let item: MediaItem
     let playbackMode: PlaybackMode
     let subtitleDisplay: String?
+    /// What AVPlayer is *actually* decoding, observed by the VM from
+    /// `AVPlayerItem.tracks` after readyToPlay. Drives the
+    /// Source/Delivered comparison in the Playback Info panel; nil
+    /// before the player has populated tracks.
+    let deliveredInfo: DeliveredStreamInfo?
     let showSkipIntro: Bool
     let showSkipCredits: Bool
     /// Mirrors the VM's `playbackRate`. Carried as a prop so SwiftUI knows
@@ -58,7 +63,8 @@ struct SimpleVideoPlayerRepresentable: UIViewControllerRepresentable {
             item: item,
             mode: playbackMode,
             subtitleDisplay: subtitleDisplay,
-            maxStreamingBitrate: settingsManager.maxBitrate
+            maxStreamingBitrate: settingsManager.maxBitrate,
+            delivered: deliveredInfo
         )
         let playbackInfoVC = PlaybackInfoViewController(info: info)
         let bitrateVC = BitrateSelectionViewController(settingsManager: settingsManager)
@@ -121,7 +127,8 @@ struct SimpleVideoPlayerRepresentable: UIViewControllerRepresentable {
             item: item,
             mode: playbackMode,
             subtitleDisplay: subtitleDisplay,
-            maxStreamingBitrate: settingsManager.maxBitrate
+            maxStreamingBitrate: settingsManager.maxBitrate,
+            delivered: deliveredInfo
         )
         context.coordinator.playbackInfoVC?.update(info: info)
 
@@ -242,6 +249,7 @@ struct VideoPlayerView: View {
                     item: viewModel.item,
                     playbackMode: viewModel.currentPlaybackMode,
                     subtitleDisplay: viewModel.currentSubtitleDisplay,
+                    deliveredInfo: viewModel.deliveredInfo,
                     showSkipIntro: viewModel.showSkipIntroButton,
                     showSkipCredits: viewModel.showSkipCreditsButton,
                     playbackRate: viewModel.playbackRate,

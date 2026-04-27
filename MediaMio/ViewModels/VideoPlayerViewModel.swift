@@ -41,6 +41,13 @@ final class VideoPlayerViewModel: ObservableObject {
     @Published var observedBitrate: Double = 0.0
     @Published var currentBitrate: Double = 0.0  // legacy: callers may set this from outside
 
+    /// What AVPlayer is *actually* decoding for the active item, observed
+    /// from `AVPlayerItem.tracks` after `.readyToPlay`. Drives the
+    /// Source/Delivered comparison in the Playback Info panel and the
+    /// honestly-computed Play Method badge. Nil before readyToPlay or
+    /// when no active item.
+    @Published var deliveredInfo: DeliveredStreamInfo? = nil
+
     /// Mirrors `AVPlayer.defaultRate` so SwiftUI invalidates whenever the
     /// playback speed changes. The transport-bar speedometer menu's checkmark
     /// is rebuilt by `updateUIViewController`, which only fires on
@@ -539,6 +546,9 @@ final class VideoPlayerViewModel: ObservableObject {
         progressReportTimer = nil
         player?.pause()
         player = nil
+        // Clear so the panel doesn't render stale Source→Delivered data
+        // from a prior session if the same VM is reused for a retry.
+        deliveredInfo = nil
     }
 
     /// KVO bridge from `AVPlayer.defaultRate` (Cocoa property, not Combine
@@ -693,6 +703,148 @@ final class VideoPlayerViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+
+        // Refresh the delivered-stream snapshot whenever AVPlayer's track
+        // list changes. AVPlayer typically populates `.tracks` synchronously
+        // with the readyToPlay flip on direct mp4, but on HLS the variant
+        // selection and per-segment track activation can rewrite the list
+        // a few times during the first seconds of playback. KVO catches
+        // every flip so the Playback Info panel reflects the most recent
+        // truth.
+        playerItem.publisher(for: \.tracks)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.refreshDeliveredInfo(from: playerItem)
+            }
+            .store(in: &cancellables)
+        // The HLS access log populates after AVPlayer has selected a
+        // variant — that's where the indicated bitrate comes from. Re-poll
+        // once a second on a slow-burn timer; bitrate doesn't need
+        // sub-second refresh.
+        Timer.publish(every: 2.0, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self, weak playerItem] _ in
+                guard let item = playerItem else { return }
+                self?.refreshDeliveredInfo(from: item)
+            }
+            .store(in: &cancellables)
+    }
+
+    /// Read what AVPlayer is *actually* decoding from
+    /// `playerItem.tracks[...].assetTrack.formatDescriptions` and
+    /// publish it as `deliveredInfo`. Safe to call repeatedly — the
+    /// publisher only re-emits when the value changes.
+    private func refreshDeliveredInfo(from playerItem: AVPlayerItem) {
+        let snapshot = Self.extractDeliveredInfo(from: playerItem)
+        if snapshot != deliveredInfo {
+            deliveredInfo = snapshot
+            DebugLog.playback("🎯 Delivered: video=\(snapshot.videoCodec ?? "?") \(snapshot.videoWidth ?? 0)×\(snapshot.videoHeight ?? 0) \(snapshot.videoRange ?? "?") audio=\(snapshot.audioCodec ?? "?") \(snapshot.audioChannels ?? 0)ch")
+        }
+    }
+
+    /// Pure extraction. Walks `playerItem.tracks`, plucks the first video
+    /// + first audio assetTrack, and reads codec FOURCC, dimensions,
+    /// color primaries, and audio channel count from each track's
+    /// `CMFormatDescription`. Bitrate is read from the HLS access log
+    /// (`accessLog().events.last?.indicatedBitrate`) so we capture the
+    /// variant AVPlayer actually selected. Static so it's trivial to test.
+    static func extractDeliveredInfo(from playerItem: AVPlayerItem) -> DeliveredStreamInfo {
+        var videoCodec: String?
+        var videoWidth: Int?
+        var videoHeight: Int?
+        var videoRange: String?
+        var audioCodec: String?
+        var audioChannels: Int?
+
+        for track in playerItem.tracks {
+            guard let assetTrack = track.assetTrack,
+                  let formatDescription = assetTrack.formatDescriptions.first else { continue }
+            // formatDescriptions is `[Any]` because AVAssetTrack lives in
+            // ObjC; the Any values are CMFormatDescription instances.
+            // swiftlint:disable:next force_cast
+            let cmFormat = formatDescription as! CMFormatDescription
+
+            switch assetTrack.mediaType {
+            case .video:
+                let fourCC = CMFormatDescriptionGetMediaSubType(cmFormat)
+                videoCodec = fourCCString(fourCC)
+                let dims = CMVideoFormatDescriptionGetDimensions(cmFormat)
+                videoWidth = Int(dims.width)
+                videoHeight = Int(dims.height)
+                videoRange = videoRangeFromExtensions(of: cmFormat)
+            case .audio:
+                let fourCC = CMFormatDescriptionGetMediaSubType(cmFormat)
+                audioCodec = fourCCString(fourCC)
+                if let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(cmFormat) {
+                    audioChannels = Int(asbd.pointee.mChannelsPerFrame)
+                }
+            default:
+                break
+            }
+        }
+
+        // HLS access log carries the variant indicated bitrate AVPlayer
+        // chose. -1 means the log hasn't populated yet (very early in
+        // playback) — surface as nil rather than a misleading 0.
+        var videoBitrate: Int?
+        if let event = playerItem.accessLog()?.events.last {
+            let indicated = event.indicatedBitrate
+            if indicated.isFinite && indicated > 0 {
+                videoBitrate = Int(indicated)
+            }
+        }
+
+        return DeliveredStreamInfo(
+            videoCodec: videoCodec,
+            videoWidth: videoWidth,
+            videoHeight: videoHeight,
+            videoRange: videoRange,
+            videoBitrate: videoBitrate,
+            audioCodec: audioCodec,
+            audioChannels: audioChannels
+        )
+    }
+
+    /// Translate a CoreMedia FourCC into a lowercase ASCII string, e.g.
+    /// `'avc1'` → "avc1", `'hvc1'` → "hvc1", `'ec-3'` → "ec-3". The
+    /// PlaybackInfoBuilder normalises this further to Jellyfin's codec
+    /// vocabulary ("h264", "hevc", "eac3") before comparing to source.
+    private static func fourCCString(_ fourCC: FourCharCode) -> String {
+        let bytes: [UInt8] = [
+            UInt8((fourCC >> 24) & 0xff),
+            UInt8((fourCC >> 16) & 0xff),
+            UInt8((fourCC >> 8) & 0xff),
+            UInt8(fourCC & 0xff)
+        ]
+        let scalars = bytes.map { Character(UnicodeScalar($0)) }
+        return String(scalars).trimmingCharacters(in: .whitespaces).lowercased()
+    }
+
+    /// Map CoreMedia color primaries to Jellyfin's `VideoRangeType`
+    /// vocabulary so direct equality against MediaStream works without
+    /// translation. bt2020 ⇒ HDR10 (we can't distinguish HDR10 from
+    /// HDR10+ from the format description alone — that's signaled in
+    /// dynamic-metadata side data, not the format extensions); SMPTE C
+    /// or BT.709 ⇒ SDR. Dolby Vision is detected by the codec FourCC
+    /// (`dvh1`/`dvhe`) when applicable, but those formats also carry
+    /// bt2020 primaries — caller can refine if needed.
+    private static func videoRangeFromExtensions(of formatDescription: CMFormatDescription) -> String? {
+        let raw = CMFormatDescriptionGetExtension(
+            formatDescription,
+            extensionKey: kCMFormatDescriptionExtension_ColorPrimaries
+        )
+        guard let primaries = raw as? String else { return nil }
+        // CoreMedia constants are CFStrings. Compare against the public
+        // string values; using the Swift symbols would force the import
+        // tax everywhere this is read.
+        switch primaries {
+        case "ITU_R_2020":
+            return "HDR10"
+        case "ITU_R_709_2", "SMPTE_C", "EBU_3213":
+            return "SDR"
+        default:
+            return primaries
+        }
     }
 
     private func waitForPlayerItemReady(playerItem: AVPlayerItem) async {

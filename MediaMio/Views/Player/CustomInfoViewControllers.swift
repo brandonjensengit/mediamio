@@ -301,15 +301,19 @@ class PlaybackInfoViewController: UIViewController, AVPlayerViewControllerDelega
         tableView.dataSource = self
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "PlaybackInfoCell")
         tableView.backgroundColor = .clear
-        tableView.allowsSelection = false
-        // Don't set allowsFocus = false here. On tvOS, focus IS the scroll
-        // mechanism — Siri Remote swipes scroll a UITableView by moving
-        // focus to off-screen cells. With focus disabled the panel is
-        // permanently pinned to the top, hiding any section below the
-        // ~600pt fold (Audio + Subtitle on most movies). Cells get the
-        // standard tvOS focus highlight on hover, which matches Settings
-        // and other system info panes — read-only rows lighting up on
-        // focus is the platform convention, not menu-row behavior.
+        // On tvOS, focus IS the scroll mechanism — Siri Remote swipes
+        // scroll a UITableView by moving focus through its cells. Two
+        // flags conspire to disable that, and BOTH must be left on:
+        //   - allowsFocus (default true) — allows cells into the focus
+        //     graph at all
+        //   - allowsSelection (default true) — the focus engine treats
+        //     unselectable cells as unfocusable, so disabling selection
+        //     makes the table un-scrollable
+        // We keep selection on but ignore taps in the delegate (the empty
+        // didSelectRowAt is intentional). cell.selectionStyle = .none
+        // suppresses the highlight flash; the focus highlight remains as
+        // a "you are here" cursor for the swipe gesture, matching the
+        // platform convention for read-only info panes.
 
         view.addSubview(tableView)
         tableView.translatesAutoresizingMaskIntoConstraints = false
@@ -355,13 +359,23 @@ extension PlaybackInfoViewController: UITableViewDelegate, UITableViewDataSource
         return info.sections[section].rows.count
     }
 
-    func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        return info.sections[section].title
+    func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
+        let model = info.sections[section]
+        return SectionHeaderView(title: model.title, badge: model.badge)
+    }
+
+    func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
+        return 56
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        // `.value1` = left-aligned label + right-aligned detail. Matches
-        // Infuse / iOS Settings-style info panels; no manual layout needed.
+        // `.value1` = left-aligned label + right-aligned detail. We keep
+        // it for layout but switch the detail to an attributed string
+        // when the row carries a delivered companion that disagrees
+        // with source — the renderer composes "<source> → <delivered>"
+        // with the delivered span colored orange. That gives a clean
+        // single-line "what AVPlayer is actually decoding" diagnostic
+        // without redesigning the cell layout.
         let cell = UITableViewCell(style: .value1, reuseIdentifier: "PlaybackInfoCell")
         let row = info.sections[indexPath.section].rows[indexPath.row]
 
@@ -369,14 +383,110 @@ extension PlaybackInfoViewController: UITableViewDelegate, UITableViewDataSource
         cell.textLabel?.textColor = .white
         cell.textLabel?.font = UIFont.systemFont(ofSize: 26, weight: .regular)
 
-        cell.detailTextLabel?.text = row.value
-        cell.detailTextLabel?.textColor = UIColor(white: 1.0, alpha: 0.7)
         cell.detailTextLabel?.font = UIFont.systemFont(ofSize: 26, weight: .medium)
+        if row.isMismatch, let delivered = row.delivered {
+            cell.detailTextLabel?.attributedText = Self.mismatchAttributed(
+                source: row.value,
+                delivered: delivered
+            )
+        } else {
+            cell.detailTextLabel?.attributedText = nil
+            cell.detailTextLabel?.text = row.value
+            cell.detailTextLabel?.textColor = UIColor(white: 1.0, alpha: 0.7)
+        }
 
         cell.backgroundColor = .clear
         cell.contentView.backgroundColor = .clear
         cell.selectionStyle = .none
 
         return cell
+    }
+
+    /// Compose `"HEVC → H.264"` with three colored spans:
+    /// source = 70%-white (matches the read-only field convention), arrow
+    /// = 40%-white (muted separator), delivered = systemOrange (the
+    /// "this is wrong" alarm color tvOS uses for warnings). Static so
+    /// it's trivially testable and we don't allocate a closure per cell.
+    private static func mismatchAttributed(source: String, delivered: String) -> NSAttributedString {
+        let result = NSMutableAttributedString()
+        let baseFont = UIFont.systemFont(ofSize: 26, weight: .medium)
+        result.append(NSAttributedString(string: source, attributes: [
+            .font: baseFont,
+            .foregroundColor: UIColor(white: 1.0, alpha: 0.7)
+        ]))
+        result.append(NSAttributedString(string: " → ", attributes: [
+            .font: baseFont,
+            .foregroundColor: UIColor(white: 1.0, alpha: 0.4)
+        ]))
+        result.append(NSAttributedString(string: delivered, attributes: [
+            .font: baseFont,
+            .foregroundColor: UIColor.systemOrange
+        ]))
+        return result
+    }
+}
+
+// MARK: - Section header view
+
+/// Section header with the title on the left and an optional pill on the
+/// right. Green pill for direct-play / direct-stream / remux (the source
+/// stream is reaching AVPlayer intact); orange pill for transcode (the
+/// server replaced one or both streams with something else). Falls back
+/// to a plain title row when no badge is set — same behavior as the
+/// `titleForHeaderInSection` path it replaces.
+private final class SectionHeaderView: UIView {
+    init(title: String, badge: PlaybackBadge?) {
+        super.init(frame: .zero)
+        backgroundColor = .clear
+
+        let titleLabel = UILabel()
+        titleLabel.text = title.uppercased()
+        titleLabel.textColor = UIColor(white: 1.0, alpha: 0.6)
+        titleLabel.font = UIFont.systemFont(ofSize: 22, weight: .semibold)
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(titleLabel)
+
+        NSLayoutConstraint.activate([
+            titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 28),
+            titleLabel.centerYAnchor.constraint(equalTo: centerYAnchor)
+        ])
+
+        if let badge = badge {
+            let pill = Self.makePill(for: badge)
+            pill.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(pill)
+            NSLayoutConstraint.activate([
+                pill.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -28),
+                pill.centerYAnchor.constraint(equalTo: centerYAnchor)
+            ])
+        }
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    private static func makePill(for badge: PlaybackBadge) -> UIView {
+        let pill = UIView()
+        let isHealthy = badge != .transcode
+        let bg = isHealthy
+            ? UIColor.systemGreen.withAlphaComponent(0.18)
+            : UIColor.systemOrange.withAlphaComponent(0.18)
+        let fg = isHealthy ? UIColor.systemGreen : UIColor.systemOrange
+        pill.backgroundColor = bg
+        pill.layer.cornerRadius = 10
+        pill.layer.cornerCurve = .continuous
+
+        let label = UILabel()
+        label.text = badge.rawValue
+        label.textColor = fg
+        label.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        pill.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: pill.leadingAnchor, constant: 12),
+            label.trailingAnchor.constraint(equalTo: pill.trailingAnchor, constant: -12),
+            label.topAnchor.constraint(equalTo: pill.topAnchor, constant: 5),
+            label.bottomAnchor.constraint(equalTo: pill.bottomAnchor, constant: -5)
+        ])
+        return pill
     }
 }

@@ -256,6 +256,114 @@ struct PlaybackInfoBuilderTests {
         #expect(PlaybackInfoBuilder.totalBitrate(source: source) == nil)
     }
 
+    // MARK: - Source vs Delivered (the core diagnostic the panel surfaces)
+
+    @Test("delivered nil: rows have no delivered companion and section badge is unset")
+    func deliveredAbsentLeavesRowsClean() {
+        let info = PlaybackInfoBuilder.build(
+            item: makeFullItem(),
+            mode: .remux,
+            subtitleDisplay: nil,
+            delivered: nil
+        )
+        let video = info.sections.first { $0.title == "Video" }
+        let codecRow = video?.rows.first { $0.label == "Codec" }
+        #expect(codecRow?.delivered == nil)
+        #expect(codecRow?.isMismatch == false)
+        // No delivered snapshot ⇒ no badge (panel falls back to source-only rendering).
+        #expect(video?.badge == nil)
+    }
+
+    @Test("delivered matches source: video rows render Direct Play badge, no mismatch flags")
+    func deliveredMatchesSourceShowsDirectPlay() {
+        // mp4 container is in AppleTVCodecSupport.supportedContainers, so
+        // an all-match snapshot ⇒ Direct Play.
+        let mp4Item = makeFullItem(container: "mp4")
+        let delivered = DeliveredStreamInfo(
+            videoCodec: "hvc1",            // FourCC; normalises to "hevc"
+            videoWidth: 3840, videoHeight: 2160,
+            videoRange: "HDR10",           // doesn't match source DOVI — but the
+            videoBitrate: nil,             // realistic case is HDR10 source for
+            audioCodec: "ec-3",            // this matching test
+            audioChannels: 6
+        )
+        let _ = delivered  // silence unused if compiler warns
+        // Build a source whose range matches HDR10 so we can assert match.
+        let info = PlaybackInfoBuilder.build(
+            item: makeFullItem(container: "mp4", videoRangeType: "HDR10"),
+            mode: .directPlay,
+            subtitleDisplay: nil,
+            delivered: DeliveredStreamInfo(
+                videoCodec: "hvc1",
+                videoWidth: 3840, videoHeight: 2160,
+                videoRange: "HDR10",
+                videoBitrate: nil,
+                audioCodec: "ec-3",
+                audioChannels: 6
+            )
+        )
+        let general = info.sections.first { $0.title == "General" }
+        #expect(general?.rows.first(where: { $0.label == "Play Method" })?.value == "Direct Play")
+        #expect(general?.badge == .directPlay)
+        // No "Requested Mode" row should appear when requested == observed.
+        #expect(general?.rows.contains { $0.label == "Requested Mode" } == false)
+        let video = info.sections.first { $0.title == "Video" }
+        #expect(video?.rows.contains { $0.isMismatch } == false)
+        #expect(video?.badge == .directPlay)
+    }
+
+    @Test("delivered diverges: video shows mismatch, badge flips to Transcode, Requested Mode row appears")
+    func deliveredDivergesShowsTranscode() {
+        // The bug case in the screenshot: source HEVC 4K HDR10, but
+        // AVPlayer is decoding H.264 1080p SDR because Jellyfin
+        // silently transcoded due to missing DeviceProfile.
+        let info = PlaybackInfoBuilder.build(
+            item: makeFullItem(container: "mkv", videoRangeType: "HDR10"),
+            mode: .remux,                // client requested Remux
+            subtitleDisplay: nil,
+            delivered: DeliveredStreamInfo(
+                videoCodec: "avc1",       // ⇒ h264
+                videoWidth: 1920, videoHeight: 1080,
+                videoRange: "SDR",
+                videoBitrate: nil,
+                audioCodec: "ec-3",       // audio matched
+                audioChannels: 6
+            )
+        )
+        let video = info.sections.first { $0.title == "Video" }
+        let codec = video?.rows.first { $0.label == "Codec" }
+        #expect(codec?.value == "HEVC")
+        #expect(codec?.delivered == "H264")
+        #expect(codec?.isMismatch == true)
+
+        let resolution = video?.rows.first { $0.label == "Resolution" }
+        #expect(resolution?.value == "3840 × 2160")
+        #expect(resolution?.delivered == "1920 × 1080")
+        #expect(resolution?.isMismatch == true)
+
+        // Section badge reflects observed reality, not requested mode.
+        #expect(video?.badge == .transcode)
+
+        // General section: Play Method is the *observed* mode, and a
+        // separate Requested Mode row exposes the disagreement.
+        let general = info.sections.first { $0.title == "General" }
+        #expect(general?.rows.first(where: { $0.label == "Play Method" })?.value == "Transcode")
+        #expect(general?.rows.first(where: { $0.label == "Requested Mode" })?.value == "Remux")
+        #expect(general?.badge == .transcode)
+    }
+
+    @Test("normalizeCodec: AVFoundation FourCC values map to Jellyfin codec vocabulary")
+    func normalizeCodecMatrix() {
+        #expect(PlaybackInfoBuilder.normalizeCodec("avc1") == "h264")
+        #expect(PlaybackInfoBuilder.normalizeCodec("hvc1") == "hevc")
+        #expect(PlaybackInfoBuilder.normalizeCodec("hev1") == "hevc")
+        #expect(PlaybackInfoBuilder.normalizeCodec("ec-3") == "eac3")
+        #expect(PlaybackInfoBuilder.normalizeCodec("ac-3") == "ac3")
+        #expect(PlaybackInfoBuilder.normalizeCodec("mp4a") == "aac")
+        #expect(PlaybackInfoBuilder.normalizeCodec("vp09") == "vp9")
+        #expect(PlaybackInfoBuilder.normalizeCodec("UnknownCodec") == "unknowncodec")
+    }
+
     @Test("build: full realistic payload produces expected video rows")
     func buildFullPayload() {
         let item = makeFullItem()
@@ -313,14 +421,17 @@ struct PlaybackInfoBuilderTests {
         )
     }
 
-    private func makeFullItem() -> MediaItem {
+    private func makeFullItem(
+        container: String = "mkv",
+        videoRangeType: String = "DOVI"
+    ) -> MediaItem {
         let video = MediaStream(
             index: 0, type: "Video", codec: "hevc", profile: "Main 10",
             width: 3840, height: 2160, bitRate: 50_000_000,
             language: nil, displayTitle: nil, title: nil,
             isExternal: false, isDefault: true,
             channels: nil, channelLayout: nil, sampleRate: nil,
-            videoRange: "HDR", videoRangeType: "DOVI"
+            videoRange: "HDR", videoRangeType: videoRangeType
         )
         let audio = MediaStream(
             index: 1, type: "Audio", codec: "eac3", profile: nil,
@@ -331,7 +442,7 @@ struct PlaybackInfoBuilderTests {
             videoRange: nil, videoRangeType: nil
         )
         let source = MediaSource(
-            id: "s1", name: nil, size: 4_509_715_660, container: "mkv",
+            id: "s1", name: nil, size: 4_509_715_660, container: container,
             bitrate: 50_640_000, mediaStreams: [video, audio]
         )
         return MediaItem(
