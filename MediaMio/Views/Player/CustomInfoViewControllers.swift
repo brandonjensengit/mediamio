@@ -302,7 +302,14 @@ class PlaybackInfoViewController: UIViewController, AVPlayerViewControllerDelega
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "PlaybackInfoCell")
         tableView.backgroundColor = .clear
         tableView.allowsSelection = false
-        tableView.allowsFocus = false  // cells are read-only, no need to focus each row
+        // Don't set allowsFocus = false here. On tvOS, focus IS the scroll
+        // mechanism — Siri Remote swipes scroll a UITableView by moving
+        // focus to off-screen cells. With focus disabled the panel is
+        // permanently pinned to the top, hiding any section below the
+        // ~600pt fold (Audio + Subtitle on most movies). Cells get the
+        // standard tvOS focus highlight on hover, which matches Settings
+        // and other system info panes — read-only rows lighting up on
+        // focus is the platform convention, not menu-row behavior.
 
         view.addSubview(tableView)
         tableView.translatesAutoresizingMaskIntoConstraints = false
