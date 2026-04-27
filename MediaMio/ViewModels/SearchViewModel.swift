@@ -10,7 +10,25 @@ import Combine
 
 @MainActor
 class SearchViewModel: ObservableObject {
-    @Published var searchQuery: String = ""
+    @Published var searchQuery: String = "" {
+        didSet {
+            // The 500ms debounce in setupSearchDebouncing creates a window
+            // where searchQuery is non-empty but isSearching is still false
+            // (the API call hasn't fired yet). During that window the View's
+            // `isEmpty` branch — results.isEmpty && !isSearching && !searchQuery.isEmpty
+            // — flashes "No Results Found" before the spinner ever appears.
+            // Flipping isSearching synchronously on any non-empty change
+            // keeps the loading branch active through debounce + API call as
+            // one continuous span. The guard skips redundant publishes on
+            // every keystroke when already in the right state.
+            let trimmed = searchQuery.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty {
+                if isSearching { isSearching = false }
+            } else if !isSearching {
+                isSearching = true
+            }
+        }
+    }
     @Published var results: [MediaItem] = []
     @Published var isSearching: Bool = false
     @Published var isLoadingMore: Bool = false
