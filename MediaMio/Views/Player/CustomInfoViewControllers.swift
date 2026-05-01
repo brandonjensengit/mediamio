@@ -299,7 +299,8 @@ class PlaybackInfoViewController: UIViewController, AVPlayerViewControllerDelega
 
         tableView.delegate = self
         tableView.dataSource = self
-        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "PlaybackInfoCell")
+        tableView.register(Value1Cell.self, forCellReuseIdentifier: "PlaybackInfoCell")
+        tableView.register(SectionHeaderHost.self, forHeaderFooterViewReuseIdentifier: "PlaybackInfoSectionHeader")
         tableView.backgroundColor = .clear
         // On tvOS, focus IS the scroll mechanism — Siri Remote swipes
         // scroll a UITableView by moving focus through its cells. Two
@@ -314,6 +315,15 @@ class PlaybackInfoViewController: UIViewController, AVPlayerViewControllerDelega
         // suppresses the highlight flash; the focus highlight remains as
         // a "you are here" cursor for the swipe gesture, matching the
         // platform convention for read-only info panes.
+        //
+        // remembersLastFocusedIndexPath: when SwiftUI re-emits the panel
+        // via `updateUIViewController` and we call `update(info:)`, the
+        // table reloads and tvOS would otherwise reset focus to row 0 —
+        // yanking the user back to the top mid-swipe. With this on, the
+        // focus engine restores focus to whichever cell the user was on
+        // before the reload, so a delivered-info change refresh does NOT
+        // auto-scroll the panel.
+        tableView.remembersLastFocusedIndexPath = true
 
         view.addSubview(tableView)
         tableView.translatesAutoresizingMaskIntoConstraints = false
@@ -337,12 +347,43 @@ class PlaybackInfoViewController: UIViewController, AVPlayerViewControllerDelega
     }
 
     /// Push fresh info into the pane. Called by the player when the
-    /// PlaybackMode flips (e.g. failover to transcode) or on bitrate
-    /// reload. Safe to call even when the view isn't loaded yet.
+    /// PlaybackMode flips (e.g. failover to transcode) or when AVPlayer's
+    /// delivered-track snapshot changes. Safe to call even when the view
+    /// isn't loaded yet.
+    ///
+    /// Reload semantics: when only row VALUES change (the common case —
+    /// codec/resolution arrives a few seconds after readyToPlay), we
+    /// reconfigure the existing visible cells in place rather than
+    /// calling `reloadData()`. `reloadData` invalidates the focus state
+    /// and would yank the user back to the top of the table mid-swipe.
+    /// Falling back to `reloadData` only when the row/section count
+    /// changes (rare — section count is fixed at 4, but row counts can
+    /// vary as Container/File Size become available).
     func update(info: PlaybackInfo) {
+        let prior = self.info
         self.info = info
-        if isViewLoaded {
+        guard isViewLoaded else { return }
+
+        let structureChanged = prior.sections.count != info.sections.count
+            || zip(prior.sections, info.sections).contains { $0.0.rows.count != $0.1.rows.count }
+
+        if structureChanged {
             tableView.reloadData()
+            return
+        }
+        // Same shape → reconfigure the visible cells without disturbing
+        // focus or scroll position. Section header pills (badge color)
+        // also need a refresh; reloadSections would jump focus, so we
+        // re-apply via the visible header views directly.
+        for indexPath in tableView.indexPathsForVisibleRows ?? [] {
+            guard let cell = tableView.cellForRow(at: indexPath) else { continue }
+            configure(cell: cell, at: indexPath)
+        }
+        for sectionIndex in 0..<info.sections.count {
+            if let header = tableView.headerView(forSection: sectionIndex) as? SectionHeaderHost {
+                header.apply(badge: info.sections[sectionIndex].badge,
+                             title: info.sections[sectionIndex].title)
+            }
         }
     }
 }
@@ -361,7 +402,11 @@ extension PlaybackInfoViewController: UITableViewDelegate, UITableViewDataSource
 
     func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
         let model = info.sections[section]
-        return SectionHeaderView(title: model.title, badge: model.badge)
+        let header = tableView.dequeueReusableHeaderFooterView(withIdentifier: "PlaybackInfoSectionHeader")
+            as? SectionHeaderHost
+            ?? SectionHeaderHost(reuseIdentifier: "PlaybackInfoSectionHeader")
+        header.apply(badge: model.badge, title: model.title)
+        return header
     }
 
     func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
@@ -369,6 +414,17 @@ extension PlaybackInfoViewController: UITableViewDelegate, UITableViewDataSource
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "PlaybackInfoCell", for: indexPath)
+        configure(cell: cell, at: indexPath)
+        return cell
+    }
+
+    /// Apply the row at `indexPath` to `cell`. Extracted so `update(info:)`
+    /// can refresh visible cells in place without calling `reloadData`,
+    /// which would reset focus.
+    fileprivate func configure(cell: UITableViewCell, at indexPath: IndexPath) {
+        let row = info.sections[indexPath.section].rows[indexPath.row]
+
         // `.value1` = left-aligned label + right-aligned detail. We keep
         // it for layout but switch the detail to an attributed string
         // when the row carries a delivered companion that disagrees
@@ -376,9 +432,6 @@ extension PlaybackInfoViewController: UITableViewDelegate, UITableViewDataSource
         // with the delivered span colored orange. That gives a clean
         // single-line "what AVPlayer is actually decoding" diagnostic
         // without redesigning the cell layout.
-        let cell = UITableViewCell(style: .value1, reuseIdentifier: "PlaybackInfoCell")
-        let row = info.sections[indexPath.section].rows[indexPath.row]
-
         cell.textLabel?.text = row.label
         cell.textLabel?.textColor = .white
         cell.textLabel?.font = UIFont.systemFont(ofSize: 26, weight: .regular)
@@ -398,8 +451,6 @@ extension PlaybackInfoViewController: UITableViewDelegate, UITableViewDataSource
         cell.backgroundColor = .clear
         cell.contentView.backgroundColor = .clear
         cell.selectionStyle = .none
-
-        return cell
     }
 
     /// Compose `"HEVC → H.264"` with three colored spans:
@@ -426,67 +477,97 @@ extension PlaybackInfoViewController: UITableViewDelegate, UITableViewDataSource
     }
 }
 
+// MARK: - Cell
+
+/// `UITableViewCell.CellStyle.value1` baked into a registrable subclass.
+/// `tableView.register(UITableViewCell.self, …)` gets the *default* style
+/// — which has no `detailTextLabel` — so dequeued cells render only the
+/// row label and the value silently vanishes. This subclass lets us use
+/// the `.value1` layout (left-aligned label + right-aligned detail) AND
+/// also `dequeueReusableCell` for in-place updates.
+private final class Value1Cell: UITableViewCell {
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: .value1, reuseIdentifier: reuseIdentifier)
+    }
+    required init?(coder: NSCoder) { fatalError("not used") }
+}
+
 // MARK: - Section header view
 
-/// Section header with the title on the left and an optional pill on the
-/// right. Green pill for direct-play / direct-stream / remux (the source
-/// stream is reaching AVPlayer intact); orange pill for transcode (the
-/// server replaced one or both streams with something else). Falls back
-/// to a plain title row when no badge is set — same behavior as the
-/// `titleForHeaderInSection` path it replaces.
-private final class SectionHeaderView: UIView {
-    init(title: String, badge: PlaybackBadge?) {
-        super.init(frame: .zero)
-        backgroundColor = .clear
+/// Reusable header with the title on the left and an optional pill on
+/// the right. Green pill for direct-play / direct-stream / remux (the
+/// source stream is reaching AVPlayer intact); orange pill for transcode
+/// (the server replaced one or both streams with something else).
+/// Falls back to a plain title row when no badge is set.
+///
+/// Subclasses `UITableViewHeaderFooterView` rather than a bare UIView so
+/// the table can recycle these views and `apply(badge:title:)` can be
+/// called from `update(info:)` to mutate a live header without
+/// triggering a reload + focus reset.
+final class SectionHeaderHost: UITableViewHeaderFooterView {
+    private let titleLabel = UILabel()
+    private let pillView = UIView()
+    private let pillLabel = UILabel()
+    private var pillTrailingConstraint: NSLayoutConstraint?
 
-        let titleLabel = UILabel()
-        titleLabel.text = title.uppercased()
-        titleLabel.textColor = UIColor(white: 1.0, alpha: 0.6)
-        titleLabel.font = UIFont.systemFont(ofSize: 22, weight: .semibold)
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(titleLabel)
-
-        NSLayoutConstraint.activate([
-            titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 28),
-            titleLabel.centerYAnchor.constraint(equalTo: centerYAnchor)
-        ])
-
-        if let badge = badge {
-            let pill = Self.makePill(for: badge)
-            pill.translatesAutoresizingMaskIntoConstraints = false
-            addSubview(pill)
-            NSLayoutConstraint.activate([
-                pill.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -28),
-                pill.centerYAnchor.constraint(equalTo: centerYAnchor)
-            ])
-        }
+    override init(reuseIdentifier: String?) {
+        super.init(reuseIdentifier: reuseIdentifier)
+        setupSubviews()
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    private static func makePill(for badge: PlaybackBadge) -> UIView {
-        let pill = UIView()
-        let isHealthy = badge != .transcode
-        let bg = isHealthy
-            ? UIColor.systemGreen.withAlphaComponent(0.18)
-            : UIColor.systemOrange.withAlphaComponent(0.18)
-        let fg = isHealthy ? UIColor.systemGreen : UIColor.systemOrange
-        pill.backgroundColor = bg
-        pill.layer.cornerRadius = 10
-        pill.layer.cornerCurve = .continuous
+    private func setupSubviews() {
+        backgroundView = UIView()  // suppress system grouped header bg
+        backgroundView?.backgroundColor = .clear
 
-        let label = UILabel()
-        label.text = badge.rawValue
-        label.textColor = fg
-        label.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
-        label.translatesAutoresizingMaskIntoConstraints = false
-        pill.addSubview(label)
+        titleLabel.textColor = UIColor(white: 1.0, alpha: 0.6)
+        titleLabel.font = UIFont.systemFont(ofSize: 22, weight: .semibold)
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(titleLabel)
+
+        pillView.layer.cornerRadius = 10
+        pillView.layer.cornerCurve = .continuous
+        pillView.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(pillView)
+
+        pillLabel.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
+        pillLabel.translatesAutoresizingMaskIntoConstraints = false
+        pillView.addSubview(pillLabel)
+
+        let pillTrailing = pillView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -28)
+        pillTrailingConstraint = pillTrailing
+
         NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: pill.leadingAnchor, constant: 12),
-            label.trailingAnchor.constraint(equalTo: pill.trailingAnchor, constant: -12),
-            label.topAnchor.constraint(equalTo: pill.topAnchor, constant: 5),
-            label.bottomAnchor.constraint(equalTo: pill.bottomAnchor, constant: -5)
+            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 28),
+            titleLabel.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+
+            pillTrailing,
+            pillView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+
+            pillLabel.leadingAnchor.constraint(equalTo: pillView.leadingAnchor, constant: 12),
+            pillLabel.trailingAnchor.constraint(equalTo: pillView.trailingAnchor, constant: -12),
+            pillLabel.topAnchor.constraint(equalTo: pillView.topAnchor, constant: 5),
+            pillLabel.bottomAnchor.constraint(equalTo: pillView.bottomAnchor, constant: -5)
         ])
-        return pill
+    }
+
+    /// Apply a fresh title + badge to a recycled or live header. No
+    /// reload required — call sites can mutate the badge color/visibility
+    /// after the table is rendered, which is what `update(info:)` does
+    /// when delivered-info changes mid-playback.
+    func apply(badge: PlaybackBadge?, title: String) {
+        titleLabel.text = title.uppercased()
+        if let badge = badge {
+            pillView.isHidden = false
+            pillLabel.text = badge.rawValue
+            let isHealthy = badge != .transcode
+            pillView.backgroundColor = isHealthy
+                ? UIColor.systemGreen.withAlphaComponent(0.18)
+                : UIColor.systemOrange.withAlphaComponent(0.18)
+            pillLabel.textColor = isHealthy ? UIColor.systemGreen : UIColor.systemOrange
+        } else {
+            pillView.isHidden = true
+        }
     }
 }

@@ -711,21 +711,21 @@ final class VideoPlayerViewModel: ObservableObject {
         // a few times during the first seconds of playback. KVO catches
         // every flip so the Playback Info panel reflects the most recent
         // truth.
+        //
+        // Why no periodic timer: an earlier draft polled every 2s to
+        // refresh the HLS-variant bitrate from `accessLog`. But every
+        // emit of `deliveredInfo` triggers SwiftUI's
+        // `updateUIViewController` → `tableView.reloadData()`, which on
+        // tvOS resets focus to the first focusable cell — auto-scrolling
+        // the Playback Info panel back to the top mid-swipe. The KVO
+        // observer alone fires only on real track changes (rare after
+        // the first second), so the panel is stable while the user
+        // browses it and the bitrate value is still captured at probe
+        // time.
         playerItem.publisher(for: \.tracks)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.refreshDeliveredInfo(from: playerItem)
-            }
-            .store(in: &cancellables)
-        // The HLS access log populates after AVPlayer has selected a
-        // variant — that's where the indicated bitrate comes from. Re-poll
-        // once a second on a slow-burn timer; bitrate doesn't need
-        // sub-second refresh.
-        Timer.publish(every: 2.0, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self, weak playerItem] _ in
-                guard let item = playerItem else { return }
-                self?.refreshDeliveredInfo(from: item)
             }
             .store(in: &cancellables)
     }
