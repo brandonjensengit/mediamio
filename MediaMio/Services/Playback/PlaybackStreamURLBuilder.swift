@@ -181,6 +181,15 @@ struct PlaybackStreamURLBuilder {
             URLQueryItem(name: "DeviceId", value: deviceId),
             URLQueryItem(name: "api_key", value: accessToken),
             URLQueryItem(name: "Container", value: "ts"),
+            // SegmentContainer=mp4 forces Jellyfin to emit HLSv7 with
+            // fMP4 fragments + an EXT-X-MAP init segment. Apple's HLS
+            // spec since tvOS 12 disallows HEVC in MPEG-TS — without
+            // this flag Jellyfin sometimes returns a single-variant
+            // manifest with hvc1-in-.ts and AVPlayer parses the
+            // playlist (gets duration) but never loads any segments,
+            // hanging at status=unknown with 0 tracks. The fMP4 path
+            // is the spec-compliant HEVC HLS transport.
+            URLQueryItem(name: "SegmentContainer", value: "mp4"),
             URLQueryItem(name: "SegmentLength", value: "3"),
             URLQueryItem(name: "EnableAutoStreamCopy", value: "true"),
             URLQueryItem(name: "CopyTimestamps", value: "true"),
@@ -229,6 +238,9 @@ struct PlaybackStreamURLBuilder {
             URLQueryItem(name: "DeviceId", value: deviceId),
             URLQueryItem(name: "api_key", value: accessToken),
             URLQueryItem(name: "Container", value: "ts,mp4"),
+            // See comment in buildDirectPlayURL — fMP4 segments are
+            // required when video is hvc1/HEVC.
+            URLQueryItem(name: "SegmentContainer", value: "mp4"),
             URLQueryItem(name: "SegmentLength", value: "3"),
             URLQueryItem(name: "EnableAutoStreamCopy", value: "true"),
             URLQueryItem(name: "CopyTimestamps", value: "true"),
@@ -269,6 +281,10 @@ struct PlaybackStreamURLBuilder {
             URLQueryItem(name: "DeviceId", value: deviceId),
             URLQueryItem(name: "api_key", value: accessToken),
             URLQueryItem(name: "Container", value: "mp4,ts"),
+            // See comment in buildDirectPlayURL — fMP4 segments are
+            // required when video is hvc1/HEVC, and the Remux path is
+            // exactly where 4K HEVC HDR sources land.
+            URLQueryItem(name: "SegmentContainer", value: "mp4"),
             URLQueryItem(name: "SegmentLength", value: "3"),
             URLQueryItem(name: "EnableAutoStreamCopy", value: "true"),
             URLQueryItem(name: "CopyTimestamps", value: "true"),
