@@ -156,7 +156,7 @@ final class SavedServersStore: ObservableObject {
             let data = try JSONEncoder().encode(servers)
             defaults.set(data, forKey: Constants.UserDefaultsKeys.savedServers)
         } catch {
-            print("⚠️ SavedServersStore: failed to encode servers: \(error)")
+            DebugLog.verbose("⚠️ SavedServersStore: failed to encode servers: \(error)")
         }
     }
 
@@ -167,7 +167,7 @@ final class SavedServersStore: ObservableObject {
         do {
             return try JSONDecoder().decode([SavedServer].self, from: data)
         } catch {
-            print("⚠️ SavedServersStore: failed to decode servers: \(error)")
+            DebugLog.verbose("⚠️ SavedServersStore: failed to decode servers: \(error)")
             return []
         }
     }

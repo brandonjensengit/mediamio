@@ -100,7 +100,7 @@ final class PlaybackFailoverController {
     func arm(playerItem: AVPlayerItem, onFallback: @escaping () async -> Void) {
         cancel()
 
-        print("🛡️ Failover armed (mode: \(currentMode?.rawValue ?? "unknown"))")
+        DebugLog.playback("🛡️ Failover armed (mode: \(currentMode?.rawValue ?? "unknown"))")
 
         // Status flips cover the fast path: .failed fires within milliseconds
         // for 404 / codec errors / malformed manifests. On `.readyToPlay`,
@@ -241,7 +241,7 @@ final class PlaybackFailoverController {
 
         switch Self.decide(snapshot) {
         case .fallback:
-            print("🔄 Failover triggered (status: \(playerItem.status.rawValue), errorNotif: \(hasErrorNotification), watchdog: \(watchdogElapsed), postReadyWatchdog: \(postReadyWatchdogElapsed), hasVideoTrack: \(hasVideoTrack))")
+            DebugLog.playback("🔄 Failover triggered (status: \(playerItem.status.rawValue), errorNotif: \(hasErrorNotification), watchdog: \(watchdogElapsed), postReadyWatchdog: \(postReadyWatchdogElapsed), hasVideoTrack: \(hasVideoTrack))")
             hasFallbackAttempted = true
             // Cancel observers up-front so a late-arriving signal doesn't
             // call onFallback again before the guard above takes effect.

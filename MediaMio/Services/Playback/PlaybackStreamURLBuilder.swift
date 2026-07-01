@@ -35,37 +35,37 @@ struct PlaybackStreamURLBuilder {
     /// Top-level entry point. Returns `nil` if every URL construction path
     /// fails (extremely rare — only on malformed `baseURL`).
     func build() -> Result? {
-        print("🎬 Building streaming URL for: \(item.name)")
+        DebugLog.playback("🎬 Building streaming URL for: \(item.name)")
 
         let fileSize = item.mediaSources?.first?.size ?? 0
         let fileSizeGB = Double(fileSize) / 1_000_000_000.0
-        print("📁 File size: \(String(format: "%.2f", fileSizeGB)) GB")
+        DebugLog.playback("📁 File size: \(String(format: "%.2f", fileSizeGB)) GB")
 
         if let mediaSource = item.mediaSources?.first {
-            print("📦 Container: \(mediaSource.container ?? "unknown")")
-            print("📊 Bitrate: \(mediaSource.bitrate ?? 0) bps")
+            DebugLog.playback("📦 Container: \(mediaSource.container ?? "unknown")")
+            DebugLog.playback("📊 Bitrate: \(mediaSource.bitrate ?? 0) bps")
 
             if let mediaStreams = mediaSource.mediaStreams {
                 for stream in mediaStreams {
                     if stream.type?.lowercased() == "video" {
-                        print("🎥 Video stream: codec=\(stream.codec ?? "unknown"), \(stream.width ?? 0)x\(stream.height ?? 0)")
+                        DebugLog.playback("🎥 Video stream: codec=\(stream.codec ?? "unknown"), \(stream.width ?? 0)x\(stream.height ?? 0)")
                     } else if stream.type?.lowercased() == "audio" {
-                        print("🔊 Audio stream: codec=\(stream.codec ?? "unknown")")
+                        DebugLog.playback("🔊 Audio stream: codec=\(stream.codec ?? "unknown")")
                     }
                 }
             } else {
-                print("⚠️ No mediaStreams data available")
+                DebugLog.playback("⚠️ No mediaStreams data available")
             }
         } else {
-            print("⚠️ No mediaSources data available")
+            DebugLog.playback("⚠️ No mediaSources data available")
         }
 
         let streamingMode = StreamingMode(rawValue: settingsManager.streamingMode) ?? .auto
-        print("📊 Streaming mode: \(streamingMode.rawValue)")
+        DebugLog.playback("📊 Streaming mode: \(streamingMode.rawValue)")
 
         let codecSupport = AppleTVCodecSupport.shared
         let bestMode = codecSupport.getBestPlaybackMode(for: item)
-        print("🎯 Best playback mode: \(bestMode.rawValue)")
+        DebugLog.playback("🎯 Best playback mode: \(bestMode.rawValue)")
 
         switch streamingMode {
         case .auto:
@@ -89,7 +89,7 @@ struct PlaybackStreamURLBuilder {
     /// This entry point is the only safe way to force transcode at runtime
     /// without mutating user settings.
     func buildForcedTranscode() -> Result? {
-        print("🔁 Forcing transcode mode (failover override)")
+        DebugLog.playback("🔁 Forcing transcode mode (failover override)")
         guard let url = buildTranscodeURL() else { return nil }
         return Result(url: url, mode: .transcode)
     }
@@ -102,26 +102,26 @@ struct PlaybackStreamURLBuilder {
             if let url = buildDirectPlayURL() {
                 return Result(url: url, mode: .directPlay)
             }
-            print("⚠️ Direct Play failed, trying Direct Stream")
+            DebugLog.playback("⚠️ Direct Play failed, trying Direct Stream")
             fallthrough
 
         case .directStream:
             if let url = buildDirectStreamURL() {
                 return Result(url: url, mode: .directStream)
             }
-            print("⚠️ Direct Stream failed, trying Remux")
+            DebugLog.playback("⚠️ Direct Stream failed, trying Remux")
             fallthrough
 
         case .remux:
             if let url = buildRemuxURL() {
                 return Result(url: url, mode: .remux)
             }
-            print("⚠️ Remux failed, falling back to transcode")
+            DebugLog.playback("⚠️ Remux failed, falling back to transcode")
             fallthrough
 
         case .transcode:
             if fileSizeGB > 25 {
-                print("💡 Large file (\(String(format: "%.1f", fileSizeGB)) GB) - transcode will load faster")
+                DebugLog.playback("💡 Large file (\(String(format: "%.1f", fileSizeGB)) GB) - transcode will load faster")
             }
             if let url = buildTranscodeURL() {
                 return Result(url: url, mode: .transcode)
@@ -135,10 +135,10 @@ struct PlaybackStreamURLBuilder {
             return Result(url: url, mode: .directPlay)
         }
         if codecSupport.canDirectStream(item), let url = buildDirectStreamURL() {
-            print("⚠️ Direct Play not possible, using Direct Stream instead")
+            DebugLog.playback("⚠️ Direct Play not possible, using Direct Stream instead")
             return Result(url: url, mode: .directStream)
         }
-        print("⚠️ Neither Direct Play nor Direct Stream available, falling back to transcoding")
+        DebugLog.playback("⚠️ Neither Direct Play nor Direct Stream available, falling back to transcoding")
         if let url = buildTranscodeURL() {
             return Result(url: url, mode: .transcode)
         }
@@ -148,20 +148,20 @@ struct PlaybackStreamURLBuilder {
     // MARK: - Mode builders (verbatim from original VideoPlayerViewModel)
 
     private func buildDirectPlayURL() -> URL? {
-        print("💎 Attempting Direct Play - HLS with hardware decoding")
+        DebugLog.playback("💎 Attempting Direct Play - HLS with hardware decoding")
 
         if let mediaSource = item.mediaSources?.first {
-            print("📦 Original container: \(mediaSource.container ?? "unknown")")
+            DebugLog.playback("📦 Original container: \(mediaSource.container ?? "unknown")")
 
             if let mediaStreams = mediaSource.mediaStreams {
                 for stream in mediaStreams {
                     if stream.type?.lowercased() == "video" {
                         let codec = stream.codec ?? "unknown"
                         let resolution = "\(stream.width ?? 0)x\(stream.height ?? 0)"
-                        print("🎥 Video codec: \(codec) @ \(resolution)")
+                        DebugLog.playback("🎥 Video codec: \(codec) @ \(resolution)")
                     } else if stream.type?.lowercased() == "audio" {
                         let codec = stream.codec ?? "unknown"
-                        print("🔊 Audio codec: \(codec)")
+                        DebugLog.playback("🔊 Audio codec: \(codec)")
                     }
                 }
             }
@@ -202,27 +202,27 @@ struct PlaybackStreamURLBuilder {
 
         if let subtitleIndex = item.firstSubtitleIndex {
             queryItems.append(URLQueryItem(name: "SubtitleStreamIndex", value: "\(subtitleIndex)"))
-            print("📝 DirectPlay: Adding subtitle track index=\(subtitleIndex)")
+            DebugLog.playback("📝 DirectPlay: Adding subtitle track index=\(subtitleIndex)")
         }
 
         components?.queryItems = queryItems
 
         guard let url = components?.url else {
-            print("❌ Failed to construct Direct Play URL")
+            DebugLog.playback("❌ Failed to construct Direct Play URL")
             return nil
         }
 
-        print("🎬 Using URL: \(url.absoluteString)")
-        print("💎 DIRECT PLAY - HLS streaming, hardware decoded, 0% server CPU")
-        print("   VideoCodec: copy (no transcoding)")
-        print("   AudioCodec: copy (no transcoding)")
-        print("   Container: ts (MPEG Transport Stream)")
-        print("   Max Bitrate: \(String(format: "%.1f", Double(maxBitrate) / 1_000_000.0)) Mbps")
+        DebugLog.playback("🎬 Using URL: \(url.absoluteString)")
+        DebugLog.playback("💎 DIRECT PLAY - HLS streaming, hardware decoded, 0% server CPU")
+        DebugLog.playback("   VideoCodec: copy (no transcoding)")
+        DebugLog.playback("   AudioCodec: copy (no transcoding)")
+        DebugLog.playback("   Container: ts (MPEG Transport Stream)")
+        DebugLog.playback("   Max Bitrate: \(String(format: "%.1f", Double(maxBitrate) / 1_000_000.0)) Mbps")
         return url
     }
 
     private func buildDirectStreamURL() -> URL? {
-        print("🔊 Using Direct Stream - video native, transcode audio only")
+        DebugLog.playback("🔊 Using Direct Stream - video native, transcode audio only")
 
         var components = URLComponents(string: baseURL)
         components?.path = "/Videos/\(item.id)/master.m3u8"
@@ -253,19 +253,19 @@ struct PlaybackStreamURLBuilder {
 
         if let subtitleIndex = item.firstSubtitleIndex {
             queryItems.append(URLQueryItem(name: "SubtitleStreamIndex", value: "\(subtitleIndex)"))
-            print("📝 DirectStream: Adding subtitle track index=\(subtitleIndex)")
+            DebugLog.playback("📝 DirectStream: Adding subtitle track index=\(subtitleIndex)")
         }
 
         components?.queryItems = queryItems
 
         let url = components?.url
-        print("🔗 Direct Stream URL: \(url?.absoluteString ?? "nil")")
-        print("💪 Apple TV hardware will decode video, 5-10% server CPU for audio")
+        DebugLog.playback("🔗 Direct Stream URL: \(url?.absoluteString ?? "nil")")
+        DebugLog.playback("💪 Apple TV hardware will decode video, 5-10% server CPU for audio")
         return url
     }
 
     private func buildRemuxURL() -> URL? {
-        print("📦 Using Remux - container change only (MKV→MP4)")
+        DebugLog.playback("📦 Using Remux - container change only (MKV→MP4)")
 
         var components = URLComponents(string: baseURL)
         components?.path = "/Videos/\(item.id)/master.m3u8"
@@ -297,19 +297,19 @@ struct PlaybackStreamURLBuilder {
 
         if let subtitleIndex = item.firstSubtitleIndex {
             queryItems.append(URLQueryItem(name: "SubtitleStreamIndex", value: "\(subtitleIndex)"))
-            print("📝 Remux: Adding subtitle track index=\(subtitleIndex)")
+            DebugLog.playback("📝 Remux: Adding subtitle track index=\(subtitleIndex)")
         }
 
         components?.queryItems = queryItems
 
         let url = components?.url
-        print("🔗 Remux URL: \(url?.absoluteString ?? "nil")")
-        print("⚡ Fast container change, 10-20% server CPU, maximum quality")
+        DebugLog.playback("🔗 Remux URL: \(url?.absoluteString ?? "nil")")
+        DebugLog.playback("⚡ Fast container change, 10-20% server CPU, maximum quality")
         return url
     }
 
     private func buildTranscodeURL() -> URL? {
-        print("⚠️ Using transcoding - quality may be reduced")
+        DebugLog.playback("⚠️ Using transcoding - quality may be reduced")
 
         var components = URLComponents(string: baseURL)
         components?.path = "/Videos/\(item.id)/master.m3u8"
@@ -323,17 +323,17 @@ struct PlaybackStreamURLBuilder {
         let videoMbps = Double(videoBitrate) / 1_000_000.0
         let audioKbps = Double(audioBitrate) / 1_000.0
 
-        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print("📊 TRANSCODE SETTINGS")
-        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print("📊 Total bitrate: \(String(format: "%.0f", mbps)) Mbps")
-        print("📊 Video bitrate: \(String(format: "%.1f", videoMbps)) Mbps (determines resolution!)")
-        print("📊 Audio bitrate: \(String(format: "%.0f", audioKbps)) Kbps")
-        print("📊 Video codec: \(videoCodec)")
+        DebugLog.playback("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        DebugLog.playback("📊 TRANSCODE SETTINGS")
+        DebugLog.playback("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        DebugLog.playback("📊 Total bitrate: \(String(format: "%.0f", mbps)) Mbps")
+        DebugLog.playback("📊 Video bitrate: \(String(format: "%.1f", videoMbps)) Mbps (determines resolution!)")
+        DebugLog.playback("📊 Audio bitrate: \(String(format: "%.0f", audioKbps)) Kbps")
+        DebugLog.playback("📊 Video codec: \(videoCodec)")
 
         if maxBitrate != 120_000_000 {
-            print("⚠️ WARNING: Bitrate is NOT 120 Mbps!")
-            print("⚠️ Current: \(String(format: "%.0f", mbps)) Mbps")
+            DebugLog.playback("⚠️ WARNING: Bitrate is NOT 120 Mbps!")
+            DebugLog.playback("⚠️ Current: \(String(format: "%.0f", mbps)) Mbps")
         }
 
         var queryItems: [URLQueryItem] = [
@@ -363,17 +363,17 @@ struct PlaybackStreamURLBuilder {
 
         if let subtitleIndex = item.firstSubtitleIndex {
             queryItems.append(URLQueryItem(name: "SubtitleStreamIndex", value: "\(subtitleIndex)"))
-            print("📝 Adding subtitle track: index=\(subtitleIndex)")
+            DebugLog.playback("📝 Adding subtitle track: index=\(subtitleIndex)")
         }
 
         components?.queryItems = queryItems
 
         guard let url = components?.url else {
-            print("❌ Failed to construct transcode URL")
+            DebugLog.playback("❌ Failed to construct transcode URL")
             return nil
         }
 
-        print("🎬 Transcode URL: \(url.absoluteString)")
+        DebugLog.playback("🎬 Transcode URL: \(url.absoluteString)")
         return url
     }
 }

@@ -44,27 +44,27 @@ final class SubtitleTrackManager: ObservableObject {
     /// based on the user's `subtitleMode` and `defaultSubtitleLanguage`.
     func configure(player: AVPlayer?) {
         guard let player = player, let playerItem = player.currentItem else {
-            print("⚠️ configureSubtitles: No player or player item")
+            DebugLog.playback("⚠️ configureSubtitles: No player or player item")
             return
         }
 
-        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print("📝 SUBTITLE CONFIGURATION")
-        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print("📊 MediaItem subtitle info:")
-        print("   - Has subtitles: \(item.hasSubtitles)")
-        print("   - Subtitle streams count: \(item.subtitleStreams.count)")
+        DebugLog.playback("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        DebugLog.playback("📝 SUBTITLE CONFIGURATION")
+        DebugLog.playback("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        DebugLog.playback("📊 MediaItem subtitle info:")
+        DebugLog.playback("   - Has subtitles: \(item.hasSubtitles)")
+        DebugLog.playback("   - Subtitle streams count: \(item.subtitleStreams.count)")
 
         guard let group = playerItem.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) else {
-            print("❌ AVPlayer: No legible media selection group found")
-            print("❌ Jellyfin did NOT include subtitles in the HLS stream")
+            DebugLog.playback("❌ AVPlayer: No legible media selection group found")
+            DebugLog.playback("❌ Jellyfin did NOT include subtitles in the HLS stream")
             return
         }
 
-        print("✅ AVPlayer detected \(group.options.count) subtitle tracks")
+        DebugLog.playback("✅ AVPlayer detected \(group.options.count) subtitle tracks")
 
         availableTracks = group.options.enumerated().map { index, option in
-            print("   - Track \(index): \(option.displayName) (\(option.locale?.languageCode ?? "unknown"))")
+            DebugLog.playback("   - Track \(index): \(option.displayName) (\(option.locale?.languageCode ?? "unknown"))")
             return SubtitleTrack(
                 index: index,
                 displayName: option.displayName,
@@ -74,19 +74,19 @@ final class SubtitleTrackManager: ObservableObject {
         }
 
         let mode = SubtitleMode(rawValue: settingsManager.subtitleMode) ?? .off
-        print("📊 Subtitle mode setting: \(mode.rawValue)")
-        print("📊 Default subtitle language: \(settingsManager.defaultSubtitleLanguage)")
+        DebugLog.playback("📊 Subtitle mode setting: \(mode.rawValue)")
+        DebugLog.playback("📊 Default subtitle language: \(settingsManager.defaultSubtitleLanguage)")
 
         switch mode {
         case .off:
             // The original implementation also enabled the first track here,
             // commenting that the user can disable via native AVPlayer
             // controls. Preserved verbatim — Phase A is no behavior change.
-            print("⚠️ Subtitle mode is OFF, but enabling first track anyway")
+            DebugLog.playback("⚠️ Subtitle mode is OFF, but enabling first track anyway")
             if let firstOption = group.options.first {
                 playerItem.select(firstOption, in: group)
                 selectedIndex = 0
-                print("✅ Enabled first subtitle: \(firstOption.displayName)")
+                DebugLog.playback("✅ Enabled first subtitle: \(firstOption.displayName)")
             } else {
                 playerItem.select(nil, in: group)
                 selectedIndex = nil
@@ -94,7 +94,7 @@ final class SubtitleTrackManager: ObservableObject {
 
         case .on, .foreignOnly, .smart:
             let defaultLang = settingsManager.defaultSubtitleLanguage
-            print("🔍 Looking for subtitle with language: \(defaultLang)")
+            DebugLog.playback("🔍 Looking for subtitle with language: \(defaultLang)")
 
             let match = group.options.enumerated().first { _, option in
                 option.locale?.languageCode == defaultLang
@@ -103,13 +103,13 @@ final class SubtitleTrackManager: ObservableObject {
             if let (index, option) = match {
                 playerItem.select(option, in: group)
                 selectedIndex = index
-                print("✅ Enabled matching subtitle: \(option.displayName) at index \(index)")
+                DebugLog.playback("✅ Enabled matching subtitle: \(option.displayName) at index \(index)")
             } else if let firstOption = group.options.first {
                 playerItem.select(firstOption, in: group)
                 selectedIndex = 0
-                print("⚠️ No language match, enabling first subtitle: \(firstOption.displayName)")
+                DebugLog.playback("⚠️ No language match, enabling first subtitle: \(firstOption.displayName)")
             } else {
-                print("❌ No subtitles available to enable")
+                DebugLog.playback("❌ No subtitles available to enable")
             }
         }
     }
@@ -117,22 +117,22 @@ final class SubtitleTrackManager: ObservableObject {
     /// Programmatically pick a subtitle track. Pass `nil` to disable.
     func select(at index: Int?, player: AVPlayer?) {
         guard let player = player, let playerItem = player.currentItem else {
-            print("⚠️ selectSubtitle: No player or player item")
+            DebugLog.playback("⚠️ selectSubtitle: No player or player item")
             return
         }
 
         guard let group = playerItem.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) else {
-            print("⚠️ selectSubtitle: No legible media selection group")
+            DebugLog.playback("⚠️ selectSubtitle: No legible media selection group")
             return
         }
 
         if let index = index, index >= 0 && index < group.options.count {
             let option = group.options[index]
-            print("📝 Selecting subtitle at index \(index): \(option.displayName)")
+            DebugLog.playback("📝 Selecting subtitle at index \(index): \(option.displayName)")
             playerItem.select(option, in: group)
             selectedIndex = index
         } else {
-            print("📝 Disabling subtitles (index=nil)")
+            DebugLog.playback("📝 Disabling subtitles (index=nil)")
             playerItem.select(nil, in: group)
             selectedIndex = nil
         }

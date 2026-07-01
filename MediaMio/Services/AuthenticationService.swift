@@ -160,15 +160,15 @@ class AuthenticationService: ObservableObject {
     func testServerConnection(serverURL: String) async throws -> ServerInfo {
         // Validate URL format
         guard isValidURL(serverURL) else {
-            print("❌ Invalid URL format: \(serverURL)")
+            DebugLog.verbose("❌ Invalid URL format: \(serverURL)")
             throw APIError.invalidURL
         }
 
-        print("🔍 Testing connection to: \(serverURL)")
+        DebugLog.verbose("🔍 Testing connection to: \(serverURL)")
 
         // Test connection - let the actual error propagate
         let serverInfo = try await apiClient.testConnection(serverURL: serverURL)
-        print("✅ Connection successful to: \(serverInfo.serverName)")
+        DebugLog.verbose("✅ Connection successful to: \(serverInfo.serverName)")
         return serverInfo
     }
 

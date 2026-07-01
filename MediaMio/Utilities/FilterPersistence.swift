@@ -19,9 +19,9 @@ class FilterPersistence {
             let encoder = JSONEncoder()
             let data = try encoder.encode(filters)
             defaults.set(data, forKey: key)
-            print("💾 Saved filters for library: \(libraryId)")
+            DebugLog.verbose("💾 Saved filters for library: \(libraryId)")
         } catch {
-            print("❌ Failed to save filters for library \(libraryId): \(error)")
+            DebugLog.verbose("❌ Failed to save filters for library \(libraryId): \(error)")
         }
     }
 
@@ -30,17 +30,17 @@ class FilterPersistence {
         let key = keyPrefix + libraryId
 
         guard let data = defaults.data(forKey: key) else {
-            print("📂 No saved filters found for library: \(libraryId)")
+            DebugLog.verbose("📂 No saved filters found for library: \(libraryId)")
             return nil
         }
 
         do {
             let decoder = JSONDecoder()
             let filters = try decoder.decode(LibraryFilters.self, from: data)
-            print("📂 Loaded filters for library: \(libraryId) - \(filters.activeCount) active")
+            DebugLog.verbose("📂 Loaded filters for library: \(libraryId) - \(filters.activeCount) active")
             return filters
         } catch {
-            print("❌ Failed to load filters for library \(libraryId): \(error)")
+            DebugLog.verbose("❌ Failed to load filters for library \(libraryId): \(error)")
             return nil
         }
     }
@@ -49,7 +49,7 @@ class FilterPersistence {
     static func clear(for libraryId: String) {
         let key = keyPrefix + libraryId
         defaults.removeObject(forKey: key)
-        print("🗑️ Cleared filters for library: \(libraryId)")
+        DebugLog.verbose("🗑️ Cleared filters for library: \(libraryId)")
     }
 
     /// Clear all saved filters
@@ -61,6 +61,6 @@ class FilterPersistence {
             defaults.removeObject(forKey: key)
         }
 
-        print("🗑️ Cleared all saved filters (\(filterKeys.count) libraries)")
+        DebugLog.verbose("🗑️ Cleared all saved filters (\(filterKeys.count) libraries)")
     }
 }

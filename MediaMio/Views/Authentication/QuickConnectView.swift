@@ -213,7 +213,7 @@ struct QuickConnectView: View {
                 // loop in the API client already handles real transients;
                 // anything that escapes here (e.g. 404 if the server dropped
                 // the session) we surface and stop polling.
-                print("❌ Quick Connect poll error: \(error)")
+                DebugLog.verbose("❌ Quick Connect poll error: \(error)")
                 self.errorMessage = "Quick Connect session ended: \(error.localizedDescription)"
                 self.state = .failed
                 return

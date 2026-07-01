@@ -46,11 +46,11 @@ final class PlaybackSessionReporter {
 
     func reportStart(positionSeconds: Double, mode: PlaybackMode) async {
         guard !hasReportedStart else {
-            print("⚠️ Playback start already reported, skipping duplicate")
+            DebugLog.playback("⚠️ Playback start already reported, skipping duplicate")
             return
         }
         hasReportedStart = true
-        print("📊 Reporting playback start to Jellyfin (\(mode.rawValue))")
+        DebugLog.playback("📊 Reporting playback start to Jellyfin (\(mode.rawValue))")
 
         guard let url = URL(string: "\(baseURL)/Sessions/Playing") else { return }
 
@@ -66,15 +66,15 @@ final class PlaybackSessionReporter {
         do {
             let (_, response) = try await postJSON(url: url, body: body)
             if let http = response as? HTTPURLResponse {
-                print("✅ Playback start reported: \(http.statusCode)")
+                DebugLog.playback("✅ Playback start reported: \(http.statusCode)")
             }
         } catch {
             let nsError = error as NSError
             if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled {
-                print("ℹ️ Playback start report cancelled (view transition)")
+                DebugLog.playback("ℹ️ Playback start report cancelled (view transition)")
                 hasReportedStart = false  // allow retry on a real new session
             } else {
-                print("⚠️ Failed to report playback start: \(error)")
+                DebugLog.playback("⚠️ Failed to report playback start: \(error)")
             }
         }
     }
@@ -98,7 +98,7 @@ final class PlaybackSessionReporter {
     }
 
     func reportStopped(positionSeconds: Double, completed: Bool, mode: PlaybackMode) async {
-        print("📊 Reporting playback stopped (completed: \(completed))")
+        DebugLog.playback("📊 Reporting playback stopped (completed: \(completed))")
 
         guard let url = URL(string: "\(baseURL)/Sessions/Playing/Stopped") else { return }
 
@@ -115,10 +115,10 @@ final class PlaybackSessionReporter {
     }
 
     func markAsWatched() async {
-        print("✅ Marking item as watched (>= 90% complete)")
+        DebugLog.playback("✅ Marking item as watched (>= 90% complete)")
 
         guard let url = URL(string: "\(baseURL)/Users/\(userId)/PlayedItems/\(item.id)") else {
-            print("❌ Failed to create mark-as-watched URL")
+            DebugLog.playback("❌ Failed to create mark-as-watched URL")
             return
         }
 
@@ -129,10 +129,10 @@ final class PlaybackSessionReporter {
         do {
             let (_, response) = try await session.data(for: request)
             if let http = response as? HTTPURLResponse {
-                print("✅ Marked as watched: \(http.statusCode)")
+                DebugLog.playback("✅ Marked as watched: \(http.statusCode)")
             }
         } catch {
-            print("⚠️ Failed to mark as watched: \(error)")
+            DebugLog.playback("⚠️ Failed to mark as watched: \(error)")
         }
     }
 
@@ -164,25 +164,25 @@ final class PlaybackSessionReporter {
                 if let http = response as? HTTPURLResponse {
                     if (200...299).contains(http.statusCode) {
                         if attempt > 1 || label == "stopped" {
-                            print("✅ Playback \(label) reported: \(http.statusCode) (attempt \(attempt))")
+                            DebugLog.playback("✅ Playback \(label) reported: \(http.statusCode) (attempt \(attempt))")
                         }
                         return
                     }
                     if (400...499).contains(http.statusCode) {
-                        print("⚠️ Playback \(label) rejected by server: \(http.statusCode) — not retrying")
+                        DebugLog.playback("⚠️ Playback \(label) rejected by server: \(http.statusCode) — not retrying")
                         return
                     }
-                    print("⚠️ Playback \(label) attempt \(attempt) returned \(http.statusCode)")
+                    DebugLog.playback("⚠️ Playback \(label) attempt \(attempt) returned \(http.statusCode)")
                 }
             } catch {
-                print("⚠️ Playback \(label) attempt \(attempt) failed: \(error.localizedDescription)")
+                DebugLog.playback("⚠️ Playback \(label) attempt \(attempt) failed: \(error.localizedDescription)")
             }
             if attempt < maxAttempts {
                 let delay = backoffMs[min(attempt - 1, backoffMs.count - 1)]
                 try? await Task.sleep(nanoseconds: delay * 1_000_000)
             }
         }
-        print("❌ Playback \(label) gave up after \(maxAttempts) attempts")
+        DebugLog.playback("❌ Playback \(label) gave up after \(maxAttempts) attempts")
     }
 
     /// Maps the internal `PlaybackMode` to the string Jellyfin expects in

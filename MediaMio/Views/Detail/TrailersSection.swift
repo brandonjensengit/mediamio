@@ -68,7 +68,7 @@ private struct TrailerTile: View {
         .focusable()
         .focused($hasFocus)
         .onTapGesture {
-            print("🎬 Trailer focused: \(trailer.name ?? "Trailer") → \(trailer.url)")
+            DebugLog.verbose("🎬 Trailer focused: \(trailer.name ?? "Trailer") → \(trailer.url)")
         }
     }
 }

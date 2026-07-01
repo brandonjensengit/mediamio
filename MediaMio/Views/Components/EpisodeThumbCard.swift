@@ -268,7 +268,7 @@ struct EpisodeThumbCard: View {
         item: episode,
         baseURL: "https://demo.jellyfin.org/stable"
     ) {
-        print("Selected: \(episode.name)")
+        DebugLog.verbose("Selected: \(episode.name)")
     }
     .padding(40)
     .background(Constants.Colors.background)

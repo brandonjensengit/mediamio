@@ -186,7 +186,7 @@ class JellyfinAPIClient: ObservableObject {
                     throw error
                 }
                 let delayMs = Self.retryDelaysMs[attempt]
-                print("🔁 Transient failure on attempt \(attempt + 1)/\(Self.retryDelaysMs.count + 1): \(error.localizedDescription). Retrying in \(delayMs)ms.")
+                DebugLog.verbose("🔁 Transient failure on attempt \(attempt + 1)/\(Self.retryDelaysMs.count + 1): \(error.localizedDescription). Retrying in \(delayMs)ms.")
                 try? await Task.sleep(nanoseconds: delayMs * 1_000_000)
             }
         }
@@ -194,23 +194,23 @@ class JellyfinAPIClient: ObservableObject {
     }
 
     private func performSingleRequest<T: Decodable>(_ request: URLRequest) async throws -> T {
-        print("🌐 Making request to: \(request.url?.absoluteString ?? "unknown")")
+        DebugLog.verbose("🌐 Making request to: \(request.url?.absoluteString ?? "unknown")")
 
         do {
             let (data, response) = try await session.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                print("❌ Invalid response type")
+                DebugLog.verbose("❌ Invalid response type")
                 throw APIError.invalidResponse
             }
 
-            print("📡 Response status code: \(httpResponse.statusCode)")
+            DebugLog.verbose("📡 Response status code: \(httpResponse.statusCode)")
 
             switch httpResponse.statusCode {
             case 200...299:
                 break
             case 401:
-                print("❌ Authentication failed (401)")
+                DebugLog.verbose("❌ Authentication failed (401)")
                 // Clear the token *before* notifying so any in-flight retries
                 // or concurrent requests see an empty token and don't pile up
                 // additional 401s. Only post the notification on the first
@@ -227,26 +227,26 @@ class JellyfinAPIClient: ObservableObject {
                 }
                 throw APIError.authenticationFailed
             default:
-                print("❌ HTTP error: \(httpResponse.statusCode)")
+                DebugLog.verbose("❌ HTTP error: \(httpResponse.statusCode)")
                 throw APIError.httpError(httpResponse.statusCode)
             }
 
             do {
                 let decoded = try decoder.decode(T.self, from: data)
-                print("✅ Successfully decoded response")
+                DebugLog.verbose("✅ Successfully decoded response")
                 return decoded
             } catch {
-                print("❌ Decoding error: \(error)")
-                print("📄 Response data: \(String(data: data, encoding: .utf8) ?? "Unable to decode")")
+                DebugLog.verbose("❌ Decoding error: \(error)")
+                DebugLog.verbose("📄 Response data: \(String(data: data, encoding: .utf8) ?? "Unable to decode")")
                 throw APIError.decodingError(error)
             }
         } catch let error as URLError {
-            print("❌ Network error: \(error.localizedDescription) (code \(error.code.rawValue))")
+            DebugLog.verbose("❌ Network error: \(error.localizedDescription) (code \(error.code.rawValue))")
             throw APIError.networkError(error)
         } catch let error as APIError {
             throw error
         } catch {
-            print("❌ Unknown error: \(error)")
+            DebugLog.verbose("❌ Unknown error: \(error)")
             throw error
         }
     }
@@ -328,7 +328,7 @@ class JellyfinAPIClient: ObservableObject {
             let enabled: Bool = try await get(endpoint: "/QuickConnect/Enabled")
             return enabled
         } catch {
-            print("⚠️ Quick Connect enabled-check failed (treating as disabled): \(error)")
+            DebugLog.verbose("⚠️ Quick Connect enabled-check failed (treating as disabled): \(error)")
             return false
         }
     }

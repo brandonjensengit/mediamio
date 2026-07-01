@@ -66,7 +66,7 @@ final class ServerDiscoveryService: ObservableObject {
 
             browser.stateUpdateHandler = { state in
                 if case .failed(let err) = state {
-                    print("⚠️ NWBrowser(\(type)) failed: \(err)")
+                    DebugLog.verbose("⚠️ NWBrowser(\(type)) failed: \(err)")
                 }
             }
 

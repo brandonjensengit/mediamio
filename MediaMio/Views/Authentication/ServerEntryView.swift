@@ -66,10 +66,10 @@ struct ServerEntryView: View {
         .onAppear { discovery.start() }
         .onDisappear { discovery.stop() }
         .onChange(of: isConnected) { oldValue, newValue in
-            print("🔄 isConnected changed from \(oldValue) to \(newValue)")
+            DebugLog.verbose("🔄 isConnected changed from \(oldValue) to \(newValue)")
             if newValue {
-                print("✅ Connection successful, showing login")
-                print("📝 Server info: \(serverInfo?.serverName ?? "nil")")
+                DebugLog.verbose("✅ Connection successful, showing login")
+                DebugLog.verbose("📝 Server info: \(serverInfo?.serverName ?? "nil")")
                 showingLogin = true
             }
         }
@@ -288,7 +288,7 @@ struct ServerEntryView: View {
 
         do {
             let info = try await authService.testServerConnection(serverURL: normalizedURL)
-            print("📥 Received server info: \(info.serverName)")
+            DebugLog.verbose("📥 Received server info: \(info.serverName)")
             serverInfo = info
             isConnected = true
 
@@ -296,7 +296,7 @@ struct ServerEntryView: View {
             UserDefaults.standard.set(normalizedURL, forKey: Constants.UserDefaultsKeys.lastServerURL)
 
         } catch {
-            print("❌ Connection failed: \(error)")
+            DebugLog.verbose("❌ Connection failed: \(error)")
             isConnected = false
 
             if let apiError = error as? APIError {

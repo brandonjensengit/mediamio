@@ -75,7 +75,7 @@ class LibraryViewModel: ObservableObject {
         if let libraryId = libraryId,
            let savedFilters = FilterPersistence.load(for: libraryId) {
             self.filters = savedFilters
-            print("📂 Restored \(savedFilters.activeCount) saved filters for library: \(libraryId)")
+            DebugLog.verbose("📂 Restored \(savedFilters.activeCount) saved filters for library: \(libraryId)")
         }
     }
 
@@ -126,7 +126,7 @@ class LibraryViewModel: ObservableObject {
 
     /// Apply current filters and reload content
     func applyFilters() async {
-        print("🔍 Applying filters: \(filters.activeCount) active")
+        DebugLog.verbose("🔍 Applying filters: \(filters.activeCount) active")
 
         // Save filters
         if let libraryId = libraryId {
@@ -138,7 +138,7 @@ class LibraryViewModel: ObservableObject {
 
     /// Clear all filters and reload
     func clearFilters() async {
-        print("🧹 Clearing all filters")
+        DebugLog.verbose("🧹 Clearing all filters")
         filters.clear()
 
         // Clear saved filters
@@ -153,7 +153,7 @@ class LibraryViewModel: ObservableObject {
     func loadFilterOptions() async {
         guard let libraryId = libraryId else { return }
 
-        print("📋 Loading filter options for library: \(libraryId)")
+        DebugLog.verbose("📋 Loading filter options for library: \(libraryId)")
 
         // Load genres from items (once we have items)
         let uniqueGenres = Set(items.flatMap { $0.genres ?? [] })
@@ -166,7 +166,7 @@ class LibraryViewModel: ObservableObject {
         let years = items.compactMap { $0.productionYear }
         availableYears = Array(Set(years)).sorted(by: >)
 
-        print("✅ Loaded \(availableGenres.count) genres, \(availableYears.count) years")
+        DebugLog.verbose("✅ Loaded \(availableGenres.count) genres, \(availableYears.count) years")
     }
 
     // MARK: - Load Content
@@ -174,7 +174,7 @@ class LibraryViewModel: ObservableObject {
     func loadContent() async {
         guard paginator.canReload else { return }
 
-        print("📚 Loading library content: \(title)")
+        DebugLog.verbose("📚 Loading library content: \(title)")
         errorMessage = nil
         paginator.beginReload()
         isLoading = true
@@ -188,7 +188,7 @@ class LibraryViewModel: ObservableObject {
     func loadMore() async {
         guard paginator.canLoadMore else { return }
 
-        print("📚 Loading more items (startIndex: \(paginator.currentStartIndex))")
+        DebugLog.verbose("📚 Loading more items (startIndex: \(paginator.currentStartIndex))")
         paginator.beginLoadMore()
         isLoadingMore = true
 
@@ -219,10 +219,10 @@ class LibraryViewModel: ObservableObject {
             paginator.apply(response)
             items = paginator.items
 
-            print("✅ Loaded \(response.items.count) items (total: \(items.count), hasMore: \(paginator.hasMore))")
+            DebugLog.verbose("✅ Loaded \(response.items.count) items (total: \(items.count), hasMore: \(paginator.hasMore))")
 
         } catch {
-            print("❌ Failed to load library content: \(error)")
+            DebugLog.verbose("❌ Failed to load library content: \(error)")
             errorMessage = "Failed to load content: \(error.localizedDescription)"
         }
     }
@@ -234,7 +234,7 @@ class LibraryViewModel: ObservableObject {
     func changeSortOption(_ option: SortOption) async {
         guard option != sortOption else { return }
 
-        print("🔄 Changing sort to: \(option.displayName)")
+        DebugLog.verbose("🔄 Changing sort to: \(option.displayName)")
         sortOption = option
         // Letter-jump is only meaningful under alphabetical sort — clear it
         // when the user switches to a different ordering.
@@ -258,7 +258,7 @@ class LibraryViewModel: ObservableObject {
     /// (digit or symbol) — Jellyfin's `NameStartsWith=#` matches digits.
     func jumpToLetter(_ letter: String?) async {
         guard letter != activeLetter else { return }
-        print("🔤 Letter jump → \(letter ?? "all")")
+        DebugLog.verbose("🔤 Letter jump → \(letter ?? "all")")
         activeLetter = letter
         await loadContent()
     }
@@ -268,7 +268,7 @@ class LibraryViewModel: ObservableObject {
     func searchLibrary(query: String, limit: Int = 100) async throws -> [MediaItem] {
         guard !query.isEmpty else { return [] }
 
-        print("🔍 Searching library '\(title)' for: '\(query)'")
+        DebugLog.verbose("🔍 Searching library '\(title)' for: '\(query)'")
 
         let response = try await contentService.searchItems(
             searchTerm: query,
@@ -277,14 +277,14 @@ class LibraryViewModel: ObservableObject {
             startIndex: 0
         )
 
-        print("✅ Found \(response.items.count) results")
+        DebugLog.verbose("✅ Found \(response.items.count) results")
         return response.items
     }
 
     // MARK: - Actions
 
     func selectItem(_ item: MediaItem) {
-        print("📺 Selected: \(item.name)")
+        DebugLog.verbose("📺 Selected: \(item.name)")
         navigationCoordinator?.navigate(to: item)
     }
 

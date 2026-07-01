@@ -117,7 +117,7 @@ final class PlaybackLifecycleController {
             do {
                 try activateAudioSession()
             } catch {
-                print("⚠️ Failed to re-activate audio session after interruption: \(error)")
+                DebugLog.playback("⚠️ Failed to re-activate audio session after interruption: \(error)")
                 return
             }
             resume()

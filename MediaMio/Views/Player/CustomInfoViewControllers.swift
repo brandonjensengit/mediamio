@@ -57,7 +57,7 @@ class BitrateSelectionViewController: UIViewController, AVPlayerViewControllerDe
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
         ])
 
-        print("📊 BitrateSelectionViewController loaded with \(bitrateOptions.count) options")
+        DebugLog.playback("📊 BitrateSelectionViewController loaded with \(bitrateOptions.count) options")
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -65,7 +65,7 @@ class BitrateSelectionViewController: UIViewController, AVPlayerViewControllerDe
 
         // Force reload data when view appears
         tableView.reloadData()
-        print("📊 BitrateSelectionViewController appeared, table reloaded")
+        DebugLog.playback("📊 BitrateSelectionViewController appeared, table reloaded")
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -84,12 +84,12 @@ class BitrateSelectionViewController: UIViewController, AVPlayerViewControllerDe
 extension BitrateSelectionViewController: UITableViewDelegate, UITableViewDataSource {
 
     func numberOfSections(in tableView: UITableView) -> Int {
-        print("📊 numberOfSections called: returning 1")
+        DebugLog.playback("📊 numberOfSections called: returning 1")
         return 1
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        print("📊 numberOfRowsInSection called: returning \(bitrateOptions.count)")
+        DebugLog.playback("📊 numberOfRowsInSection called: returning \(bitrateOptions.count)")
         return bitrateOptions.count
     }
 
@@ -112,7 +112,7 @@ extension BitrateSelectionViewController: UITableViewDelegate, UITableViewDataSo
             cell.accessoryType = .none
         }
 
-        print("📊 Configuring cell \(indexPath.row): \(option.label)")
+        DebugLog.playback("📊 Configuring cell \(indexPath.row): \(option.label)")
 
         return cell
     }
@@ -126,7 +126,7 @@ extension BitrateSelectionViewController: UITableViewDelegate, UITableViewDataSo
         // Reload to update checkmarks
         tableView.reloadData()
 
-        print("📊 Bitrate changed to: \(option.label)")
+        DebugLog.playback("📊 Bitrate changed to: \(option.label)")
 
         // Post notification to reload video with new bitrate
         NotificationCenter.default.post(name: NSNotification.Name("ReloadVideoWithNewBitrate"), object: nil)
@@ -184,7 +184,7 @@ class AudioQualitySelectionViewController: UIViewController, AVPlayerViewControl
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
         ])
 
-        print("🔊 AudioQualitySelectionViewController loaded with \(audioQualityOptions.count) options")
+        DebugLog.playback("🔊 AudioQualitySelectionViewController loaded with \(audioQualityOptions.count) options")
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -192,7 +192,7 @@ class AudioQualitySelectionViewController: UIViewController, AVPlayerViewControl
 
         // Force reload data when view appears
         tableView.reloadData()
-        print("🔊 AudioQualitySelectionViewController appeared, table reloaded")
+        DebugLog.playback("🔊 AudioQualitySelectionViewController appeared, table reloaded")
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -211,12 +211,12 @@ class AudioQualitySelectionViewController: UIViewController, AVPlayerViewControl
 extension AudioQualitySelectionViewController: UITableViewDelegate, UITableViewDataSource {
 
     func numberOfSections(in tableView: UITableView) -> Int {
-        print("🔊 numberOfSections called: returning 1")
+        DebugLog.playback("🔊 numberOfSections called: returning 1")
         return 1
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        print("🔊 numberOfRowsInSection called: returning \(audioQualityOptions.count)")
+        DebugLog.playback("🔊 numberOfRowsInSection called: returning \(audioQualityOptions.count)")
         return audioQualityOptions.count
     }
 
@@ -239,7 +239,7 @@ extension AudioQualitySelectionViewController: UITableViewDelegate, UITableViewD
             cell.accessoryType = .none
         }
 
-        print("🔊 Configuring cell \(indexPath.row): \(option.label)")
+        DebugLog.playback("🔊 Configuring cell \(indexPath.row): \(option.label)")
 
         return cell
     }
@@ -253,7 +253,7 @@ extension AudioQualitySelectionViewController: UITableViewDelegate, UITableViewD
         // Reload to update checkmarks
         tableView.reloadData()
 
-        print("🔊 Audio quality changed to: \(option.label)")
+        DebugLog.playback("🔊 Audio quality changed to: \(option.label)")
 
         // Post notification to reload video with new audio quality
         NotificationCenter.default.post(name: NSNotification.Name("ReloadVideoWithNewAudioQuality"), object: nil)
@@ -334,16 +334,16 @@ class PlaybackInfoViewController: UIViewController, AVPlayerViewControllerDelega
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
         ])
 
-        print("📋 PlaybackInfoViewController viewDidLoad — sections=\(info.sections.count) rows=\(info.totalRows)")
+        DebugLog.playback("📋 PlaybackInfoViewController viewDidLoad — sections=\(info.sections.count) rows=\(info.totalRows)")
         for section in info.sections {
-            print("   § \(section.title): \(section.rows.count) rows — \(section.rows.map { "\($0.label)=\($0.value)" }.joined(separator: ", "))")
+            DebugLog.playback("   § \(section.title): \(section.rows.count) rows — \(section.rows.map { "\($0.label)=\($0.value)" }.joined(separator: ", "))")
         }
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         tableView.reloadData()  // picks up any mid-playback mode flips
-        print("📋 PlaybackInfoViewController viewWillAppear — rendering \(info.totalRows) rows across \(info.sections.count) sections")
+        DebugLog.playback("📋 PlaybackInfoViewController viewWillAppear — rendering \(info.totalRows) rows across \(info.sections.count) sections")
     }
 
     /// Push fresh info into the pane. Called by the player when the

@@ -55,10 +55,10 @@ final class IntroCreditsController: ObservableObject {
     /// Fetch intro markers from Jellyfin's intro-skipper plugin.
     /// Silent on 404 — most items don't have markers.
     func fetchMarkers() async {
-        print("🎬 Fetching intro markers from Jellyfin")
+        DebugLog.playback("🎬 Fetching intro markers from Jellyfin")
 
         guard let url = URL(string: "\(baseURL)/Shows/\(itemId)/IntroTimestamps") else {
-            print("❌ Failed to create intro markers URL")
+            DebugLog.playback("❌ Failed to create intro markers URL")
             return
         }
 
@@ -78,22 +78,22 @@ final class IntroCreditsController: ObservableObject {
                        let end = markers["IntroEnd"] as? Double {
                         introStart = start
                         introEnd = end
-                        print("✅ Intro detected: \(formatTime(start)) - \(formatTime(end))")
+                        DebugLog.playback("✅ Intro detected: \(formatTime(start)) - \(formatTime(end))")
                     }
                     if let start = markers["CreditsStart"] as? Double,
                        let end = markers["CreditsEnd"] as? Double {
                         creditsStart = start
                         creditsEnd = end
-                        print("✅ Credits detected: \(formatTime(start)) - \(formatTime(end))")
+                        DebugLog.playback("✅ Credits detected: \(formatTime(start)) - \(formatTime(end))")
                     }
                 }
             case 404:
-                print("ℹ️ No intro markers available for this item")
+                DebugLog.playback("ℹ️ No intro markers available for this item")
             default:
-                print("⚠️ Intro markers request returned: \(http.statusCode)")
+                DebugLog.playback("⚠️ Intro markers request returned: \(http.statusCode)")
             }
         } catch {
-            print("⚠️ Failed to fetch intro markers: \(error)")
+            DebugLog.playback("⚠️ Failed to fetch intro markers: \(error)")
         }
     }
 
@@ -117,7 +117,7 @@ final class IntroCreditsController: ObservableObject {
                 let countdown = settingsManager.skipIntroCountdown
                 if countdown > 0 {
                     if abs(currentTime - start) < 1.0 {
-                        print("⏳ Auto-skipping intro in \(countdown) seconds...")
+                        DebugLog.playback("⏳ Auto-skipping intro in \(countdown) seconds...")
                         DispatchQueue.main.asyncAfter(deadline: .now() + Double(countdown)) { [weak self] in
                             guard let self = self, !self.hasSkippedIntro else { return }
                             self.skip(player: player)
@@ -144,7 +144,7 @@ final class IntroCreditsController: ObservableObject {
                 let countdown = settingsManager.skipCreditsCountdown
                 if countdown > 0 {
                     if abs(currentTime - start) < 1.0 {
-                        print("⏳ Auto-skipping credits in \(countdown) seconds...")
+                        DebugLog.playback("⏳ Auto-skipping credits in \(countdown) seconds...")
                         DispatchQueue.main.asyncAfter(deadline: .now() + Double(countdown)) { [weak self] in
                             guard let self = self, !self.hasSkippedCredits else { return }
                             self.skipCredits(player: player)
@@ -163,7 +163,7 @@ final class IntroCreditsController: ObservableObject {
     /// player to the end of the intro and dismisses the button.
     func skip(player: AVPlayer?) {
         guard let player = player, let end = introEnd else { return }
-        print("⏭️ Skipping intro to: \(formatTime(end))")
+        DebugLog.playback("⏭️ Skipping intro to: \(formatTime(end))")
         let seekTime = CMTime(seconds: end, preferredTimescale: 600)
         player.seek(to: seekTime, toleranceBefore: .zero, toleranceAfter: .zero)
         hasSkippedIntro = true
@@ -175,7 +175,7 @@ final class IntroCreditsController: ObservableObject {
     /// player's didPlayToEndTime notification to fire.
     func skipCredits(player: AVPlayer?) {
         guard let player = player, let end = creditsEnd else { return }
-        print("⏭️ Skipping credits to: \(formatTime(end))")
+        DebugLog.playback("⏭️ Skipping credits to: \(formatTime(end))")
         let seekTime = CMTime(seconds: end, preferredTimescale: 600)
         player.seek(to: seekTime, toleranceBefore: .zero, toleranceAfter: .zero)
         hasSkippedCredits = true

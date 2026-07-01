@@ -47,7 +47,7 @@ class LibraryTabViewModel: ObservableObject {
     func loadLibraries() async {
         guard !isLoading else { return }
 
-        print("📚 Loading libraries for Library tab")
+        DebugLog.verbose("📚 Loading libraries for Library tab")
         isLoading = true
         errorMessage = nil
 
@@ -57,9 +57,9 @@ class LibraryTabViewModel: ObservableObject {
             // Create view models for each category
             await createCategoryViewModels()
 
-            print("✅ Loaded \(libraries.count) libraries")
+            DebugLog.verbose("✅ Loaded \(libraries.count) libraries")
         } catch {
-            print("❌ Failed to load libraries: \(error)")
+            DebugLog.verbose("❌ Failed to load libraries: \(error)")
             errorMessage = "Failed to load libraries: \(error.localizedDescription)"
         }
 
@@ -71,7 +71,7 @@ class LibraryTabViewModel: ObservableObject {
     func selectCategory(_ category: LibraryCategory) {
         guard category != selectedCategory else { return }
 
-        print("🔄 Switching to category: \(category.displayName)")
+        DebugLog.verbose("🔄 Switching to category: \(category.displayName)")
         selectedCategory = category
     }
 
@@ -93,9 +93,9 @@ class LibraryTabViewModel: ObservableObject {
                 navigationCoordinator: navigationCoordinator
             )
 
-            print("✅ Created Movies view model for library: \(moviesLibrary.name)")
+            DebugLog.verbose("✅ Created Movies view model for library: \(moviesLibrary.name)")
         } else {
-            print("⚠️ No Movies library found")
+            DebugLog.verbose("⚠️ No Movies library found")
         }
 
         // TV Shows
@@ -113,9 +113,9 @@ class LibraryTabViewModel: ObservableObject {
                 navigationCoordinator: navigationCoordinator
             )
 
-            print("✅ Created TV Shows view model for library: \(tvLibrary.name)")
+            DebugLog.verbose("✅ Created TV Shows view model for library: \(tvLibrary.name)")
         } else {
-            print("⚠️ No TV Shows library found")
+            DebugLog.verbose("⚠️ No TV Shows library found")
         }
     }
 }

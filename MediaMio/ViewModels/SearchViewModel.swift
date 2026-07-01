@@ -123,7 +123,7 @@ class SearchViewModel: ObservableObject {
             return
         }
 
-        print("🔍 Searching for: '\(query)' (filter: \(filterType.rawValue))")
+        DebugLog.verbose("🔍 Searching for: '\(query)' (filter: \(filterType.rawValue))")
         errorMessage = nil
         paginator.beginReload()
         isSearching = true
@@ -158,7 +158,7 @@ class SearchViewModel: ObservableObject {
             paginator.apply(response)
             results = paginator.items
 
-            print("✅ Found \(response.items.count) results (total: \(results.count), hasMore: \(paginator.hasMore))")
+            DebugLog.verbose("✅ Found \(response.items.count) results (total: \(results.count), hasMore: \(paginator.hasMore))")
 
             // Record the query once we know it matched something. Queries
             // that return zero results aren't worth re-offering. Only the
@@ -171,7 +171,7 @@ class SearchViewModel: ObservableObject {
         } catch {
             if Task.isCancelled { return }
 
-            print("❌ Search failed: \(error)")
+            DebugLog.verbose("❌ Search failed: \(error)")
             errorMessage = "Search failed: \(error.localizedDescription)"
         }
     }
@@ -180,7 +180,7 @@ class SearchViewModel: ObservableObject {
         guard paginator.canLoadMore else { return }
         guard !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty else { return }
 
-        print("🔍 Loading more results (startIndex: \(paginator.currentStartIndex))")
+        DebugLog.verbose("🔍 Loading more results (startIndex: \(paginator.currentStartIndex))")
         paginator.beginLoadMore()
         isLoadingMore = true
 
@@ -193,7 +193,7 @@ class SearchViewModel: ObservableObject {
     func changeFilter(_ filter: FilterType) {
         guard filter != filterType else { return }
 
-        print("🔄 Changing filter to: \(filter.rawValue)")
+        DebugLog.verbose("🔄 Changing filter to: \(filter.rawValue)")
         filterType = filter
 
         // Re-trigger search with new filter
@@ -212,7 +212,7 @@ class SearchViewModel: ObservableObject {
     // MARK: - Actions
 
     func selectItem(_ item: MediaItem) {
-        print("📺 Selected search result: \(item.name)")
+        DebugLog.verbose("📺 Selected search result: \(item.name)")
         navigationCoordinator?.navigate(to: item)
     }
 

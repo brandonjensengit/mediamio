@@ -70,7 +70,7 @@ struct BitratePickerModal: View {
                                 isSelected: settingsManager.maxBitrate == option.bps,
                                 action: {
                                     settingsManager.maxBitrate = option.bps
-                                    print("📊 Bitrate changed to: \(option.mbps) Mbps")
+                                    DebugLog.playback("📊 Bitrate changed to: \(option.mbps) Mbps")
                                 }
                             )
                             .focused($focusedBitrate, equals: index)

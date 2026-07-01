@@ -296,7 +296,7 @@ struct ProgressBar: View {
         item: mockItem,
         baseURL: "https://demo.jellyfin.org/stable"
     ) {
-        print("Selected: \(mockItem.name)")
+        DebugLog.verbose("Selected: \(mockItem.name)")
     }
     .padding()
     .background(Color.black)

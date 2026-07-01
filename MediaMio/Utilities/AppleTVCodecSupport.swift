@@ -76,7 +76,7 @@ class AppleTVCodecSupport {
     /// Determine the best playback mode for a media item
     func getBestPlaybackMode(for item: MediaItem) -> PlaybackMode {
         guard let mediaSource = item.mediaSources?.first else {
-            print("⚠️ No media source - defaulting to transcode")
+            DebugLog.playback("⚠️ No media source - defaulting to transcode")
             return .transcode
         }
 
@@ -87,31 +87,31 @@ class AppleTVCodecSupport {
         let videoCodec = videoStream?.codec
         let audioCodec = audioStream?.codec
 
-        print("📊 Codec Analysis:")
-        print("   Container: \(container ?? "unknown")")
-        print("   Video Codec: \(videoCodec ?? "unknown")")
-        print("   Audio Codec: \(audioCodec ?? "unknown")")
+        DebugLog.playback("📊 Codec Analysis:")
+        DebugLog.playback("   Container: \(container ?? "unknown")")
+        DebugLog.playback("   Video Codec: \(videoCodec ?? "unknown")")
+        DebugLog.playback("   Audio Codec: \(audioCodec ?? "unknown")")
 
         let videoSupported = isVideoCodecSupported(videoCodec)
         let audioSupported = isAudioCodecSupported(audioCodec)
         let containerSupported = isContainerSupported(container)
 
-        print("   Video Supported: \(videoSupported ? "✅" : "❌")")
-        print("   Audio Supported: \(audioSupported ? "✅" : "❌")")
-        print("   Container Supported: \(containerSupported ? "✅" : "❌")")
+        DebugLog.playback("   Video Supported: \(videoSupported ? "✅" : "❌")")
+        DebugLog.playback("   Audio Supported: \(audioSupported ? "✅" : "❌")")
+        DebugLog.playback("   Container Supported: \(containerSupported ? "✅" : "❌")")
 
         // Decision tree for best mode
         if videoSupported && audioSupported && containerSupported {
-            print("💎 DIRECT PLAY - All formats natively supported!")
+            DebugLog.playback("💎 DIRECT PLAY - All formats natively supported!")
             return .directPlay
         } else if videoSupported && audioSupported && !containerSupported {
-            print("📦 REMUX - Need container change only (MKV→MP4)")
+            DebugLog.playback("📦 REMUX - Need container change only (MKV→MP4)")
             return .remux
         } else if videoSupported && !audioSupported {
-            print("🔊 DIRECT STREAM - Video native, transcode audio only")
+            DebugLog.playback("🔊 DIRECT STREAM - Video native, transcode audio only")
             return .directStream
         } else {
-            print("⚙️ TRANSCODE - Video codec not supported, full transcode needed")
+            DebugLog.playback("⚙️ TRANSCODE - Video codec not supported, full transcode needed")
             return .transcode
         }
     }

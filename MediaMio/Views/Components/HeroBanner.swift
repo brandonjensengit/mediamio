@@ -539,9 +539,9 @@ struct MetadataBadge: View {
     HeroBanner(
         item: mockItem,
         baseURL: "https://demo.jellyfin.org/stable",
-        onPlay: { print("Play tapped") },
-        onPlayFromBeginning: { print("Play from beginning tapped") },
-        onInfo: { print("Info tapped") }
+        onPlay: { DebugLog.verbose("Play tapped") },
+        onPlayFromBeginning: { DebugLog.verbose("Play from beginning tapped") },
+        onInfo: { DebugLog.verbose("Info tapped") }
     )
     .background(Color.black)
 }

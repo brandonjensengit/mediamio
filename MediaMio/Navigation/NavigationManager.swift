@@ -62,7 +62,7 @@ class NavigationManager: ObservableObject {
     /// Present detail view for a media item
     func showDetail(for item: MediaItem) {
         presentedItem = item
-        print("📱 Showing detail for: \(item.name)")
+        DebugLog.focus("📱 Showing detail for: \(item.name)")
     }
 
     /// Start playing a media item. Pass `startPositionTicks` to jump to a
@@ -81,7 +81,7 @@ class NavigationManager: ObservableObject {
         } else {
             showingPlayerAtRoot = true
         }
-        print("▶️ Playing: \(item.name)")
+        DebugLog.focus("▶️ Playing: \(item.name)")
     }
 
     /// Invoked by whichever `.fullScreenCover` presented the player, on
@@ -95,7 +95,7 @@ class NavigationManager: ObservableObject {
     /// Dismiss the detail view
     func dismissDetail() {
         presentedItem = nil
-        print("📱 Dismissed detail view")
+        DebugLog.focus("📱 Dismissed detail view")
     }
 
     /// Close the video player. Currently unused — the fullScreenCover
@@ -106,7 +106,7 @@ class NavigationManager: ObservableObject {
         showingPlayerOverDetail = false
         currentPlayerItem = nil
         currentPlayerStartTicks = nil
-        print("⏹️ Closed player")
+        DebugLog.focus("⏹️ Closed player")
     }
 
     // MARK: - Focus Memory
@@ -114,7 +114,7 @@ class NavigationManager: ObservableObject {
     /// Remember focus position for a specific row, keyed by stableKey.
     func rememberFocus(rowKey: String, itemIndex: Int) {
         focusedItemIndices[rowKey] = itemIndex
-        print("🎯 Remembered focus: Row \(rowKey), Item \(itemIndex)")
+        DebugLog.focus("🎯 Remembered focus: Row \(rowKey), Item \(itemIndex)")
     }
 
     /// Recall last focused item index for a row.
@@ -133,7 +133,7 @@ class NavigationManager: ObservableObject {
     /// Switch to a specific tab
     func switchToTab(_ tab: Tab) {
         selectedTab = tab
-        print("🔀 Switched to tab: \(tab.rawValue)")
+        DebugLog.focus("🔀 Switched to tab: \(tab.rawValue)")
     }
 }
 

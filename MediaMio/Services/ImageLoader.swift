@@ -54,7 +54,7 @@ class ImageLoader: ObservableObject {
                 if !Task.isCancelled {
                     self.error = error
                     self.isLoading = false
-                    print("❌ Failed to load image: \(error.localizedDescription)")
+                    DebugLog.verbose("❌ Failed to load image: \(error.localizedDescription)")
                 }
             }
         }
@@ -154,7 +154,7 @@ class ImageLoader: ObservableObject {
                 }
             } catch {
                 // Prefetch is best-effort; a real load will surface errors to the user.
-                print("↩︎ Prefetch failed for \(urlString): \(error.localizedDescription)")
+                DebugLog.verbose("↩︎ Prefetch failed for \(urlString): \(error.localizedDescription)")
             }
         }
     }

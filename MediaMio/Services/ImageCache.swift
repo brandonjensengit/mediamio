@@ -117,7 +117,7 @@ class ImageCache: NSObject {
             try data.write(to: fileURL)
             await checkDiskCacheSize()
         } catch {
-            print("❌ Failed to write image to disk cache: \(error)")
+            DebugLog.verbose("❌ Failed to write image to disk cache: \(error)")
         }
     }
 
@@ -143,7 +143,7 @@ class ImageCache: NSObject {
     }
 
     @objc private func handleMemoryWarning() {
-        print("⚠️ Memory warning — clearing in-memory image cache")
+        DebugLog.verbose("⚠️ Memory warning — clearing in-memory image cache")
         clearMemoryCache()
     }
 
@@ -154,7 +154,7 @@ class ImageCache: NSObject {
                 try? fileManager.removeItem(at: fileURL)
             }
         } catch {
-            print("❌ Failed to clear disk cache: \(error)")
+            DebugLog.verbose("❌ Failed to clear disk cache: \(error)")
         }
     }
 
@@ -195,10 +195,10 @@ class ImageCache: NSObject {
                     removedSize += file.size
                 }
 
-                print("🗑️ Pruned \(removedSize / 1024 / 1024) MB from disk cache")
+                DebugLog.verbose("🗑️ Pruned \(removedSize / 1024 / 1024) MB from disk cache")
             }
         } catch {
-            print("❌ Failed to check disk cache size: \(error)")
+            DebugLog.verbose("❌ Failed to check disk cache size: \(error)")
         }
     }
 
@@ -226,10 +226,10 @@ class ImageCache: NSObject {
             }
 
             if removedCount > 0 {
-                print("🗑️ Removed \(removedCount) old cache files")
+                DebugLog.verbose("🗑️ Removed \(removedCount) old cache files")
             }
         } catch {
-            print("❌ Failed to clean old cache: \(error)")
+            DebugLog.verbose("❌ Failed to clean old cache: \(error)")
         }
     }
 
@@ -261,7 +261,7 @@ class ImageCache: NSObject {
                 }
             }
         } catch {
-            print("❌ Failed to get cache stats: \(error)")
+            DebugLog.verbose("❌ Failed to get cache stats: \(error)")
         }
 
         return (0, diskSize, diskCount)

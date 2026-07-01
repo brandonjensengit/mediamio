@@ -95,7 +95,7 @@ final class NowPlayingPublisher {
             } catch {
                 // Artwork is best-effort; a failure here is not worth
                 // surfacing to the user.
-                print("⚠️ Now-playing artwork fetch failed: \(error)")
+                DebugLog.playback("⚠️ Now-playing artwork fetch failed: \(error)")
             }
         }
     }

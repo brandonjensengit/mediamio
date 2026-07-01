@@ -318,9 +318,9 @@ extension View {
             section: section,
             baseURL: "https://demo.jellyfin.org/stable"
         ) { item in
-            print("Selected: \(item.name)")
+            DebugLog.verbose("Selected: \(item.name)")
         } onSeeAll: {
-            print("See All tapped")
+            DebugLog.verbose("See All tapped")
         }
 
         LoadingContentRow(title: "Loading...")

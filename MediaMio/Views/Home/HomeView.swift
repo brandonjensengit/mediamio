@@ -110,22 +110,22 @@ class NavigationCoordinator: ObservableObject {
     @Published var navigationPath = NavigationPath()
 
     func navigate(to item: MediaItem) {
-        print("🧭 Navigating to: \(item.name)")
+        DebugLog.verbose("🧭 Navigating to: \(item.name)")
         navigationPath.append(item)
     }
 
     func navigate(to section: ContentSection) {
-        print("🧭 Navigating to section: \(section.title)")
+        DebugLog.verbose("🧭 Navigating to section: \(section.title)")
         navigationPath.append(section)
     }
 
     func navigateToSearch() {
-        print("🧭 Navigating to: Search")
+        DebugLog.verbose("🧭 Navigating to: Search")
         navigationPath.append(NavigationDestination.search)
     }
 
     func navigateToSettings() {
-        print("🧭 Navigating to: Settings")
+        DebugLog.verbose("🧭 Navigating to: Settings")
         navigationPath.append(NavigationDestination.settings)
     }
 }

@@ -67,25 +67,25 @@ class ItemDetailViewModel: ObservableObject {
 
     func loadDetails() async {
         guard let userId = userId else {
-            print("❌ No userId available")
+            DebugLog.verbose("❌ No userId available")
             errorMessage = "Not authenticated"
             return
         }
 
-        print("📄 Starting loadDetails for: \(item.name) (id: \(item.id))")
+        DebugLog.verbose("📄 Starting loadDetails for: \(item.name) (id: \(item.id))")
         isLoading = true
         errorMessage = nil
 
         do {
-            print("📄 Calling API getItemDetails...")
+            DebugLog.verbose("📄 Calling API getItemDetails...")
 
             // Load detailed item info
             let details = try await apiClient.getItemDetails(userId: userId, itemId: item.id)
-            print("✅ Loaded detailed item: \(details.name)")
-            print("   - Has overview: \(details.overview != nil)")
-            print("   - Has genres: \(details.genres != nil), count: \(details.genres?.count ?? 0)")
-            print("   - Has studios: \(details.studios != nil), count: \(details.studios?.count ?? 0)")
-            print("   - Has backdrop: \(details.imageTags?.backdrop != nil)")
+            DebugLog.verbose("✅ Loaded detailed item: \(details.name)")
+            DebugLog.verbose("   - Has overview: \(details.overview != nil)")
+            DebugLog.verbose("   - Has genres: \(details.genres != nil), count: \(details.genres?.count ?? 0)")
+            DebugLog.verbose("   - Has studios: \(details.studios != nil), count: \(details.studios?.count ?? 0)")
+            DebugLog.verbose("   - Has backdrop: \(details.imageTags?.backdrop != nil)")
 
             self.detailedItem = details
             // Fresh UserData from server — discard any pending optimistic flip.
@@ -93,25 +93,25 @@ class ItemDetailViewModel: ObservableObject {
 
             // Load seasons if this is a Series
             if details.type == "Series" {
-                print("📄 Loading seasons for series...")
+                DebugLog.verbose("📄 Loading seasons for series...")
                 await loadSeasons()
             }
 
             // Load similar items
-            print("📄 Loading similar items...")
+            DebugLog.verbose("📄 Loading similar items...")
             if let similar = try? await apiClient.getSimilarItems(userId: userId, itemId: item.id, limit: 12) {
                 self.similarItems = similar.items
-                print("✅ Loaded \(similar.items.count) similar items")
+                DebugLog.verbose("✅ Loaded \(similar.items.count) similar items")
             } else {
-                print("⚠️ No similar items found")
+                DebugLog.verbose("⚠️ No similar items found")
             }
 
             isLoading = false
 
         } catch {
-            print("❌ Failed to load item details: \(error)")
+            DebugLog.verbose("❌ Failed to load item details: \(error)")
             if let urlError = error as? URLError {
-                print("   URLError code: \(urlError.code)")
+                DebugLog.verbose("   URLError code: \(urlError.code)")
             }
             errorMessage = "Failed to load details: \(error.localizedDescription)"
             isLoading = false
@@ -122,17 +122,17 @@ class ItemDetailViewModel: ObservableObject {
         guard let userId = userId else { return }
 
         do {
-            print("📺 Fetching seasons for series: \(item.id)")
+            DebugLog.verbose("📺 Fetching seasons for series: \(item.id)")
             let response = try await apiClient.getSeasons(userId: userId, seriesId: item.id)
             self.seasons = response.items
-            print("✅ Loaded \(response.items.count) seasons")
+            DebugLog.verbose("✅ Loaded \(response.items.count) seasons")
 
             // Auto-select first season and load its episodes
             if let firstSeason = seasons.first {
                 await selectSeason(firstSeason)
             }
         } catch {
-            print("❌ Failed to load seasons: \(error)")
+            DebugLog.verbose("❌ Failed to load seasons: \(error)")
         }
     }
 
@@ -145,22 +145,22 @@ class ItemDetailViewModel: ObservableObject {
         guard let userId = userId else { return }
 
         do {
-            print("📺 Fetching episodes for season: \(season.id)")
+            DebugLog.verbose("📺 Fetching episodes for season: \(season.id)")
             let response = try await apiClient.getEpisodes(userId: userId, seriesId: item.id, seasonId: season.id)
             self.episodes = response.items
-            print("✅ Loaded \(response.items.count) episodes")
+            DebugLog.verbose("✅ Loaded \(response.items.count) episodes")
         } catch {
-            print("❌ Failed to load episodes: \(error)")
+            DebugLog.verbose("❌ Failed to load episodes: \(error)")
         }
     }
 
     func playEpisode(_ episode: MediaItem) {
-        print("▶️ Play episode: \(episode.name)")
+        DebugLog.verbose("▶️ Play episode: \(episode.name)")
         navigationManager?.playItem(episode)
     }
 
     func playChapter(_ chapter: Chapter) {
-        print("📖 Play chapter '\(chapter.displayName)' at \(chapter.formattedStart)")
+        DebugLog.verbose("📖 Play chapter '\(chapter.displayName)' at \(chapter.formattedStart)")
         guard let navManager = navigationManager else {
             errorMessage = "Cannot start playback (navigation not configured)"
             return
@@ -177,10 +177,10 @@ class ItemDetailViewModel: ObservableObject {
     ///   logic kicks in — auto-resumes if userData has progress, else plays
     ///   from start.
     func playItem(fromBeginning: Bool = false) {
-        print("▶️ Play: \(displayItem.name)\(fromBeginning ? " (from beginning)" : "")")
+        DebugLog.verbose("▶️ Play: \(displayItem.name)\(fromBeginning ? " (from beginning)" : "")")
 
         guard let navManager = navigationManager else {
-            print("❌ playItem failed: NavigationManager is nil — Play button is unwired")
+            DebugLog.verbose("❌ playItem failed: NavigationManager is nil — Play button is unwired")
             errorMessage = "Cannot start playback (navigation not configured)"
             return
         }
@@ -216,7 +216,7 @@ class ItemDetailViewModel: ObservableObject {
         let currentValue = isFavorite
         let newValue = !currentValue
 
-        print("❤️ Toggle favorite: \(displayItem.name) → \(newValue)")
+        DebugLog.verbose("❤️ Toggle favorite: \(displayItem.name) → \(newValue)")
 
         // Optimistic flip: the UI (heart icon + button label) re-renders now.
         isFavoriteOverride = newValue
@@ -231,14 +231,14 @@ class ItemDetailViewModel: ObservableObject {
             // Success — leave the override in place until next loadDetails()
             // naturally refreshes the underlying UserData.
         } catch {
-            print("❌ Favorite toggle failed: \(error)")
+            DebugLog.verbose("❌ Favorite toggle failed: \(error)")
             isFavoriteOverride = currentValue
             errorMessage = "Couldn't update favorite: \(error.localizedDescription)"
         }
     }
 
     func selectSimilarItem(_ item: MediaItem) {
-        print("📺 Selected similar item: \(item.name)")
+        DebugLog.verbose("📺 Selected similar item: \(item.name)")
 
         // Use NavigationManager if available (new tab-based navigation)
         if let navManager = navigationManager {
@@ -259,13 +259,13 @@ class ItemDetailViewModel: ObservableObject {
         guard let userData = displayItem.userData,
               let position = userData.playbackPositionTicks,
               let total = displayItem.runTimeTicks else {
-            print("📊 hasProgress=false for '\(displayItem.name)': userData=\(displayItem.userData != nil), position=\(displayItem.userData?.playbackPositionTicks != nil), total=\(displayItem.runTimeTicks != nil)")
+            DebugLog.verbose("📊 hasProgress=false for '\(displayItem.name)': userData=\(displayItem.userData != nil), position=\(displayItem.userData?.playbackPositionTicks != nil), total=\(displayItem.runTimeTicks != nil)")
             return false
         }
 
         let progress = Double(position) / Double(total) * 100.0
         let hasProgress = progress > 1.0 && progress < 95.0
-        print("📊 hasProgress=\(hasProgress) for '\(displayItem.name)': position=\(position), total=\(total), progress=\(String(format: "%.1f", progress))%")
+        DebugLog.verbose("📊 hasProgress=\(hasProgress) for '\(displayItem.name)': position=\(position), total=\(total), progress=\(String(format: "%.1f", progress))%")
         return hasProgress
     }
 
