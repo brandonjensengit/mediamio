@@ -29,6 +29,7 @@
 		BD2DF6E52EBB9F50001C4B74 /* launch-experience-implementation.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6E42EBB9F50001C4B74 /* launch-experience-implementation.md */; };
 		BD2DF6EF2EBBE86A001C4B74 /* fix-blurry-video-quality.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6EE2EBBE86A001C4B74 /* fix-blurry-video-quality.md */; };
 		BD2DF6F32EC15B49001C4B74 /* hardware-decoding-quick-guide.md in Resources */ = {isa = PBXBuildFile; fileRef = BD2DF6F22EC15B49001C4B74 /* hardware-decoding-quick-guide.md */; };
+		AA100002000000000000AB01 /* TopShelfExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA100001000000000000AB01 /* TopShelfExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -45,6 +46,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = BD2DF5752EB51367001C4B74;
 			remoteInfo = MediaMio;
+		};
+		AA10000A000000000000AB01 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BD2DF56E2EB51367001C4B74 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA100005000000000000AB01;
+			remoteInfo = TopShelfExtension;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -74,6 +82,7 @@
 		BD2DF6E42EBB9F50001C4B74 /* launch-experience-implementation.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "launch-experience-implementation.md"; sourceTree = "<group>"; };
 		BD2DF6EE2EBBE86A001C4B74 /* fix-blurry-video-quality.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "fix-blurry-video-quality.md"; sourceTree = "<group>"; };
 		BD2DF6F22EC15B49001C4B74 /* hardware-decoding-quick-guide.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "hardware-decoding-quick-guide.md"; sourceTree = "<group>"; };
+		AA100001000000000000AB01 /* TopShelfExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TopShelfExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -83,6 +92,13 @@
 				Info.plist,
 			);
 			target = BD2DF5752EB51367001C4B74 /* MediaMio */;
+		};
+		AA100009000000000000AB01 /* Exceptions for "TopShelf" folder in "TopShelfExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				TopShelfInfo.plist,
+			);
+			target = AA100005000000000000AB01 /* TopShelfExtension */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -105,7 +121,29 @@
 			path = MediaMioUITests;
 			sourceTree = "<group>";
 		};
+		AA100004000000000000AB01 /* TopShelf */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AA100009000000000000AB01 /* Exceptions for "TopShelf" folder in "TopShelfExtension" target */,
+			);
+			path = TopShelf;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		AA100003000000000000AB01 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				AA100002000000000000AB01 /* TopShelfExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		BD2DF5732EB51367001C4B74 /* Frameworks */ = {
@@ -129,6 +167,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA100007000000000000AB01 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -138,6 +183,7 @@
 				BD2DF5782EB51367001C4B74 /* MediaMio */,
 				BD2DF5862EB51369001C4B74 /* MediaMioTests */,
 				BD2DF5902EB51369001C4B74 /* MediaMioUITests */,
+				AA100004000000000000AB01 /* TopShelf */,
 				BD2DF5772EB51367001C4B74 /* Products */,
 				BD2DF67B2EB7E842001C4B74 /* mediamioappicon.png */,
 				BD2DF67D2EB7EA64001C4B74 /* logotext.png */,
@@ -170,6 +216,7 @@
 				BD2DF5762EB51367001C4B74 /* MediaMio.app */,
 				BD2DF5832EB51369001C4B74 /* MediaMioTests.xctest */,
 				BD2DF58D2EB51369001C4B74 /* MediaMioUITests.xctest */,
+				AA100001000000000000AB01 /* TopShelfExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -184,10 +231,12 @@
 				BD2DF5722EB51367001C4B74 /* Sources */,
 				BD2DF5732EB51367001C4B74 /* Frameworks */,
 				BD2DF5742EB51367001C4B74 /* Resources */,
+				AA100003000000000000AB01 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				AA10000B000000000000AB01 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				BD2DF5782EB51367001C4B74 /* MediaMio */,
@@ -245,6 +294,28 @@
 			productReference = BD2DF58D2EB51369001C4B74 /* MediaMioUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		AA100005000000000000AB01 /* TopShelfExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA10000E000000000000AB01 /* Build configuration list for PBXNativeTarget "TopShelfExtension" */;
+			buildPhases = (
+				AA100006000000000000AB01 /* Sources */,
+				AA100007000000000000AB01 /* Frameworks */,
+				AA100008000000000000AB01 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AA100004000000000000AB01 /* TopShelf */,
+			);
+			name = TopShelfExtension;
+			packageProductDependencies = (
+			);
+			productName = TopShelfExtension;
+			productReference = AA100001000000000000AB01 /* TopShelfExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -255,6 +326,9 @@
 				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
+					AA100005000000000000AB01 = {
+						CreatedOnToolsVersion = 26.0.1;
+					};
 					BD2DF5752EB51367001C4B74 = {
 						CreatedOnToolsVersion = 26.0.1;
 					};
@@ -285,6 +359,7 @@
 				BD2DF5752EB51367001C4B74 /* MediaMio */,
 				BD2DF5822EB51369001C4B74 /* MediaMioTests */,
 				BD2DF58C2EB51369001C4B74 /* MediaMioUITests */,
+				AA100005000000000000AB01 /* TopShelfExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -333,6 +408,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA100008000000000000AB01 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -357,6 +439,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA100006000000000000AB01 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -369,6 +458,11 @@
 			isa = PBXTargetDependency;
 			target = BD2DF5752EB51367001C4B74 /* MediaMio */;
 			targetProxy = BD2DF58E2EB51369001C4B74 /* PBXContainerItemProxy */;
+		};
+		AA10000B000000000000AB01 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA100005000000000000AB01 /* TopShelfExtension */;
+			targetProxy = AA10000A000000000000AB01 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -499,6 +593,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "App Icon & Top Shelf Image";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = MediaMio/MediaMio.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = MW25D9KU2A;
@@ -531,6 +626,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "App Icon & Top Shelf Image";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = MediaMio/MediaMio.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = MW25D9KU2A;
@@ -642,6 +738,58 @@
 			};
 			name = Release;
 		};
+		AA10000C000000000000AB01 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = TopShelf/TopShelf.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = MW25D9KU2A;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TopShelf/TopShelfInfo.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = TopShelfExtension;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bran.jellyfintv.TopShelf;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 18.6;
+			};
+			name = Debug;
+		};
+		AA10000D000000000000AB01 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = TopShelf/TopShelf.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = MW25D9KU2A;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TopShelf/TopShelfInfo.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = TopShelfExtension;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bran.jellyfintv.TopShelf;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 18.6;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -677,6 +825,15 @@
 			buildConfigurations = (
 				BD2DF59E2EB51369001C4B74 /* Debug */,
 				BD2DF59F2EB51369001C4B74 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA10000E000000000000AB01 /* Build configuration list for PBXNativeTarget "TopShelfExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA10000C000000000000AB01 /* Debug */,
+				AA10000D000000000000AB01 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

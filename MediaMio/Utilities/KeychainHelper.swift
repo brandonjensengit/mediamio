@@ -24,19 +24,30 @@ class KeychainHelper {
     private init() {}
 
     // MARK: - Save
+    /// Shared access group so the Top Shelf extension can read credentials.
+    private static let sharedAccessGroup = "MW25D9KU2A.com.bran.jellyfintv.shared"
+
     func save(_ data: Data, for key: String) throws {
-        let query: [String: Any] = [
+        let baseQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: Constants.Keychain.service,
-            kSecAttrAccount as String: key,
-            kSecValueData as String: data
+            kSecAttrAccount as String: key
         ]
 
-        // Delete any existing item
-        SecItemDelete(query as CFDictionary)
+        // Delete any existing item (searches all accessible groups)
+        SecItemDelete(baseQuery as CFDictionary)
 
-        // Add new item
-        let status = SecItemAdd(query as CFDictionary, nil)
+        // Add to the shared group so the Top Shelf extension can read it
+        var query = baseQuery
+        query[kSecValueData as String] = data
+        query[kSecAttrAccessGroup as String] = Self.sharedAccessGroup
+        var status = SecItemAdd(query as CFDictionary, nil)
+
+        // Fall back to the default group if the entitlement isn't present
+        if status == errSecMissingEntitlement || status == errSecNoAccessForItem {
+            query.removeValue(forKey: kSecAttrAccessGroup as String)
+            status = SecItemAdd(query as CFDictionary, nil)
+        }
 
         guard status == errSecSuccess else {
             throw KeychainError.unknown(status)

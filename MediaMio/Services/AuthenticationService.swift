@@ -72,6 +72,14 @@ class AuthenticationService: ObservableObject {
             return
         }
 
+        // Migrate credentials into the shared keychain group (Top Shelf)
+        try? keychain.saveCredentials(
+            serverURL: credentials.serverURL,
+            username: credentials.username,
+            accessToken: credentials.accessToken,
+            userId: credentials.userId
+        )
+
         // Configure API client
         apiClient.configure(baseURL: credentials.serverURL, accessToken: credentials.accessToken)
 

@@ -127,6 +127,17 @@ struct MainTabView: View {
             homeViewModel.navigationManager = navigationManager
             homeViewModel.navigationCoordinator = homeCoordinator
         }
+        // Deep links from the Top Shelf extension (gloxx://item/{id})
+        .onOpenURL { url in
+            guard url.scheme == "gloxx", url.host == "item" else { return }
+            let itemId = url.lastPathComponent
+            guard !itemId.isEmpty, let userId = env.authService.currentSession?.user.id else { return }
+            Task {
+                if let item = try? await env.apiClient.getItemDetails(userId: userId, itemId: itemId) {
+                    navigationManager.showDetail(for: item)
+                }
+            }
+        }
         // Present detail view full-screen. We deliberately avoid `.sheet` /
         // `.presentationDetents([.large])` because tvOS renders that as an
         // inset card with rounded corners — leaves the parent tab bleeding
