@@ -221,6 +221,7 @@ struct DetailHeaderView: View {
     @ObservedObject var viewModel: ItemDetailViewModel
     let focusNamespace: Namespace.ID
 
+    @AppStorage("showRatings") private var showRatings = true
     @State private var backdropURL: String?
     @State private var showPlayChoice: Bool = false
 
@@ -356,10 +357,11 @@ struct DetailHeaderView: View {
                         icon: "play.fill",
                         style: .primary
                     ) {
-                        if viewModel.hasProgress {
+                        // Resume Behavior decides: Always Ask shows the
+                        // prompt, Always Resume / Start from Beginning act
+                        // immediately.
+                        if viewModel.handlePlayButtonTapped() {
                             showPlayChoice = true
-                        } else {
-                            viewModel.playItem()
                         }
                     }
                     .prefersDefaultFocus(true, in: focusNamespace)
@@ -390,7 +392,7 @@ struct DetailHeaderView: View {
         if item.type != "Series", let runtime = item.runtimeFormatted {
             parts.append(runtime)
         }
-        if let rating = item.ratingText { parts.append("★ \(rating)") }
+        if showRatings, let rating = item.ratingText { parts.append("★ \(rating)") }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 

@@ -18,13 +18,11 @@ class SettingsManager: ObservableObject {
 
     // MARK: - Audio Settings
     @AppStorage("audioQuality") var audioQuality = AudioQuality.high.rawValue
-    @AppStorage("defaultAudioLanguage") var defaultAudioLanguage = "eng"
 
     // MARK: - Playback Settings
     @AppStorage("autoPlayNext") var autoPlayNext = true
     @AppStorage("autoPlayCountdown") var autoPlayCountdown = 10
     @AppStorage("resumeBehavior") var resumeBehavior = ResumeBehavior.alwaysAsk.rawValue
-    @AppStorage("markPlayedThreshold") var markPlayedThreshold = 90
     @AppStorage("rememberAudioTrack") var rememberAudioTrack = true
     @AppStorage("rememberSubtitleTrack") var rememberSubtitleTrack = true
     /// Streaming convention: on 2s hero focus dwell, start a muted looping
@@ -37,11 +35,9 @@ class SettingsManager: ObservableObject {
     @AppStorage("subtitleMode") var subtitleMode = SubtitleMode.off.rawValue
     @AppStorage("defaultSubtitleLanguage") var defaultSubtitleLanguage = "eng"
     @AppStorage("subtitleSize") var subtitleSize = SubtitleSize.medium.rawValue
-    @AppStorage("subtitleFont") var subtitleFont = "System"
     @AppStorage("subtitleColor") var subtitleColor = "white"
     @AppStorage("subtitleBackground") var subtitleBackground = "semitransparent"
     @AppStorage("subtitleEdgeStyle") var subtitleEdgeStyle = "dropShadow"
-    @AppStorage("subtitlePosition") var subtitlePosition = 0.9 // 0-1
 
     // MARK: - Skip Settings
     @AppStorage("autoSkipIntros") var autoSkipIntros = false
@@ -56,17 +52,13 @@ class SettingsManager: ObservableObject {
     @AppStorage("skipBehavior") var skipBehavior = SkipBehavior.buttonWithDelay.rawValue
 
     // MARK: - Network Settings
-    @AppStorage("preBufferDuration") var preBufferDuration = 10
-    @AppStorage("cacheSize") var cacheSize = 500 // MB
+    @AppStorage("cacheSize") var cacheSize = 500 // MB — disk ceiling for the image cache
     @AppStorage("lowBandwidthMode") var lowBandwidthMode = false
     @AppStorage("preferLocalNetwork") var preferLocalNetwork = true
     @AppStorage("allowTranscoding") var allowTranscoding = true
 
     // MARK: - Interface Settings
-    @AppStorage("theme") var theme = AppTheme.dark.rawValue
-    @AppStorage("accentColor") var accentColor = "e8a13b"
     @AppStorage("showRatings") var showRatings = true
-    @AppStorage("showAdultContent") var showAdultContent = false
     @AppStorage("spoilerProtection") var spoilerProtection = false
 
     // MARK: - Parental Controls

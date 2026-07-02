@@ -28,6 +28,7 @@ struct PosterCard: View {
 
     @FocusState private var isFocused: Bool
     @State private var imageURL: String?
+    @AppStorage("showRatings") private var showRatings = true
 
     @ViewBuilder
     var body: some View {
@@ -122,7 +123,7 @@ struct PosterCard: View {
                     .foregroundColor(.secondary)
             }
 
-            if let rating = item.ratingText {
+            if showRatings, let rating = item.ratingText {
                 HStack(spacing: 2) {
                     Image(systemName: "star.fill")
                         .font(.caption2)

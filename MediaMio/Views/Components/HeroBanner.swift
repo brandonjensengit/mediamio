@@ -168,6 +168,7 @@ private struct HeroBannerContent: View {
     let onInfo: () -> Void
     var onFocusChange: ((Bool) -> Void)? = nil
 
+    @AppStorage("showRatings") private var showRatings = true
     @State private var playButtonFocused: Bool = false
     @State private var infoButtonFocused: Bool = false
     @State private var showPlayChoice: Bool = false
@@ -319,7 +320,7 @@ private struct HeroBannerContent: View {
             parts.append(officialRating)
         }
         if let runtime = item.runtimeFormatted { parts.append(runtime) }
-        if let rating = item.ratingText { parts.append("★ \(rating)") }
+        if showRatings, let rating = item.ratingText { parts.append("★ \(rating)") }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 

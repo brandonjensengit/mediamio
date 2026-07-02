@@ -28,10 +28,6 @@ struct AppSettingsView: View {
     @State private var cacheSize: String = "Calculating…"
     @State private var showClearCacheAlert = false
 
-    private var selectedTheme: AppTheme {
-        AppTheme(rawValue: settingsManager.theme) ?? .dark
-    }
-
     private var cacheCeilingLabel: String {
         cacheCeilingOptions.first(where: { $0.mb == settingsManager.cacheSize })?.label
             ?? "\(settingsManager.cacheSize) MB"
@@ -40,20 +36,6 @@ struct AppSettingsView: View {
     var body: some View {
         SettingsCardScreen(title: "App Settings") {
             SettingsSection("Interface", footer: "Spoiler protection hides episode thumbnails and descriptions until watched.") {
-                SettingsPickerNavRow(
-                    icon: "paintbrush.fill",
-                    title: "Theme",
-                    value: selectedTheme.rawValue
-                ) {
-                    SettingsOptionPickerView(
-                        title: "Theme",
-                        selection: $settingsManager.theme,
-                        options: AppTheme.allCases.map {
-                            SettingsPickerOption(value: $0.rawValue, title: $0.rawValue)
-                        }
-                    )
-                }
-
                 SettingsToggleRow(
                     icon: "star.fill",
                     title: "Show Ratings",
@@ -86,6 +68,10 @@ struct AppSettingsView: View {
                             SettingsPickerOption(value: $0.mb, title: $0.label)
                         }
                     )
+                }
+                .onChange(of: settingsManager.cacheSize) { _, mb in
+                    ImageCache.shared.setMaxDiskCacheSize(megabytes: mb)
+                    calculateCacheSize()
                 }
 
                 SettingsActionRow(
@@ -137,7 +123,7 @@ struct AppSettingsView: View {
                 .buttonStyle(.cardChrome)
             }
 
-            SettingsSection("Debug", footer: "Restores every setting to its default value.") {
+            SettingsSection("Advanced", footer: "Restores every setting to its default value.") {
                 SettingsActionRow(
                     icon: "arrow.counterclockwise",
                     title: "Reset All Settings",
@@ -170,8 +156,9 @@ struct AppSettingsView: View {
 
     private func calculateCacheSize() {
         DispatchQueue.global(qos: .utility).async {
-            let bytes = URLCache.shared.currentDiskUsage
-            let formatted = ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+            // Posters live in ImageCache.shared, not URLCache.shared.
+            let bytes = ImageCache.shared.currentDiskUsageBytes()
+            let formatted = ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
             DispatchQueue.main.async {
                 cacheSize = formatted
             }
@@ -179,8 +166,12 @@ struct AppSettingsView: View {
     }
 
     private func clearCache() {
+        ImageCache.shared.clearAll()
         URLCache.shared.removeAllCachedResponses()
-        calculateCacheSize()
+        // clearAll's disk wipe is async; re-read shortly after.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            calculateCacheSize()
+        }
     }
 }
 
@@ -191,7 +182,7 @@ struct OpenSourceLicensesView: View {
         SettingsCardScreen(title: "Open Source") {
             SettingsSection {
                 LicenseCard(
-                    name: "MediaMio",
+                    name: "Gloxx",
                     description: "Jellyfin client for Apple TV",
                     license: "MIT License"
                 )

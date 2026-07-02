@@ -28,6 +28,7 @@ class ItemDetailViewModel: ObservableObject {
 
     private let apiClient: JellyfinAPIClient
     private let authService: AuthenticationService
+    private let settingsManager = SettingsManager()
     weak var navigationCoordinator: NavigationCoordinator?
     weak var navigationManager: NavigationManager?
 
@@ -185,6 +186,22 @@ class ItemDetailViewModel: ObservableObject {
             return
         }
         navManager.playItem(displayItem, startPositionTicks: fromBeginning ? 0 : nil)
+    }
+
+    /// Handle a Play-button tap, honoring the user's Resume Behavior setting.
+    /// Returns `true` if the caller should present the Resume / Play-from-
+    /// Beginning prompt; otherwise playback has already been started here.
+    /// With no saved progress, always plays from the start (no prompt).
+    func handlePlayButtonTapped() -> Bool {
+        guard hasProgress else { playItem(); return false }
+        switch ResumeBehavior(rawValue: settingsManager.resumeBehavior) ?? .alwaysAsk {
+        case .alwaysAsk:
+            return true                       // caller shows the dialog
+        case .alwaysResume:
+            playItem(); return false          // resume silently
+        case .neverResume:
+            playItem(fromBeginning: true); return false
+        }
     }
 
     /// Human-readable resume-from label — "1h 20m" or "25m". Used in the

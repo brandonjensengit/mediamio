@@ -15,7 +15,13 @@ struct ExternalLinksSection: View {
     let communityRating: Double?
     let criticRating: Double?
 
+    @AppStorage("showRatings") private var showRatings = true
     @State private var presentedLink: ExternalURL?
+
+    /// Community rating hidden when "Show Ratings" is off (matches cards).
+    private var effectiveCommunityRating: Double? {
+        showRatings ? communityRating : nil
+    }
 
     /// IMDb/TMDB pills are hidden for now — QR handoff was the only way to
     /// act on them (tvOS has no browser) and the extra focus targets made
@@ -30,13 +36,13 @@ struct ExternalLinksSection: View {
     }
 
     var body: some View {
-        if visibleLinks.isEmpty && communityRating == nil && criticRating == nil {
+        if visibleLinks.isEmpty && effectiveCommunityRating == nil && criticRating == nil {
             EmptyView()
         } else {
             DetailSectionView(title: "Ratings & Links") {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: 20) {
-                        if let rating = communityRating {
+                        if let rating = effectiveCommunityRating {
                             RatingPill(label: "Community", value: String(format: "%.1f", rating), icon: "star.fill")
                         }
                         if let rating = criticRating {

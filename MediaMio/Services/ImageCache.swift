@@ -23,7 +23,11 @@ class ImageCache: NSObject {
     private let cacheDirectory: URL
 
     private let maxMemoryCacheSize = 100 * 1024 * 1024  // 100 MB in memory
-    private let maxDiskCacheSize = 500 * 1024 * 1024    // 500 MB on disk
+    /// Disk ceiling in bytes. Defaults to the user's "Maximum Cache Size"
+    /// setting (MB) so the App Settings picker actually bounds the cache.
+    private var maxDiskCacheSize = UserDefaults.standard.integer(forKey: "cacheSize") == 0
+        ? 500 * 1024 * 1024
+        : UserDefaults.standard.integer(forKey: "cacheSize") * 1024 * 1024
     private let maxCacheAge: TimeInterval = 7 * 24 * 60 * 60  // 7 days
 
     // MARK: - Initialization
@@ -140,6 +144,27 @@ class ImageCache: NSObject {
 
     func clearMemoryCache() {
         memoryCache.removeAllObjects()
+    }
+
+    /// Current on-disk size of the image cache, in bytes. Used by App
+    /// Settings to show real usage (URLCache.shared is not where posters
+    /// live — this store is).
+    func currentDiskUsageBytes() -> Int64 {
+        guard let contents = try? fileManager.contentsOfDirectory(
+            at: cacheDirectory,
+            includingPropertiesForKeys: [.fileSizeKey],
+            options: .skipsHiddenFiles
+        ) else { return 0 }
+        return contents.reduce(0) { sum, url in
+            sum + Int64((try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0)
+        }
+    }
+
+    /// Update the disk ceiling (MB) from the user's "Maximum Cache Size"
+    /// setting and prune immediately if the new ceiling is smaller.
+    func setMaxDiskCacheSize(megabytes: Int) {
+        maxDiskCacheSize = max(1, megabytes) * 1024 * 1024
+        Task { await checkDiskCacheSize() }
     }
 
     @objc private func handleMemoryWarning() {
