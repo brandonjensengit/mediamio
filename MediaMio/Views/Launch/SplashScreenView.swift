@@ -116,15 +116,16 @@ struct SplashScreenView: View {
     }
 
     private func checkIfReadyToTransition() {
-        // On the authenticated branch, wait for HomeViewModel to signal its
-        // first content load has completed. On the unauthenticated branch
-        // (fresh install, logged out, saved-token invalidated), no one is
-        // going to flip `contentLoaded` — we're routing to ServerEntryView,
-        // which has no "content" to load — so dismissing after the minimum
-        // time is the correct terminal state. Without this branch, the
-        // splash overlay hangs forever on a new sim / new user.
-        let contentReady = appState.contentLoaded || !authService.isAuthenticated
-        guard minimumTimeElapsed && contentReady else {
+        // Dismiss once the minimum brand-moment floor elapses — we do NOT
+        // wait for content to finish loading. MainTabView/HomeContentView
+        // mount behind this overlay, so their load is already in flight; on
+        // dismiss the user lands on HomeSkeletonView (which HomeContentView
+        // shows while `isLoading && !hasContent`) rather than a held logo.
+        // This keeps cold-start perceived latency at ~1.2s regardless of how
+        // long the first content fetch takes. The unauthenticated branch
+        // (ServerEntryView) has no content to load and dismisses on the same
+        // floor.
+        guard minimumTimeElapsed else {
             return
         }
 
