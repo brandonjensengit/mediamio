@@ -197,6 +197,9 @@ struct ItemDetailView: View {
                             }
                         }
                         .padding(.horizontal, Constants.UI.defaultPadding)
+                        // Vertical room so the focus scale/lift isn't clipped
+                        // by the ScrollView bounds (same as ContentRow).
+                        .padding(.vertical, 40)
                     }
                 }
             }

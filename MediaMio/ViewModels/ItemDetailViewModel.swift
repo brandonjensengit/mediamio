@@ -240,12 +240,14 @@ class ItemDetailViewModel: ObservableObject {
     func selectSimilarItem(_ item: MediaItem) {
         DebugLog.verbose("📺 Selected similar item: \(item.name)")
 
-        // Use NavigationManager if available (new tab-based navigation)
-        if let navManager = navigationManager {
-            navManager.showDetail(for: item)
+        // Prefer pushing onto the detail sheet's own NavigationStack so the
+        // similar item opens as a new detail page (drill-down; Menu-back pops
+        // it). Reassigning `presentedItem` while the fullScreenCover is
+        // already open just dismisses it and drops the user back on Home.
+        if let coordinator = navigationCoordinator {
+            coordinator.navigate(to: item)
         } else {
-            // Fallback to old navigation coordinator
-            navigationCoordinator?.navigate(to: item)
+            navigationManager?.showDetail(for: item)
         }
     }
 

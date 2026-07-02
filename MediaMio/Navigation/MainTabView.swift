@@ -253,17 +253,28 @@ struct ItemDetailSheetWrapper: View {
     @EnvironmentObject var env: AppEnvironment
     @EnvironmentObject var navigationManager: NavigationManager
     @State private var viewModel: ItemDetailViewModel?
+    // Owns the drill-down stack for "More Like This": selecting a similar
+    // item pushes another detail page here (Menu-back pops it) instead of
+    // reassigning the global `presentedItem`, which would dismiss the sheet.
+    @StateObject private var coordinator = NavigationCoordinator()
 
     var body: some View {
-        Group {
-            if let vm = viewModel {
-                ItemDetailView(viewModel: vm)
-            } else {
-                LoadingView(message: "Loading details...", showLogo: false)
-                    .onAppear {
-                        initializeViewModel()
-                    }
+        NavigationStack(path: $coordinator.navigationPath) {
+            Group {
+                if let vm = viewModel {
+                    ItemDetailView(viewModel: vm)
+                } else {
+                    LoadingView(message: "Loading details...", showLogo: false)
+                        .onAppear {
+                            initializeViewModel()
+                        }
+                }
             }
+            .navigationDestination(for: MediaItem.self) { pushed in
+                PushedDetailView(item: pushed, coordinator: coordinator)
+                    .navigationBarHidden(true)
+            }
+            .navigationBarHidden(true)
         }
         // Sheet-level player cover — when Play is tapped inside this Detail
         // sheet, the player presents on top without dismissing the sheet.
@@ -291,9 +302,42 @@ struct ItemDetailSheetWrapper: View {
             item: item,
             apiClient: env.apiClient,
             authService: env.authService,
-            navigationCoordinator: nil,
+            navigationCoordinator: coordinator,
             navigationManager: navigationManager
         )
+    }
+}
+
+// MARK: - Pushed Detail (drill-down within the detail sheet)
+
+/// A detail page pushed onto the sheet's own NavigationStack (e.g. from
+/// "More Like This"). Builds its own view model wired to the same
+/// `coordinator`, so further similar-item taps keep drilling down.
+private struct PushedDetailView: View {
+    let item: MediaItem
+    let coordinator: NavigationCoordinator
+    @EnvironmentObject var env: AppEnvironment
+    @EnvironmentObject var navigationManager: NavigationManager
+    @State private var viewModel: ItemDetailViewModel?
+
+    var body: some View {
+        Group {
+            if let vm = viewModel {
+                ItemDetailView(viewModel: vm)
+            } else {
+                LoadingView(message: "Loading details...", showLogo: false)
+                    .onAppear {
+                        guard viewModel == nil, env.authService.currentSession != nil else { return }
+                        viewModel = ItemDetailViewModel(
+                            item: item,
+                            apiClient: env.apiClient,
+                            authService: env.authService,
+                            navigationCoordinator: coordinator,
+                            navigationManager: navigationManager
+                        )
+                    }
+            }
+        }
     }
 }
 
