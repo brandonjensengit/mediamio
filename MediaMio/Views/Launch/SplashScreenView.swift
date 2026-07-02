@@ -32,8 +32,8 @@ struct SplashScreenView: View {
 
     var body: some View {
         ZStack {
-            // Pure black background
-            Color.black.ignoresSafeArea()
+            // Page background (matches the app shell, not pure black)
+            Constants.Colors.background.ignoresSafeArea()
 
             VStack(spacing: 40) {
                 // Typographic wordmark — matches gloxx.ai brand treatment
@@ -104,7 +104,7 @@ struct SplashScreenView: View {
     private func loadJellyfinData() {
         // Start minimum time timer
         Task {
-            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+            try? await Task.sleep(nanoseconds: 1_200_000_000) // 1.2s minimum floor
             await MainActor.run {
                 minimumTimeElapsed = true
                 if let id = splashSignpostID {

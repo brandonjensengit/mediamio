@@ -87,11 +87,12 @@ struct PosterCard: View {
                 height: Constants.UI.posterHeight
             )
 
-            // Dark gradient at bottom for text readability
+            // Dark gradient at bottom for text readability — blends to the
+            // page background (not pure black) so cards don't show a seam.
             LinearGradient(
                 colors: [
                     Color.clear,
-                    Color.black.opacity(0.8)
+                    Constants.Colors.background.opacity(0.85)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -108,7 +109,7 @@ struct PosterCard: View {
             }
         }
         .frame(width: Constants.UI.posterWidth, height: Constants.UI.posterHeight)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: Constants.UI.cardCornerRadius))
     }
 
     // MARK: - Metadata row
@@ -128,7 +129,7 @@ struct PosterCard: View {
                     Text(rating)
                         .font(.caption)
                 }
-                .foregroundColor(.yellow)
+                .foregroundColor(Constants.Colors.accent)
             }
 
             if let runtime = item.runtimeFormatted {
@@ -236,16 +237,16 @@ struct ProgressBar: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
-                // Background
+                // Background — dark & consistent regardless of poster colors
                 Rectangle()
-                    .fill(Constants.Colors.surface2.opacity(0.8))
+                    .fill(Color.black.opacity(0.55))
 
-                // Progress
+                // Progress — brand accent for visibility over artwork
                 Rectangle()
-                    .fill(Constants.Colors.primary)
+                    .fill(Constants.Colors.accent)
                     .frame(width: geometry.size.width * CGFloat(progress / 100.0))
             }
-            .cornerRadius(3)
+            .cornerRadius(Constants.UI.smallCornerRadius)
         }
     }
 }

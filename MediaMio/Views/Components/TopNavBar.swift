@@ -128,12 +128,12 @@ private struct TopNavTabChip: View {
             // the bar; SwiftUI animates the slide between chips.
             ZStack {
                 if isSelected {
-                    RoundedRectangle(cornerRadius: 2)
+                    RoundedRectangle(cornerRadius: Constants.UI.smallCornerRadius)
                         .fill(Constants.Colors.accent)
-                        .frame(height: 4)
+                        .frame(height: Constants.UI.focusIndicatorHeight)
                         .matchedGeometryEffect(id: "topNavUnderline", in: namespace)
                 } else {
-                    Color.clear.frame(height: 4)
+                    Color.clear.frame(height: Constants.UI.focusIndicatorHeight)
                 }
             }
             .frame(maxWidth: .infinity)

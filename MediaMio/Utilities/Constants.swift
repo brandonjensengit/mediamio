@@ -141,8 +141,13 @@ enum Constants {
 
         // Buttons & Cards
         static let buttonHeight: CGFloat = 80
-        static let cornerRadius: CGFloat = 12
-        static let cardCornerRadius: CGFloat = 8
+        static let cornerRadius: CGFloat = 12       // CTAs, hero buttons
+        static let cardCornerRadius: CGFloat = 8    // poster / thumb cards
+        static let pillCornerRadius: CGFloat = 16   // chips, pills, filters
+        static let smallCornerRadius: CGFloat = 4   // small badges, dividers
+        /// Focus/selection bars (tab underline, progress). Thicker than iOS —
+        /// a 4pt line is hard to spot from 10 feet.
+        static let focusIndicatorHeight: CGFloat = 6
 
         // Image Quality
         static let imageQuality: Int = 90
