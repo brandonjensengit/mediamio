@@ -119,8 +119,9 @@ enum Constants {
             static let animation: Animation = .spring(response: 0.3, dampingFraction: 0.7)
         }
 
-        // Spacing (Netflix-level: 60pt edge padding)
-        static let defaultPadding: CGFloat = 60  // Edge breathing room
+        // Spacing — 90pt edge padding per Apple's tvOS layout guidance
+        // (60pt read tight to the screen edge on real TVs).
+        static let defaultPadding: CGFloat = 90  // Edge breathing room
         static let cardSpacing: CGFloat = 30
         static let rowSpacing: CGFloat = 60
         static let sectionSpacing: CGFloat = 80

@@ -31,7 +31,7 @@ struct TopNavBar: View {
             Spacer()
             userChip
         }
-        .padding(.horizontal, 80)
+        .padding(.horizontal, Constants.UI.defaultPadding)
         .padding(.top, 32)
         .padding(.bottom, 24)
         .focusSection()
