@@ -79,18 +79,11 @@ final class SubtitleTrackManager: ObservableObject {
 
         switch mode {
         case .off:
-            // The original implementation also enabled the first track here,
-            // commenting that the user can disable via native AVPlayer
-            // controls. Preserved verbatim — Phase A is no behavior change.
-            DebugLog.playback("⚠️ Subtitle mode is OFF, but enabling first track anyway")
-            if let firstOption = group.options.first {
-                playerItem.select(firstOption, in: group)
-                selectedIndex = 0
-                DebugLog.playback("✅ Enabled first subtitle: \(firstOption.displayName)")
-            } else {
-                playerItem.select(nil, in: group)
-                selectedIndex = nil
-            }
+            // Subtitles off means off. (The original force-enabled the first
+            // track here, which turned on a random language unasked.)
+            playerItem.select(nil, in: group)
+            selectedIndex = nil
+            DebugLog.playback("📝 Subtitle mode OFF — no track selected")
 
         case .on, .foreignOnly, .smart:
             let defaultLang = settingsManager.defaultSubtitleLanguage
@@ -104,12 +97,13 @@ final class SubtitleTrackManager: ObservableObject {
                 playerItem.select(option, in: group)
                 selectedIndex = index
                 DebugLog.playback("✅ Enabled matching subtitle: \(option.displayName) at index \(index)")
-            } else if let firstOption = group.options.first {
-                playerItem.select(firstOption, in: group)
-                selectedIndex = 0
-                DebugLog.playback("⚠️ No language match, enabling first subtitle: \(firstOption.displayName)")
             } else {
-                DebugLog.playback("❌ No subtitles available to enable")
+                // Preferred language unavailable — leave subtitles off rather
+                // than forcing an arbitrary foreign track (e.g. Vietnamese on
+                // an English request). User can pick one from the track list.
+                playerItem.select(nil, in: group)
+                selectedIndex = nil
+                DebugLog.playback("ℹ️ No \(defaultLang) subtitle among \(group.options.count) tracks — leaving off")
             }
         }
     }
